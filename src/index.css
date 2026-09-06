@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@import "./styles/app.css";
+
+/*
+ * Prestige design tokens. Runtime values live on :root (used by the component
+ * layer in src/styles/app.css); @theme inline exposes them to Tailwind utilities
+ * (bg-brand, text-muted, ...). Keep in sync with src/themes/index.js.
+ */
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-neutral-bg: var(--neutral-bg);
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 22px;
+  --radius-panel: 12px;
+}
+
+@layer base {
+  :root {
+    --ink: #241c14;
+    --ink-soft: #6b5d4f;
+    --muted: #9c8d7d;
+    --line: #ece0d0;
+    --line-strong: #ddccb3;
+    --paper: #f7ede1;
+    --paper-2: #f0e2cd;
+    --surface: #ffffff;
+    --surface-2: #faf5ec;
+    --navy: #12213b;
+    --navy-2: #0b1830;
+    --brand: #e8603c;
+    --brand-2: #d14e2c;
+    --accent: #f2a93c;
+    --accent-soft: #fdf0da;
+    --success: #2f9e5c;
+    --success-bg: #e8faf0;
+    --warning: #d97706;
+    --warning-bg: #fdf1de;
+    --danger: #e0483a;
+    --danger-bg: #fbe9e5;
+    --info: #2f8fb0;
+    --info-bg: #e9f4f8;
+    --neutral-bg: #f2e9dc;
+
+    --accent-ink: #c2410c;
+    --topbar-bg: #fffcf7e6;
+    --landing-nav-bg: #ffffffbf;
+
+    --shadow: 0 1px 2px rgba(58, 40, 20, 0.05), 0 8px 24px rgba(58, 40, 20, 0.07);
+    --shadow-lift: 0 4px 10px rgba(58, 40, 20, 0.07), 0 20px 40px rgba(58, 40, 20, 0.14);
+    --radius: 22px;
+    --radius-sm: 12px;
+    --sidebar: 248px;
+    --top: 64px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --fast: 0.14s var(--ease);
+    --med: 0.22s var(--ease);
+  }
+
+  /*
+   * Dark theme. An explicit choice stamps data-theme="dark" / "light" on <html>
+   * (see hooks/useTheme.js and the inline script in index.html); with no
+   * choice the system preference applies. Only the tokens change.
+   */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #f3e9dc;
+    --ink-soft: #cdbeab;
+    --muted: #93846f;
+    --line: #34291f;
+    --line-strong: #4c3d2e;
+    --paper: #15100c;
+    --paper-2: #1d1712;
+    --surface: #211a14;
+    --surface-2: #2a221a;
+    --navy: #0b1830;
+    --navy-2: #071022;
+    --accent-soft: #3b2a10;
+    --success-bg: #11301e;
+    --warning-bg: #3a2608;
+    --danger-bg: #3c1a15;
+    --info-bg: #0f2730;
+    --neutral-bg: #2f261e;
+    --accent-ink: #f2a93c;
+    --topbar-bg: #1b1510e6;
+    --landing-nav-bg: #15100cbf;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --shadow-lift: 0 4px 10px rgba(0, 0, 0, 0.35), 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ink: #f3e9dc;
+      --ink-soft: #cdbeab;
+      --muted: #93846f;
+      --line: #34291f;
+      --line-strong: #4c3d2e;
+      --paper: #15100c;
+      --paper-2: #1d1712;
+      --surface: #211a14;
+      --surface-2: #2a221a;
+      --navy: #0b1830;
+      --navy-2: #071022;
+      --accent-soft: #3b2a10;
+      --success-bg: #11301e;
+      --warning-bg: #3a2608;
+      --danger-bg: #3c1a15;
+      --info-bg: #0f2730;
+      --neutral-bg: #2f261e;
+      --accent-ink: #f2a93c;
+      --topbar-bg: #1b1510e6;
+      --landing-nav-bg: #15100cbf;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+      --shadow-lift: 0 4px 10px rgba(0, 0, 0, 0.35), 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--paper);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand-2);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}

@@ -1,0 +1,3 @@
+// Document/photo storage
+
+export {};
