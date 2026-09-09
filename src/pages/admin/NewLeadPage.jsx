@@ -70,7 +70,7 @@ export default function NewLeadPage() {
       </Link>
       <PageHeader
         title="New lead"
-        description={`Capture the lead in ${unit?.name ?? "this unit"}. It starts as Nurture — mark it Qualified and assign an estimator once the decision is made on the ground.`}
+        description={`Capture the lead in ${unit?.name ?? "this unit"}. It starts as Nurture — log a client meeting and attach site photos or sketches on the record before it can be marked Qualified and attached to the pipeline.`}
       />
       <form onSubmit={submit} className="card card-pad" noValidate>
         <LeadForm
@@ -81,6 +81,8 @@ export default function NewLeadPage() {
           sales={sales}
           referrers={referrers}
           unit={unit}
+          allowQualified={false}
+          qualifiedHint="log a meeting and site evidence on the saved record first"
         />
         {errorList.length ? (
           <Alert tone="danger">

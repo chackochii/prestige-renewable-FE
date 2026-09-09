@@ -74,6 +74,14 @@ export default function LoginPage() {
 
       <section className="login-panel">
         <form className="login-card route-fade" onSubmit={submit} noValidate>
+          {/* Visible only on small screens, where the art panel is hidden. */}
+          <Link to="/" className="brand login-brand">
+            <BrandMark size={34} />
+            <div>
+              <div className="brand-name">Prestige Renewable</div>
+              <div className="brand-sub">Sales &amp; delivery</div>
+            </div>
+          </Link>
           <h1>Sign in</h1>
           <p className="lede">Use the email and password your administrator set up for you.</p>
 

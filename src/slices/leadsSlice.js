@@ -69,6 +69,39 @@ export const deleteLead = createAsyncThunk("leads/delete", async (id, { rejectWi
   }
 });
 
+// Lead pack attachments. Each resolves to the refreshed opportunity.
+export const addMeeting = createAsyncThunk("leads/addMeeting", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.addMeeting(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const removeMeeting = createAsyncThunk("leads/removeMeeting", async ({ id, meetingId }, { rejectWithValue }) => {
+  try {
+    return await api.removeMeeting(id, meetingId);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const uploadDocuments = createAsyncThunk("leads/uploadDocuments", async ({ id, files, meta }, { rejectWithValue }) => {
+  try {
+    return await api.uploadDocuments(id, files, meta);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const removeDocument = createAsyncThunk("leads/removeDocument", async ({ id, docId }, { rejectWithValue }) => {
+  try {
+    return await api.removeDocument(id, docId);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
 const upsert = (state, opp) => {
   if (!opp) return;
   const idx = state.items.findIndex((o) => o.id === opp.id);
@@ -119,6 +152,10 @@ const leadsSlice = createSlice({
       .addCase(createLead.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(updateLead.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(advanceStage.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(addMeeting.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(removeMeeting.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(uploadDocuments.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(removeDocument.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(deleteLead.fulfilled, (state, action) => {
         state.items = state.items.filter((o) => o.id !== action.payload);
         if (state.selected?.id === action.payload) state.selected = null;

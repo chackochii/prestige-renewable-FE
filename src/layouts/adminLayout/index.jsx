@@ -37,17 +37,39 @@ export default function AdminLayout() {
         e.preventDefault();
         setPaletteOpen(true);
       }
+      if (e.key === "Escape") setSidebarOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // The drawer (small screens) closes on navigation and locks page scroll
+  // while it is open.
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [sidebarOpen]);
+
   const closePalette = useCallback(() => setPaletteOpen(false), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   return (
     <UnitSelectGate>
       <div className="app-shell">
-        <SidebarNav open={sidebarOpen} onClose={() => setSidebarOpen(false)} onSearch={() => setPaletteOpen(true)} />
+        <SidebarNav open={sidebarOpen} onClose={closeSidebar} onSearch={() => setPaletteOpen(true)} />
+        <div
+          className={`sidebar-backdrop ${sidebarOpen ? "open" : ""}`.trim()}
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
         <div className="main">
           <TopBar onMenu={() => setSidebarOpen(true)} />
           <div className="content">

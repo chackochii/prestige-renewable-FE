@@ -275,7 +275,7 @@ export default function RolesPage() {
       {status !== "succeeded" && roles.length === 0 ? (
         <LoadingState label="Loading roles…" />
       ) : (
-        <div className="grid-2" style={{ gridTemplateColumns: "0.9fr 1.4fr" }}>
+        <div className="grid-2 split-left">
           <Card title="Roles" sub={`${roles.length} in the catalog`}>
             <div className="list-stack">
               {roles.map((r) => (

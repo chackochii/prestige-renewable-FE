@@ -2,6 +2,11 @@
 // automated ones are set by inbound-lead conversion only (ad platforms and
 // ServiceM8) and are shown read-only.
 
+export const LEAD_TYPES = [
+  { key: "residential", label: "Residential" },
+  { key: "commercial", label: "Commercial" },
+];
+
 export const MANUAL_LEAD_SOURCES = [
   { key: "internal", label: "Internal outreach" },
   { key: "inbound", label: "Inbound enquiry" },

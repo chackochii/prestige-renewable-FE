@@ -15,6 +15,21 @@ export function leadGateItems(opp) {
   return missing;
 }
 
+export const SITE_EVIDENCE_TYPES = ["site_photo", "drawing"];
+
+/**
+ * What is still missing before the lead may be marked Qualified — a logged
+ * client meeting and a site photo or sketch. Mirrors the API's rule.
+ */
+export function qualificationGateItems(opp) {
+  if (!opp) return [];
+  const missing = [];
+  if (!(Array.isArray(opp.meetings) ? opp.meetings : []).length) missing.push("Log a client meeting");
+  const docs = Array.isArray(opp.documents) ? opp.documents : [];
+  if (!docs.some((d) => SITE_EVIDENCE_TYPES.includes(d.type))) missing.push("Attach a site photo or sketch");
+  return missing;
+}
+
 /** Softer completeness checklist for the lead pack (not enforced by the API). */
 export function leadCompletenessItems(opp) {
   if (!opp) return [];

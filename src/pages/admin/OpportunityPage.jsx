@@ -138,7 +138,7 @@ export default function OpportunityPage() {
             {opp.referrer?.organisation ? <Badge tone="neutral">Referred by {opp.referrer.organisation}</Badge> : null}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="opp-hero-actions">
           {canEdit ? (
             <button type="button" className="btn btn-ghost" onClick={() => setLifecycleOpen(true)}>
               {opp.lifecycle === "Active" ? "Mark won / lost" : "Change status"}

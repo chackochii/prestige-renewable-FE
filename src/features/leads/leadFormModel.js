@@ -9,6 +9,7 @@ const MANUAL_SOURCE_KEYS = MANUAL_LEAD_SOURCES.map((s) => s.key);
 
 export function emptyLeadForm() {
   return {
+    leadType: "",
     customerLegalName: "",
     customerTradingName: "",
     customerAbn: "",
@@ -51,6 +52,7 @@ export function leadToForm(opp) {
   if (!opp) return base;
   return {
     ...base,
+    leadType: str(opp.leadType),
     customerLegalName: str(opp.customerLegalName),
     customerTradingName: str(opp.customerTradingName),
     customerAbn: str(opp.customerAbn),
@@ -97,6 +99,7 @@ export function isAutomatedSource(source) {
 
 export function formToPayload(form) {
   const payload = {
+    leadType: form.leadType || "",
     customerLegalName: trim(form.customerLegalName),
     customerTradingName: trim(form.customerTradingName),
     customerAbn: trim(form.customerAbn),

@@ -75,6 +75,10 @@
     --radius-sm: 12px;
     --sidebar: 248px;
     --top: 64px;
+    /* Horizontal page gutter and the widest the content column grows. Both
+       step up with the viewport in src/styles/app.css (responsive section). */
+    --gutter: 36px;
+    --content-max: 1280px;
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
     --fast: 0.14s var(--ease);
     --med: 0.22s var(--ease);

@@ -6,7 +6,7 @@ import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
 import NumberInput from "@/components/NumberInput";
 import { AU_STATES, QUALIFICATIONS } from "@/constants/stages";
-import { commissionTiersFor, leadSourceLabel, MANUAL_LEAD_SOURCES } from "@/features/leads/leadSourceOptions";
+import { commissionTiersFor, leadSourceLabel, LEAD_TYPES, MANUAL_LEAD_SOURCES } from "@/features/leads/leadSourceOptions";
 import { isAutomatedSource } from "@/features/leads/leadFormModel";
 
 const SECTIONS = [
@@ -30,11 +30,16 @@ export default function LeadForm({
   referrers = [],
   unit,
   disabled = false,
+  // Qualified is only offered once the record has a logged meeting and site
+  // evidence (see helpers/stageTransition.qualificationGateItems).
+  allowQualified = true,
+  qualifiedHint,
 }) {
   const err = (field) => errors[field];
   const [active, setActive] = useState(SECTIONS[0].id);
   const automated = isAutomatedSource(form.leadSource);
   const tiers = commissionTiersFor(unit);
+  const qualifiedLocked = !allowQualified && form.qualification !== "qualified";
 
   useEffect(() => {
     const nodes = SECTIONS.map((s) => document.getElementById(s.id)).filter(Boolean);
@@ -83,6 +88,16 @@ export default function LeadForm({
       <div className="section" id="lf-customer">
         <SectionHead icon={<Building2 size={13} />} title="Customer" />
         <div className="form-grid">
+          <Field label="Lead type" className="span-2" error={err("leadType")}>
+            <select value={form.leadType} disabled={disabled} onChange={(e) => set("leadType", e.target.value)}>
+              <option value="">Select</option>
+              {LEAD_TYPES.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Legal name" error={err("customerLegalName")}>
             {input("customerLegalName")}
           </Field>
@@ -146,11 +161,16 @@ export default function LeadForm({
       <div className="section" id="lf-qualification">
         <SectionHead icon={<ClipboardList size={13} />} title="Qualification" />
         <div className="form-grid">
-          <Field label="Qualification" error={err("qualification")} hint="Qualified needs an estimator and a next action">
+          <Field
+            label="Qualification"
+            error={err("qualification")}
+            hint={qualifiedLocked ? qualifiedHint || "Qualified unlocks after a client meeting and site evidence" : "Qualified needs an estimator and a next action"}
+          >
             <select value={form.qualification} disabled={disabled} onChange={(e) => set("qualification", e.target.value)}>
               {QUALIFICATIONS.map((q) => (
-                <option key={q.key} value={q.key}>
+                <option key={q.key} value={q.key} disabled={q.key === "qualified" && qualifiedLocked}>
                   {q.label}
+                  {q.key === "qualified" && qualifiedLocked ? " (locked)" : ""}
                 </option>
               ))}
             </select>

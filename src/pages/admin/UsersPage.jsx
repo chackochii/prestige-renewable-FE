@@ -113,7 +113,7 @@ export default function UsersPage() {
             const manageable = isSuperAdmin || !isAdminAccount;
             return (
               <div key={u.id} className="list-row" style={{ flexWrap: "wrap" }}>
-                <div style={{ minWidth: 220 }}>
+                <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                   <div className="row-title">
                     {u.name}
                     {isMe ? " · you" : ""}
