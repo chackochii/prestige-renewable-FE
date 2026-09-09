@@ -15,6 +15,15 @@ const initialState = {
   selectedStatus: "idle",
   selectedError: null,
   mutationStatus: "idle",
+  history: [],
+  historyStatus: "idle",
+  historyError: null,
+  meetings: [],
+  meetingsStatus: "idle",
+  meetingsError: null,
+  attachments: [],
+  attachmentsStatus: "idle",
+  attachmentsError: null,
 };
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
@@ -69,38 +78,110 @@ export const deleteLead = createAsyncThunk("leads/delete", async (id, { rejectWi
   }
 });
 
-// Lead pack attachments. Each resolves to the refreshed opportunity.
-export const addMeeting = createAsyncThunk("leads/addMeeting", async ({ id, body }, { rejectWithValue }) => {
+export const fetchOpportunityHistory = createAsyncThunk("leads/fetchHistory", async (id, { rejectWithValue }) => {
   try {
-    return await api.addMeeting(id, body);
+    return await api.listOpportunityHistory(id);
   } catch (err) {
     return reject(err, rejectWithValue);
   }
 });
 
-export const removeMeeting = createAsyncThunk("leads/removeMeeting", async ({ id, meetingId }, { rejectWithValue }) => {
+export const addOpportunityHistoryEntry = createAsyncThunk(
+  "leads/addHistoryEntry",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.addOpportunityHistory(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const fetchOpportunityMeetings = createAsyncThunk("leads/fetchMeetings", async (id, { rejectWithValue }) => {
   try {
-    return await api.removeMeeting(id, meetingId);
+    return await api.listOpportunityMeetings(id);
   } catch (err) {
     return reject(err, rejectWithValue);
   }
 });
 
-export const uploadDocuments = createAsyncThunk("leads/uploadDocuments", async ({ id, files, meta }, { rejectWithValue }) => {
-  try {
-    return await api.uploadDocuments(id, files, meta);
-  } catch (err) {
-    return reject(err, rejectWithValue);
-  }
-});
+export const addOpportunityMeeting = createAsyncThunk(
+  "leads/addMeeting",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.addOpportunityMeeting(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
 
-export const removeDocument = createAsyncThunk("leads/removeDocument", async ({ id, docId }, { rejectWithValue }) => {
-  try {
-    return await api.removeDocument(id, docId);
-  } catch (err) {
-    return reject(err, rejectWithValue);
-  }
-});
+export const fetchOpportunityAttachments = createAsyncThunk(
+  "leads/fetchAttachments",
+  async (id, { rejectWithValue }) => {
+    try {
+      return await api.listOpportunityAttachments(id);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const uploadOpportunityAttachment = createAsyncThunk(
+  "leads/uploadAttachment",
+  async ({ id, category, file }, { rejectWithValue }) => {
+    try {
+      return await api.uploadOpportunityAttachment(id, category, file);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const assignSalesperson = createAsyncThunk(
+  "leads/assignSalesperson",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.assignSalesperson(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const assignEstimator = createAsyncThunk(
+  "leads/assignEstimator",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.assignEstimator(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const assignCoordinator = createAsyncThunk(
+  "leads/assignCoordinator",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.assignCoordinator(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+/** Fire-and-forget — no opportunity fields change, so nothing to store here. */
+export const notifyBusinessOwner = createAsyncThunk(
+  "leads/notifyBusinessOwner",
+  async (id, { rejectWithValue }) => {
+    try {
+      return await api.notifyBusinessOwner(id);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
 
 const upsert = (state, opp) => {
   if (!opp) return;
@@ -118,6 +199,15 @@ const leadsSlice = createSlice({
       state.selected = null;
       state.selectedStatus = "idle";
       state.selectedError = null;
+      state.history = [];
+      state.historyStatus = "idle";
+      state.historyError = null;
+      state.meetings = [];
+      state.meetingsStatus = "idle";
+      state.meetingsError = null;
+      state.attachments = [];
+      state.attachmentsStatus = "idle";
+      state.attachmentsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -152,14 +242,58 @@ const leadsSlice = createSlice({
       .addCase(createLead.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(updateLead.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(advanceStage.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(addMeeting.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(removeMeeting.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(uploadDocuments.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(removeDocument.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(deleteLead.fulfilled, (state, action) => {
         state.items = state.items.filter((o) => o.id !== action.payload);
         if (state.selected?.id === action.payload) state.selected = null;
       })
+      .addCase(fetchOpportunityHistory.pending, (state) => {
+        state.historyStatus = "loading";
+        state.historyError = null;
+      })
+      .addCase(fetchOpportunityHistory.fulfilled, (state, action) => {
+        state.historyStatus = "succeeded";
+        state.history = action.payload || [];
+      })
+      .addCase(fetchOpportunityHistory.rejected, (state, action) => {
+        state.historyStatus = "failed";
+        state.historyError = action.payload;
+      })
+      .addCase(addOpportunityHistoryEntry.fulfilled, (state, action) => {
+        state.history.unshift(action.payload);
+      })
+      .addCase(fetchOpportunityMeetings.pending, (state) => {
+        state.meetingsStatus = "loading";
+        state.meetingsError = null;
+      })
+      .addCase(fetchOpportunityMeetings.fulfilled, (state, action) => {
+        state.meetingsStatus = "succeeded";
+        state.meetings = action.payload || [];
+      })
+      .addCase(fetchOpportunityMeetings.rejected, (state, action) => {
+        state.meetingsStatus = "failed";
+        state.meetingsError = action.payload;
+      })
+      .addCase(addOpportunityMeeting.fulfilled, (state, action) => {
+        state.meetings.unshift(action.payload);
+      })
+      .addCase(fetchOpportunityAttachments.pending, (state) => {
+        state.attachmentsStatus = "loading";
+        state.attachmentsError = null;
+      })
+      .addCase(fetchOpportunityAttachments.fulfilled, (state, action) => {
+        state.attachmentsStatus = "succeeded";
+        state.attachments = action.payload || [];
+      })
+      .addCase(fetchOpportunityAttachments.rejected, (state, action) => {
+        state.attachmentsStatus = "failed";
+        state.attachmentsError = action.payload;
+      })
+      .addCase(uploadOpportunityAttachment.fulfilled, (state, action) => {
+        state.attachments.unshift(action.payload);
+      })
+      .addCase(assignSalesperson.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(assignEstimator.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(assignCoordinator.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(logout, () => initialState);
   },
 });

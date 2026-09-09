@@ -285,6 +285,27 @@
   .substage { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--line); }
   .substage:last-child { border-bottom: 0; }
 
+  /* ---- Checklist (mandatory-details style forms) ------------------------ */
+  .eyebrow { text-transform: uppercase; font-weight: 700; font-size: 11.5px; letter-spacing: 0.06em; color: var(--muted); margin: 22px 0 8px; }
+  .eyebrow:first-child { margin-top: 0; }
+  .checklist-progress {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding: 14px 16px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-panel);
+  }
+  .checklist-progress .cp-track { flex: 1; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .checklist-progress .cp-track > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand-2), var(--accent)); transition: width var(--med); }
+  .checklist-progress .cp-label { font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+  .checklist { display: flex; flex-direction: column; gap: 10px; }
+  .checklist-row {
+    display: flex; gap: 18px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line);
+    border-radius: var(--radius-panel); background: var(--surface); transition: border-color var(--fast), background var(--fast);
+  }
+  .checklist-row:hover { border-color: var(--line-strong); }
+  .checklist-row.is-done { background: var(--surface-2); border-color: var(--line); }
+  .checklist-row .cr-label { display: flex; gap: 10px; align-items: center; flex: 0 0 176px; padding-top: 8px; font-weight: 600; font-size: 13.5px; }
+  .checklist-row .cr-body { flex: 1; min-width: 0; }
+  .decision-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 18px 20px; margin-top: 24px; }
+  .decision-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
   /* ---- Uploads & meetings (lead pack) --------------------------------- */
   .uploader h3 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
   .uploader > .sub { margin-bottom: 10px; }
@@ -390,6 +411,18 @@
   .menu-pop button { width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
   .menu-pop button:hover { background: var(--surface-2); }
   .menu-pop .menu-meta { padding: 8px 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 12px; color: var(--muted); }
+
+  /* ---- File dropzone --------------------------------------------------- */
+  .dropzone {
+    border: 1.5px dashed var(--line-strong); border-radius: var(--radius-panel); background: var(--accent-soft);
+    padding: 28px 16px; text-align: center; color: var(--accent-ink); cursor: pointer; font-size: 13.5px; font-weight: 500;
+    transition: border-color var(--fast), background var(--fast);
+  }
+  .dropzone svg { margin-bottom: 6px; }
+  .dropzone:hover, .dropzone.dragging { border-color: var(--brand); }
+  .dropzone input[type="file"] { display: none; }
+  .dropzone-list { margin-top: 10px; }
+  .dropzone-empty { color: var(--muted); font-size: 13.5px; margin-top: 10px; }
 
   /* ---- Modal, palette, toasts ---------------------------------------- */
   .modal-back {
@@ -686,6 +719,17 @@
     .form-grid .span-2 { grid-column: auto; }
     .form-grid.auto { grid-template-columns: 1fr 1fr; }
     .choice-grid { grid-template-columns: 1fr; }
+    .checklist-row { flex-direction: column; gap: 8px; }
+    .checklist-row .cr-label { flex-basis: auto; padding-top: 0; }
+    .modal.wide { width: min(520px, 100%); }
+    .stats { grid-template-columns: 1fr; }
+    .who span { display: none; }
+    .unit-switch > span { display: none; }
+    .unit-switch { padding: 6px 8px; }
+    .unit-switch select { max-width: 150px; }
+    .topbar { padding: 0 16px; }
+    .content { padding: 20px 16px 40px; }
+    .page-head { flex-direction: column; align-items: flex-start; }
     .modal { padding: 20px; border-radius: 16px; }
     .modal.wide { width: min(560px, 100%); }
     .toolbar { gap: 8px; }

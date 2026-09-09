@@ -11,10 +11,19 @@ import OppCell from "@/components/OppCell";
 import { QUALIFICATIONS, qualificationMeta } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
-import { slaStatus } from "@/helpers/dateTimeHelpers";
+import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
+
+/** Latest contact attempt for the list — method + date, with a count if there's more than one. */
+function contactSummary(o) {
+  const attempts = Array.isArray(o.contactAttempts) ? o.contactAttempts : [];
+  if (!attempts.length) return o.needsClientContact ? "Not yet contacted" : "—";
+  const last = attempts[attempts.length - 1];
+  const suffix = attempts.length > 1 ? ` (${attempts.length} attempts)` : "";
+  return `${last.method} · ${formatDate(last.contactedAt)}${suffix}`;
+}
 
 export default function LeadsPage() {
   const navigate = useNavigate();
@@ -96,6 +105,7 @@ export default function LeadsPage() {
                   <th>Lead</th>
                   <th>Qualification</th>
                   <th>Source</th>
+                  <th>Contact</th>
                   <th>Estimator</th>
                   <th>Next action</th>
                   <th>SLA</th>
@@ -114,6 +124,7 @@ export default function LeadsPage() {
                         <Badge tone={q.tone}>{q.label}</Badge>
                       </td>
                       <td data-label="Source">{leadSourceLabel(o.leadSource)}</td>
+                      <td data-label="Contact">{contactSummary(o)}</td>
                       <td data-label="Estimator">{userName(o.estimatorId) || "—"}</td>
                       <td data-label="Next action">{o.nextAction || "—"}</td>
                       <td data-label="SLA">
