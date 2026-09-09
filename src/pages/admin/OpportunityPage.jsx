@@ -209,7 +209,7 @@ export default function OpportunityPage() {
           )}
         </div>
       ) : (
-        <HistoryTab opp={opp} timeZone={timeZone} />
+        <HistoryTab opp={opp} timeZone={timeZone} canEdit={canEdit} />
       )}
 
       {lifecycleOpen ? <LifecycleModal opp={opp} onClose={() => setLifecycleOpen(false)} onSave={saveLifecycle} /> : null}

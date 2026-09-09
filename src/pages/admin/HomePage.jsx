@@ -104,6 +104,16 @@ export default function HomePage() {
           meta: `Next action overdue · ${o.nextAction || "no action set"}`,
           cta: "Review lead",
         })),
+      ...leads
+        .filter((o) => o.qualification === "qualified")
+        .map((o) => ({
+          id: `potential-${o.id}`,
+          oppId: o.id,
+          tone: "success",
+          title: oppTitle(o),
+          meta: "Potential client — ready for estimation team inputs",
+          cta: o.estimatorId ? "Advance to estimation" : "Assign an estimator",
+        })),
     ].slice(0, 6);
     return { active, leads, pipeline, pipelineValue, overdue, overdueValue, mine, closed, closedValue, onSchedule, byStage, health, team, activity, attention };
   }, [items, user.id, unit, period, userName]);
@@ -342,7 +352,11 @@ export default function HomePage() {
             )}
           </Card>
 
-          <Card title="Needs attention" sub="Ranked by urgency — SLA breaches and overdue next actions." style={{ marginTop: 20 }}>
+          <Card
+            title="Needs attention"
+            sub="Ranked by urgency — SLA breaches, overdue next actions and potential clients awaiting handoff."
+            style={{ marginTop: 20 }}
+          >
             {data.attention.length === 0 ? (
               <p className="lede">Nothing needs attention right now.</p>
             ) : (

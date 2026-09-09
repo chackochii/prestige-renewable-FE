@@ -1,8 +1,13 @@
 // Lead form model: empty form, opportunity → form, form → API payload, and
 // validation. Field names match prestige-be's opportunity LEAD_FIELDS.
+//
+// `qualification` has no direct UI control any more — it's derived from the
+// Potential client? decision (see LeadForm): "yes" -> qualified, "no" ->
+// disqualified, undecided -> nurture. This keeps leadGateItems/advanceState
+// (stageTransition.js) and the qualification badges elsewhere working
+// unchanged.
 
-import { toDateInput } from "@/helpers/dateTimeHelpers";
-import { isBlank, isDateInput, isEmail } from "@/utils/validators";
+import { isBlank, isEmail } from "@/utils/validators";
 import { MANUAL_LEAD_SOURCES } from "./leadSourceOptions";
 
 const MANUAL_SOURCE_KEYS = MANUAL_LEAD_SOURCES.map((s) => s.key);
@@ -22,25 +27,29 @@ export function emptyLeadForm() {
     siteJurisdiction: "NSW",
     siteContact: "",
     siteAccessNotes: "",
-    contactName: "",
-    contactRole: "",
-    contactEmail: "",
-    contactPhone: "",
+    siteMapUrl: "",
     qualification: "nurture",
-    qualificationAuthority: "",
-    qualificationTiming: "",
-    estimatedValue: "",
-    nextAction: "",
-    nextActionDueAt: "",
+    leadType: "",
+    needsClientContact: false,
+    contactAttempts: [],
     energyAnnualKwh: "",
     energyHasBills: false,
-    energyNotes: "",
     leadSource: "internal",
+    leadSourceDetails: "",
     referrerId: "",
     involvementTier: "lead_only",
+    hasOwnerDiscount: false,
+    ownerDiscountName: "",
+    ownerDiscountAmount: "",
     estimatorId: "",
     salespersonId: "",
-    notes: "",
+    unassignedReason: "",
+    needsClientVisit: false,
+    clientVisitReason: "",
+    operationalCoordinatorId: "",
+    customFields: [],
+    potential: "",
+    notPotentialReason: "",
   };
 }
 
@@ -64,30 +73,43 @@ export function leadToForm(opp) {
     siteJurisdiction: str(opp.siteJurisdiction) || str(opp.siteState) || "NSW",
     siteContact: str(opp.siteContact),
     siteAccessNotes: str(opp.siteAccessNotes),
-    contactName: str(opp.contactName),
-    contactRole: str(opp.contactRole),
-    contactEmail: str(opp.contactEmail),
-    contactPhone: str(opp.contactPhone),
+    siteMapUrl: str(opp.siteMapUrl),
     qualification: str(opp.qualification) || "nurture",
-    qualificationAuthority: str(opp.qualificationAuthority),
-    qualificationTiming: str(opp.qualificationTiming),
-    estimatedValue: str(opp.estimatedValue),
-    nextAction: str(opp.nextAction),
-    nextActionDueAt: toDateInput(opp.nextActionDueAt),
+    leadType: str(opp.leadType),
+    needsClientContact: Boolean(opp.needsClientContact),
+    contactAttempts: Array.isArray(opp.contactAttempts)
+      ? opp.contactAttempts.map((a) => ({
+          method: str(a?.method),
+          contactedAt: str(a?.contactedAt),
+          reached: a?.reached !== false,
+          reason: str(a?.reason),
+        }))
+      : [],
     energyAnnualKwh: str(opp.energyAnnualKwh),
     energyHasBills: Boolean(opp.energyHasBills),
-    energyNotes: str(opp.energyNotes),
     leadSource: str(opp.leadSource) || "internal",
+    leadSourceDetails: str(opp.leadSourceDetails),
     referrerId: str(opp.referrerId),
     involvementTier: str(opp.involvementTier) || "lead_only",
+    hasOwnerDiscount: Boolean(opp.hasOwnerDiscount),
+    ownerDiscountName: str(opp.ownerDiscountName),
+    ownerDiscountAmount: str(opp.ownerDiscountAmount),
     estimatorId: str(opp.estimatorId),
     salespersonId: str(opp.salespersonId),
-    notes: str(opp.notes),
+    unassignedReason: str(opp.unassignedReason),
+    needsClientVisit: Boolean(opp.needsClientVisit),
+    clientVisitReason: str(opp.clientVisitReason),
+    operationalCoordinatorId: str(opp.operationalCoordinatorId),
+    customFields: Array.isArray(opp.customFields)
+      ? opp.customFields.map((f) => ({ label: str(f?.label), value: str(f?.value) }))
+      : [],
+    potential: opp.qualification === "qualified" ? "yes" : opp.qualification === "disqualified" ? "no" : "",
+    notPotentialReason: str(opp.notPotentialReason),
   };
 }
 
 const trim = (v) => String(v ?? "").trim();
-const idOrNull = (v) => (isBlank(v) ? null : Number(v));
+export const idOrNull = (v) => (isBlank(v) ? null : Number(v));
 const numberOrNull = (v) => (isBlank(v) ? null : Number(v));
 
 /** True when the source was set by an integration and must not be edited by hand. */
@@ -95,6 +117,12 @@ export function isAutomatedSource(source) {
   return Boolean(source) && !MANUAL_SOURCE_KEYS.includes(source);
 }
 
+/**
+ * PATCH body for the generic lead-pack save. Salesperson/estimator/operational-
+ * coordinator assignment are deliberately excluded — those go through their
+ * own endpoints (assignSalesperson/assignEstimator/assignCoordinator in
+ * leadsApi.js), called separately by LeadPackPanel/NewLeadPage.
+ */
 export function formToPayload(form) {
   const payload = {
     customerLegalName: trim(form.customerLegalName),
@@ -110,22 +138,31 @@ export function formToPayload(form) {
     siteJurisdiction: form.siteJurisdiction || form.siteState,
     siteContact: trim(form.siteContact),
     siteAccessNotes: trim(form.siteAccessNotes),
-    contactName: trim(form.contactName),
-    contactRole: trim(form.contactRole),
-    contactEmail: trim(form.contactEmail),
-    contactPhone: trim(form.contactPhone),
-    qualification: form.qualification,
-    qualificationAuthority: trim(form.qualificationAuthority),
-    qualificationTiming: trim(form.qualificationTiming),
-    estimatedValue: numberOrNull(form.estimatedValue),
-    nextAction: trim(form.nextAction),
-    nextActionDueAt: form.nextActionDueAt || null,
+    siteMapUrl: trim(form.siteMapUrl),
+    qualification: form.potential === "yes" ? "qualified" : form.potential === "no" ? "disqualified" : "nurture",
+    leadType: form.leadType,
+    needsClientContact: Boolean(form.needsClientContact),
+    contactAttempts: form.needsClientContact
+      ? (form.contactAttempts || []).map((a) => ({
+          method: trim(a.method),
+          contactedAt: a.contactedAt || null,
+          reached: a.reached !== false,
+          reason: a.reached === false ? trim(a.reason) : "",
+        }))
+      : [],
     energyAnnualKwh: numberOrNull(form.energyAnnualKwh),
     energyHasBills: Boolean(form.energyHasBills),
-    energyNotes: trim(form.energyNotes),
-    estimatorId: idOrNull(form.estimatorId),
-    salespersonId: idOrNull(form.salespersonId),
-    notes: trim(form.notes),
+    leadSourceDetails: trim(form.leadSourceDetails),
+    hasOwnerDiscount: Boolean(form.hasOwnerDiscount),
+    ownerDiscountName: form.hasOwnerDiscount ? trim(form.ownerDiscountName) : "",
+    ownerDiscountAmount: form.hasOwnerDiscount ? numberOrNull(form.ownerDiscountAmount) : null,
+    needsClientVisit: Boolean(form.needsClientVisit),
+    clientVisitReason: form.needsClientVisit ? trim(form.clientVisitReason) : "",
+    customFields: (form.customFields || [])
+      .map((f) => ({ label: trim(f.label), value: trim(f.value) }))
+      .filter((f) => f.label || f.value),
+    potential: form.potential || null,
+    notPotentialReason: form.potential === "no" ? trim(form.notPotentialReason) : "",
   };
   // Automated sources are owned by the integration that set them.
   if (!isAutomatedSource(form.leadSource)) {
@@ -138,20 +175,42 @@ export function formToPayload(form) {
 
 export function validateLeadForm(form) {
   const errors = {};
-  if (isBlank(form.customerLegalName)) errors.customerLegalName = "Enter the customer legal name.";
+  if (isBlank(form.customerLegalName)) errors.customerLegalName = "Enter the customer name.";
   if (!isBlank(form.customerEmail) && !isEmail(form.customerEmail)) errors.customerEmail = "Enter a valid customer email.";
-  if (!isBlank(form.contactEmail) && !isEmail(form.contactEmail)) errors.contactEmail = "Enter a valid decision-maker email.";
-  if (!isBlank(form.estimatedValue) && Number(form.estimatedValue) < 0) errors.estimatedValue = "Value cannot be negative.";
+  if (isBlank(form.customerPhone) && isBlank(form.customerEmail)) {
+    errors.customerPhone = "Enter a phone number or email.";
+    if (!errors.customerEmail) errors.customerEmail = "Enter a phone number or email.";
+  }
+  if (isBlank(form.salespersonId) && isBlank(form.unassignedReason))
+    errors.unassignedReason = "Enter the reason no salesperson is assigned yet.";
+
+  // Everything below has a visible field only once a salesperson is set
+  // (that's what unlocks the Mandatory checklist in LeadForm) — never
+  // require something the user can't see or fill in.
+  if (isBlank(form.salespersonId)) return errors;
+
   if (!isBlank(form.energyAnnualKwh) && Number(form.energyAnnualKwh) < 0) errors.energyAnnualKwh = "Usage cannot be negative.";
-  if (!isBlank(form.nextActionDueAt) && !isDateInput(form.nextActionDueAt))
-    errors.nextActionDueAt = "Enter a valid due date.";
   if (!form.leadSource) errors.leadSource = "Select a lead source.";
   if (form.leadSource === "referrer" && isBlank(form.referrerId))
     errors.referrerId = "Select the referrer who introduced this lead.";
-  if (form.qualification === "qualified") {
-    if (isBlank(form.estimatorId)) errors.estimatorId = "Assign an estimator to qualify this lead.";
-    if (isBlank(form.nextAction)) errors.nextAction = "Set the next action.";
-    if (isBlank(form.nextActionDueAt)) errors.nextActionDueAt = "Set a due date.";
+  if (isBlank(form.leadType)) errors.leadType = "Select a type.";
+  if (form.needsClientVisit && isBlank(form.clientVisitReason))
+    errors.clientVisitReason = "Enter the reason a client visit is needed.";
+  if (form.needsClientVisit && isBlank(form.operationalCoordinatorId))
+    errors.operationalCoordinatorId = "Assign an operational coordinator for the client visit.";
+  if (form.needsClientContact && !(form.contactAttempts || []).length)
+    errors.contactAttempts = "Log at least one contact attempt.";
+  if ((form.contactAttempts || []).some((a) => a.reached === false && isBlank(a.reason)))
+    errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
+  if (form.hasOwnerDiscount) {
+    if (isBlank(form.ownerDiscountName)) errors.ownerDiscountName = "Enter the owner's name.";
+    if (isBlank(form.ownerDiscountAmount)) errors.ownerDiscountAmount = "Enter the discount amount.";
+    if (!isBlank(form.ownerDiscountAmount) && Number(form.ownerDiscountAmount) < 0)
+      errors.ownerDiscountAmount = "Discount cannot be negative.";
   }
+  if (form.potential === "no" && isBlank(form.notPotentialReason))
+    errors.notPotentialReason = "Enter the reason this isn't a potential client.";
+  if (form.potential === "yes" && isBlank(form.estimatorId))
+    errors.estimatorId = "Assign an estimator for this potential client.";
   return errors;
 }

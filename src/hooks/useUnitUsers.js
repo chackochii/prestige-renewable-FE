@@ -21,6 +21,7 @@ export function useUnitUsers() {
   const active = useMemo(() => users.filter((u) => u.status === "active"), [users]);
   const estimators = useMemo(() => usersWithRoleHint(active, "estimator"), [active]);
   const sales = useMemo(() => usersWithRoleHint(active, "sales"), [active]);
+  const siteOps = useMemo(() => usersWithRoleHint(active, "siteOps"), [active]);
   const byId = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
   return {
@@ -28,6 +29,7 @@ export function useUnitUsers() {
     active,
     estimators,
     sales,
+    siteOps,
     byId,
     status,
     ready: loadedForUnit && status === "succeeded",

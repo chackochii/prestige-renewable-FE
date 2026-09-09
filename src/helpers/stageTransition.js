@@ -10,7 +10,7 @@ import { isBlank } from "@/utils/validators";
 export function leadGateItems(opp) {
   if (!opp) return [];
   const missing = [];
-  if (opp.qualification !== "qualified") missing.push("Lead must be Qualified to progress (or mark it Lost / Nurture)");
+  if (opp.qualification !== "qualified") missing.push("Lead must be marked Potential to progress");
   if (!opp.estimatorId) missing.push("Assigned estimator");
   return missing;
 }
@@ -21,12 +21,9 @@ export function leadCompletenessItems(opp) {
   const missing = [];
   if (isBlank(opp.customerLegalName)) missing.push("Business name");
   if (isBlank(opp.siteLine1) || isBlank(opp.siteSuburb)) missing.push("Site street and suburb");
-  if (isBlank(opp.contactName) || isBlank(opp.contactEmail)) missing.push("Decision-maker contact");
   if (isBlank(opp.energyAnnualKwh) && !opp.energyHasBills) missing.push("Energy usage or bills");
   if (!opp.leadSource) missing.push("Lead source");
   if (opp.leadSource === "referrer" && !opp.referrerId) missing.push("Referrer");
-  if (isBlank(opp.nextAction)) missing.push("Next action");
-  if (!opp.nextActionDueAt) missing.push("Next-action due date");
   return missing;
 }
 
