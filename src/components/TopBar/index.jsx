@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Menu, Moon, Sun } from "lucide-react";
+import BrandMark from "@/components/BrandMark";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
@@ -34,10 +35,15 @@ export default function TopBar({ onMenu }) {
 
   return (
     <header className="topbar">
-      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <div className="topbar-left">
         <button type="button" className="icon-btn mobile-toggle" onClick={onMenu} aria-label="Open menu">
           <Menu size={18} />
         </button>
+        {/* Shown only while the sidebar is a drawer, so the brand stays visible. */}
+        <div className="topbar-brand">
+          <BrandMark size={28} />
+          <span>{unit?.code ? `Prestige · ${unit.code}` : "Prestige"}</span>
+        </div>
       </div>
 
       <div className="top-actions">

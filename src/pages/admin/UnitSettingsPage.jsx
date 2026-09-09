@@ -39,14 +39,14 @@ function KeyLabelRows({ rows, onChange, keyMax, disabled, keyHint }) {
   return (
     <>
       {rows.map((r, i) => (
-        <div key={i} className="form-grid" style={{ gridTemplateColumns: "140px 1fr auto", marginBottom: 8 }}>
-          <Field label={i === 0 ? `Key${keyHint ? ` · ${keyHint}` : ""}` : undefined}>
+        <div key={i} className="row-grid">
+          <Field label={`Key${keyHint ? ` · ${keyHint}` : ""}`}>
             <input value={r.key} maxLength={keyMax} disabled={disabled} onChange={(e) => update(i, "key", e.target.value)} />
           </Field>
-          <Field label={i === 0 ? "Label" : undefined}>
+          <Field label="Label">
             <input value={r.label || ""} disabled={disabled} onChange={(e) => update(i, "label", e.target.value)} />
           </Field>
-          <div style={{ alignSelf: "end" }}>
+          <div>
             {!disabled ? (
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange(rows.filter((_, idx) => idx !== i))}>
                 Remove
@@ -199,7 +199,7 @@ export default function UnitSettingsPage() {
           </Card>
 
           <Card title="SLA days" sub="Response-time target per stage, plus the approvals window." style={{ marginBottom: 20 }}>
-            <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+            <div className="form-grid auto">
               {[...STAGES.map((s) => [String(s.id), `${s.id}. ${s.short}`]), ["approval", "Approvals window"]].map(([key, label]) => (
                 <Field key={key} label={label}>
                   <NumberInput value={form.slaDays[key] ?? ""} min={0} disabled={!canEdit} onChange={(v) => set("slaDays", { ...form.slaDays, [key]: v })} />
@@ -210,17 +210,17 @@ export default function UnitSettingsPage() {
 
           <Card title="Billing split" sub={`Milestone percentages must total 100%. Currently ${billingTotal}%.`} style={{ marginBottom: 20 }}>
             {form.billingSplit.map((m, i) => (
-              <div key={i} className="form-grid" style={{ gridTemplateColumns: "140px 1fr 120px auto", marginBottom: 8 }}>
-                <Field label={i === 0 ? "Key" : undefined}>
+              <div key={i} className="row-grid billing">
+                <Field label="Key">
                   <input value={m.key} maxLength={20} disabled={!canEdit} onChange={(e) => set("billingSplit", form.billingSplit.map((x, idx) => (idx === i ? { ...x, key: e.target.value } : x)))} />
                 </Field>
-                <Field label={i === 0 ? "Label" : undefined}>
+                <Field label="Label">
                   <input value={m.label || ""} disabled={!canEdit} onChange={(e) => set("billingSplit", form.billingSplit.map((x, idx) => (idx === i ? { ...x, label: e.target.value } : x)))} />
                 </Field>
-                <Field label={i === 0 ? "Percent" : undefined}>
+                <Field label="Percent">
                   <NumberInput value={m.percent} min={0} max={100} disabled={!canEdit} onChange={(v) => set("billingSplit", form.billingSplit.map((x, idx) => (idx === i ? { ...x, percent: v } : x)))} />
                 </Field>
-                <div style={{ alignSelf: "end" }}>
+                <div>
                   {canEdit ? (
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("billingSplit", form.billingSplit.filter((_, idx) => idx !== i))}>
                       Remove
@@ -238,14 +238,14 @@ export default function UnitSettingsPage() {
 
           <Card title="Referrer commission tiers" sub="Rate paid on accepted contract value by involvement tier." style={{ marginBottom: 20 }}>
             {form.commissionTiers.map((t, i) => (
-              <div key={t.key} className="form-grid" style={{ gridTemplateColumns: "180px 1fr 140px", marginBottom: 8 }}>
-                <Field label={i === 0 ? "Tier" : undefined}>
+              <div key={t.key} className="row-grid tiers">
+                <Field label="Tier">
                   <input value={t.key} disabled />
                 </Field>
-                <Field label={i === 0 ? "Label" : undefined}>
+                <Field label="Label">
                   <input value={t.label || ""} disabled={!canEdit} onChange={(e) => set("commissionTiers", form.commissionTiers.map((x, idx) => (idx === i ? { ...x, label: e.target.value } : x)))} />
                 </Field>
-                <Field label={i === 0 ? "Rate (%)" : undefined}>
+                <Field label="Rate (%)">
                   <NumberInput value={t.ratePercent} step="0.1" min={0} max={100} disabled={!canEdit} onChange={(v) => set("commissionTiers", form.commissionTiers.map((x, idx) => (idx === i ? { ...x, ratePercent: v } : x)))} />
                 </Field>
               </div>
