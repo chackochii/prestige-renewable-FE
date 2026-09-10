@@ -10,9 +10,19 @@ const initialState = {
   query: null,
   status: "idle",
   error: null,
+  // Names-only directory of the current unit, for pickers (see useUnitUsers).
+  directory: { items: [], unitId: null, status: "idle", error: null },
 };
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
+
+export const fetchDirectory = createAsyncThunk("employee/fetchDirectory", async (unitId, { rejectWithValue }) => {
+  try {
+    return { items: await api.listDirectory(unitId), unitId };
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
 
 export const fetchUsers = createAsyncThunk("employee/fetchAll", async (params = {}, { rejectWithValue }) => {
   try {
@@ -81,6 +91,22 @@ const employeeSlice = createSlice({
       .addCase(fetchUsers.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload;
+      })
+      .addCase(fetchDirectory.pending, (state, action) => {
+        state.directory.status = "loading";
+        state.directory.error = null;
+        state.directory.unitId = action.meta.arg;
+      })
+      .addCase(fetchDirectory.fulfilled, (state, action) => {
+        state.directory.status = "succeeded";
+        state.directory.items = action.payload.items;
+        state.directory.unitId = action.payload.unitId;
+      })
+      .addCase(fetchDirectory.rejected, (state, action) => {
+        // Keep unitId so the hook does not retry in a loop; the unit change resets it.
+        state.directory.status = "failed";
+        state.directory.error = action.payload;
+        state.directory.unitId = action.meta.arg;
       })
       .addCase(createUser.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(updateUser.fulfilled, (state, action) => upsert(state, action.payload))

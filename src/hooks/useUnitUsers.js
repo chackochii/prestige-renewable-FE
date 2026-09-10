@@ -1,23 +1,27 @@
 // People in the current business unit, split for the pickers on lead forms.
+// Backed by the names-only directory endpoint (id, name, title, roles), which
+// any member of the unit may read — the full user records stay behind
+// admin.read on the Users screen.
 
 import { useEffect, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { fetchUsers } from "@/slices/employeeSlice";
+import { fetchDirectory } from "@/slices/employeeSlice";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { usersWithRoleHint } from "@/constants/roles";
 
 export function useUnitUsers() {
   const dispatch = useAppDispatch();
   const { unitId } = useBusinessUnit();
-  const { items, status, query } = useAppSelector((s) => s.employee);
-  const loadedForUnit = query?.businessUnitId === unitId && !query?.allUnits;
+  const { items, unitId: loadedUnitId, status, error } = useAppSelector((s) => s.employee.directory);
+  const loadedForUnit = loadedUnitId === unitId;
 
   useEffect(() => {
     if (!unitId || status === "loading") return;
-    if (status === "idle" || !loadedForUnit) dispatch(fetchUsers({ businessUnitId: unitId }));
+    // A failed load for this unit stays failed until the unit changes — no retry storm.
+    if (!loadedForUnit) dispatch(fetchDirectory(unitId));
   }, [unitId, status, loadedForUnit, dispatch]);
 
-  const users = useMemo(() => (loadedForUnit ? items : []), [items, loadedForUnit]);
+  const users = useMemo(() => (loadedForUnit && status === "succeeded" ? items : []), [items, loadedForUnit, status]);
   const active = useMemo(() => users.filter((u) => u.status === "active"), [users]);
   const estimators = useMemo(() => usersWithRoleHint(active, "estimator"), [active]);
   const sales = useMemo(() => usersWithRoleHint(active, "sales"), [active]);
@@ -32,6 +36,7 @@ export function useUnitUsers() {
     siteOps,
     byId,
     status,
+    error: loadedForUnit ? error : null,
     ready: loadedForUnit && status === "succeeded",
     userName: (id) => byId.get(Number(id))?.name || null,
   };

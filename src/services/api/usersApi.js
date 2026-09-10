@@ -7,6 +7,14 @@ export async function listUsers(params = {}) {
   return unwrapList(await apiClient.get("/users", { params }));
 }
 
+/**
+ * Names-only people list for one business unit (id, name, title, roles,
+ * status). Readable by any member of the unit — used by the pickers.
+ */
+export async function listDirectory(businessUnitId) {
+  return unwrap(await apiClient.get("/users/directory", { params: { businessUnitId } }));
+}
+
 export async function getUser(id) {
   return unwrap(await apiClient.get(`/users/${id}`));
 }
