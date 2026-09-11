@@ -1,5 +1,6 @@
 # dependencies
 node_modules
+package-lock.json
 .pnp
 .pnp.*
 
@@ -7,6 +8,7 @@ node_modules
 dist
 dist-ssr
 *.local
+coverage
 
 # logs
 logs
@@ -16,11 +18,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# editor
+# editor / OS
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 
 # env files
 .env
