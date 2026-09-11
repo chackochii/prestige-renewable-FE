@@ -4,14 +4,12 @@ import { useEffect, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import Alert from "@/components/Alert";
 import LeadForm from "@/features/leads/LeadForm";
-import ClientMeetingPanel from "@/features/leads/ClientMeetingPanel";
 import { formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
 import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   addOpportunityHistoryEntry,
-  assignCoordinator,
   assignEstimator,
   assignSalesperson,
   fetchOpportunityAttachments,
@@ -24,7 +22,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
-  const { estimators, sales, siteOps } = useUnitUsers();
+  const { estimators, sales } = useUnitUsers();
   const referrers = useAppSelector((s) => s.referrals.items);
   const referrersStatus = useAppSelector((s) => s.referrals.status);
   const attachments = useAppSelector((s) => s.leads.attachments);
@@ -130,13 +128,6 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         }
       }
 
-      if (form.needsClientVisit) {
-        const newCoordinatorId = idOrNull(form.operationalCoordinatorId);
-        if (newCoordinatorId && newCoordinatorId !== (opp.operationalCoordinatorId ?? null)) {
-          await dispatch(assignCoordinator({ id: opp.id, body: { operationalCoordinatorId: newCoordinatorId } })).unwrap();
-        }
-      }
-
       notify("Lead pack saved");
     } catch (err) {
       setSaveError(typeof err === "string" ? err : err?.message || "Could not save the lead pack.");
@@ -170,12 +161,9 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         errors={errors}
         estimators={estimators}
         sales={sales}
-        siteOps={siteOps}
         referrers={referrers}
         unit={unit}
         disabled={!canEdit}
-        showChecklist={atLeadStage}
-        clientMeetingSlot={<ClientMeetingPanel opp={opp} canEdit={canEdit} />}
         billFiles={billFiles}
         onUploadBills={canEdit ? uploadBills : undefined}
         uploadingBills={uploadingBills}

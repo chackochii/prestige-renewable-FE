@@ -1,6 +1,6 @@
 // Numeric input that keeps "" for empty and strips leading zeros.
 
-export default function NumberInput({ value, onChange, disabled, step, min, max, placeholder = "0", id }) {
+export default function NumberInput({ value, onChange, onBlur, disabled, step, min, max, placeholder = "0", id }) {
   const empty = value === "" || value === null || value === undefined;
   return (
     <input
@@ -13,6 +13,7 @@ export default function NumberInput({ value, onChange, disabled, step, min, max,
       disabled={disabled}
       placeholder={placeholder}
       value={empty ? "" : value}
+      onBlur={onBlur}
       onChange={(e) => {
         let next = e.target.value;
         if (next === "") {

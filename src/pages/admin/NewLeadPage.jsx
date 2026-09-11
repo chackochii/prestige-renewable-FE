@@ -12,7 +12,6 @@ import { emptyLeadForm, formToPayload, idOrNull, validateLeadForm } from "@/feat
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   addOpportunityHistoryEntry,
-  assignCoordinator,
   assignEstimator,
   assignSalesperson,
   createLead,
@@ -30,7 +29,7 @@ export default function NewLeadPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { unit, unitId } = useBusinessUnit();
-  const { estimators, sales, siteOps } = useUnitUsers();
+  const { estimators, sales } = useUnitUsers();
   const referrers = useAppSelector((s) => s.referrals.items);
   const referrersStatus = useAppSelector((s) => s.referrals.status);
   const { notify } = useNotifications();
@@ -38,8 +37,6 @@ export default function NewLeadPage() {
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState([]);
-  const [sketchFiles, setSketchFiles] = useState([]);
   const [billFiles, setBillFiles] = useState([]);
   const [historyNotes, setHistoryNotes] = useState([]);
   const [noteDraft, setNoteDraft] = useState("");
@@ -58,8 +55,6 @@ export default function NewLeadPage() {
     });
   };
 
-  const addPhotos = (files) => setPhotoFiles((prev) => [...prev, ...files]);
-  const addSketches = (files) => setSketchFiles((prev) => [...prev, ...files]);
   const addBills = (files) => setBillFiles((prev) => [...prev, ...files]);
 
   const addNote = () => {
@@ -144,23 +139,9 @@ export default function NewLeadPage() {
           notify("Lead saved, but the estimator assignment could not be recorded.", "danger");
         }
       }
-      if (form.needsClientVisit && !isBlank(form.operationalCoordinatorId)) {
-        try {
-          await dispatch(
-            assignCoordinator({ id: created.id, body: { operationalCoordinatorId: idOrNull(form.operationalCoordinatorId) } }),
-          ).unwrap();
-        } catch {
-          notify("Lead saved, but the operational coordinator assignment could not be recorded.", "danger");
-        }
-      }
-
-      // Photos/sketches are captured before the lead exists — upload them
-      // best-effort once it's saved, without blocking navigation.
-      const uploads = [
-        ...photoFiles.map((file) => ({ file, category: "photo" })),
-        ...sketchFiles.map((file) => ({ file, category: "sketch" })),
-        ...billFiles.map((file) => ({ file, category: "bill" })),
-      ];
+      // Bills are captured before the lead exists — upload them best-effort
+      // once it's saved, without blocking navigation.
+      const uploads = billFiles.map((file) => ({ file, category: "bill" }));
       for (const { file, category } of uploads) {
         try {
           await dispatch(uploadOpportunityAttachment({ id: created.id, category, file })).unwrap();
@@ -191,30 +172,6 @@ export default function NewLeadPage() {
 
   const errorList = [...new Set(Object.values(errors))];
 
-  const clientMeetingSlot = (
-    <div>
-      <p className="eyebrow">Site photos</p>
-      <p className="lede" style={{ marginBottom: 12 }}>
-        Photos from the site visit — access, electrical conditions, constraints.
-      </p>
-      <FileDropzone
-        files={photoFiles.map((f, i) => ({ id: `photo-${i}`, filename: f.name }))}
-        onSelect={addPhotos}
-        disabled={saving}
-      />
-
-      <p className="eyebrow">Sketches &amp; drawings</p>
-      <p className="lede" style={{ marginBottom: 12 }}>
-        Hand sketches, plans or design outputs from the site visit.
-      </p>
-      <FileDropzone
-        files={sketchFiles.map((f, i) => ({ id: `sketch-${i}`, filename: f.name }))}
-        onSelect={addSketches}
-        disabled={saving}
-      />
-    </div>
-  );
-
   return (
     <>
       <Link to="/leads" className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}>
@@ -231,10 +188,8 @@ export default function NewLeadPage() {
           errors={errors}
           estimators={estimators}
           sales={sales}
-          siteOps={siteOps}
           referrers={referrers}
           unit={unit}
-          clientMeetingSlot={clientMeetingSlot}
           billFiles={billFiles.map((f, i) => ({ id: `bill-${i}`, filename: f.name }))}
           onUploadBills={addBills}
         />

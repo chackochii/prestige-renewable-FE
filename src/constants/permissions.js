@@ -10,6 +10,8 @@ export const PERMISSIONS = {
   LEADS_DELETE: "leads.delete",
   LEADS_APPROVE: "leads.approve",
 
+  ESTIMATION_UPDATE: "estimation.update",
+
   ADMIN_CREATE: "admin.create",
   ADMIN_READ: "admin.read",
   ADMIN_UPDATE: "admin.update",

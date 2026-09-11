@@ -13,6 +13,7 @@ import StageStepper from "@/components/StageStepper";
 import HistoryTab from "@/components/HistoryTab";
 import { oppTitle } from "@/helpers/opportunity";
 import LeadPackPanel from "@/features/leads/LeadPackPanel";
+import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
 import LifecycleModal from "@/features/pipeline/LifecycleModal";
 import { lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
@@ -22,7 +23,7 @@ import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { joinAddress } from "@/utils/text";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { advanceStage, clearSelected, deleteLead, fetchOpportunity, updateLead } from "@/slices/leadsSlice";
+import { advanceStage, clearSelected, deleteLead, fetchOpportunity, fetchOpportunityQuote, updateLead } from "@/slices/leadsSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -34,7 +35,7 @@ export default function OpportunityPage() {
   const { hasPermission } = useAuth();
   const { unit, units, switchUnit } = useBusinessUnit();
   const { notify } = useNotifications();
-  const { selected: opp, selectedStatus, selectedError } = useAppSelector((s) => s.leads);
+  const { selected: opp, selectedStatus, selectedError, quote } = useAppSelector((s) => s.leads);
   const [tab, setTab] = useState("work");
   const [viewStage, setViewStage] = useState(null);
   const [advanceError, setAdvanceError] = useState("");
@@ -44,6 +45,7 @@ export default function OpportunityPage() {
 
   useEffect(() => {
     dispatch(fetchOpportunity(id));
+    dispatch(fetchOpportunityQuote(id));
     setViewStage(null);
     setTab("work");
     setAdvanceError("");
@@ -78,12 +80,13 @@ export default function OpportunityPage() {
   }
 
   const canEdit = hasPermission(PERMISSIONS.LEADS_UPDATE);
+  const canEditEstimation = hasPermission(PERMISSIONS.ESTIMATION_UPDATE);
   const canDelete = hasPermission(PERMISSIONS.LEADS_DELETE) && Number(opp.stage) === 1;
   const current = Number(opp.stage);
   const viewing = viewStage ?? current;
   const stage = stageById(current);
   const next = nextStageFor(current, unit);
-  const gate = advanceState(opp);
+  const gate = advanceState(opp, { quote });
   const sla = slaStatus(opp.slaDueAt);
   const life = lifecycleMeta(opp.lifecycle);
   const value = Number(opp.acceptedValue) || Number(opp.estimatedValue) || 0;
@@ -204,6 +207,8 @@ export default function OpportunityPage() {
         <div className="panel">
           {viewing === 1 ? (
             <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
+          ) : viewing === 2 ? (
+            <EstimationPanel key={opp.id} opp={opp} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} />
           ) : (
             <StagePanel stageId={viewing} opp={opp} unit={unit} />
           )}

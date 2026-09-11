@@ -3,7 +3,7 @@
 // decision, in that order.
 
 import { useEffect, useState } from "react";
-import { Building2, Check, ClipboardCheck, PhoneCall, Plus, Users, X } from "lucide-react";
+import { Building2, Check, ClipboardCheck, PhoneCall, Plus, X } from "lucide-react";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
@@ -30,12 +30,10 @@ export default function LeadForm({
   errors = {},
   estimators = [],
   sales = [],
-  siteOps = [],
   referrers = [],
   unit,
   disabled = false,
   showChecklist = true,
-  clientMeetingSlot,
   billFiles = [],
   onUploadBills,
   uploadingBills = false,
@@ -449,96 +447,47 @@ export default function LeadForm({
             </ChecklistRow>
           </div>
 
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={form.needsClientVisit}
-              disabled={disabled}
-              onChange={(e) => set("needsClientVisit", e.target.checked)}
-            />
-            Need client visit
-          </label>
-          {form.needsClientVisit ? (
-            <div style={{ marginTop: 10, maxWidth: 480 }}>
-              <Field label="Reason for client visit" error={err("clientVisitReason")}>
-                <textarea
-                  rows={2}
-                  value={form.clientVisitReason}
-                  disabled={disabled}
-                  onChange={(e) => set("clientVisitReason", e.target.value)}
-                />
-              </Field>
-            </div>
-          ) : null}
-
-          {form.needsClientVisit ? (
-            <div className="decision-card">
-              <SectionHead icon={<Users size={13} />} title="Client meeting & site visit" />
-
-              <div style={{ maxWidth: 320, marginBottom: 16 }}>
-                <Field label="Assign to operational coordinator" error={err("operationalCoordinatorId")}>
-                  <select
-                    value={form.operationalCoordinatorId}
-                    disabled={disabled}
-                    onChange={(e) => set("operationalCoordinatorId", e.target.value)}
-                  >
-                    <option value="">Select coordinator</option>
-                    {siteOps.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                        {u.title ? ` · ${u.title}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {siteOps.length === 0 ? (
-                    <span className="field-error">No operational coordinator in this unit yet. Add one in Admin.</span>
-                  ) : null}
-                </Field>
-              </div>
-
-              {clientMeetingSlot}
-
-              <p className="eyebrow">Custom fields</p>
-              <div className="list-stack" style={{ marginBottom: 10 }}>
-                {customFields.map((f, i) => (
-                  <div key={i} className="form-grid" style={{ alignItems: "start" }}>
-                    <Field>
-                      <input
-                        placeholder="Field name"
-                        value={f.label}
-                        disabled={disabled}
-                        onChange={(e) => setCustomField(i, "label", e.target.value)}
-                      />
-                    </Field>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
-                        <Field>
-                          <input
-                            placeholder="Value"
-                            value={f.value}
-                            disabled={disabled}
-                            onChange={(e) => setCustomField(i, "value", e.target.value)}
-                          />
-                        </Field>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={disabled}
-                        onClick={() => removeCustomField(i)}
-                        aria-label="Remove field"
-                      >
-                        <X size={14} />
-                      </button>
+          <div className="decision-card">
+            <SectionHead icon={<ClipboardCheck size={13} />} title="Custom fields" />
+            <div className="list-stack" style={{ marginBottom: 10 }}>
+              {customFields.map((f, i) => (
+                <div key={i} className="form-grid" style={{ alignItems: "start" }}>
+                  <Field>
+                    <input
+                      placeholder="Field name"
+                      value={f.label}
+                      disabled={disabled}
+                      onChange={(e) => setCustomField(i, "label", e.target.value)}
+                    />
+                  </Field>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <Field>
+                        <input
+                          placeholder="Value"
+                          value={f.value}
+                          disabled={disabled}
+                          onChange={(e) => setCustomField(i, "value", e.target.value)}
+                        />
+                      </Field>
                     </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={disabled}
+                      onClick={() => removeCustomField(i)}
+                      aria-label="Remove field"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
-                ))}
-              </div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={addCustomField} disabled={disabled}>
-                <Plus size={14} /> Add custom field
-              </button>
+                </div>
+              ))}
             </div>
-          ) : null}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={addCustomField} disabled={disabled}>
+              <Plus size={14} /> Add custom field
+            </button>
+          </div>
 
           <div className="decision-card">
             <SectionHead icon={<Check size={13} />} title="Potential client?" />

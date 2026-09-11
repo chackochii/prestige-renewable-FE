@@ -44,9 +44,6 @@ export function emptyLeadForm() {
     estimatorId: "",
     salespersonId: "",
     unassignedReason: "",
-    needsClientVisit: false,
-    clientVisitReason: "",
-    operationalCoordinatorId: "",
     customFields: [],
     potential: "",
     notPotentialReason: "",
@@ -97,9 +94,6 @@ export function leadToForm(opp) {
     estimatorId: str(opp.estimatorId),
     salespersonId: str(opp.salespersonId),
     unassignedReason: str(opp.unassignedReason),
-    needsClientVisit: Boolean(opp.needsClientVisit),
-    clientVisitReason: str(opp.clientVisitReason),
-    operationalCoordinatorId: str(opp.operationalCoordinatorId),
     customFields: Array.isArray(opp.customFields)
       ? opp.customFields.map((f) => ({ label: str(f?.label), value: str(f?.value) }))
       : [],
@@ -156,8 +150,6 @@ export function formToPayload(form) {
     hasOwnerDiscount: Boolean(form.hasOwnerDiscount),
     ownerDiscountName: form.hasOwnerDiscount ? trim(form.ownerDiscountName) : "",
     ownerDiscountAmount: form.hasOwnerDiscount ? numberOrNull(form.ownerDiscountAmount) : null,
-    needsClientVisit: Boolean(form.needsClientVisit),
-    clientVisitReason: form.needsClientVisit ? trim(form.clientVisitReason) : "",
     customFields: (form.customFields || [])
       .map((f) => ({ label: trim(f.label), value: trim(f.value) }))
       .filter((f) => f.label || f.value),
@@ -194,10 +186,6 @@ export function validateLeadForm(form) {
   if (form.leadSource === "referrer" && isBlank(form.referrerId))
     errors.referrerId = "Select the referrer who introduced this lead.";
   if (isBlank(form.leadType)) errors.leadType = "Select a type.";
-  if (form.needsClientVisit && isBlank(form.clientVisitReason))
-    errors.clientVisitReason = "Enter the reason a client visit is needed.";
-  if (form.needsClientVisit && isBlank(form.operationalCoordinatorId))
-    errors.operationalCoordinatorId = "Assign an operational coordinator for the client visit.";
   if (form.needsClientContact && !(form.contactAttempts || []).length)
     errors.contactAttempts = "Log at least one contact attempt.";
   if ((form.contactAttempts || []).some((a) => a.reached === false && isBlank(a.reason)))
