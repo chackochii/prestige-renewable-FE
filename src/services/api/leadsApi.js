@@ -57,7 +57,7 @@ export async function listOpportunityAttachments(id) {
   return unwrap(await apiClient.get(`/opportunities/${id}/attachments`));
 }
 
-/** category: "photo" | "sketch" */
+/** category: "photo" | "sketch" | "bill" | "client_document" */
 export async function uploadOpportunityAttachment(id, category, file) {
   const formData = new FormData();
   formData.append("file", file);
@@ -92,4 +92,91 @@ export async function assignCoordinator(id, body) {
 /** Tells prestige-be to notify whoever holds the Business Owner role about this lead. */
 export async function notifyBusinessOwner(id) {
   return unwrap(await apiClient.post(`/opportunities/${id}/notify-owner`));
+}
+
+// ---- Estimation stage (2) workflow ------------------------------------
+// One dedicated endpoint per gate, same reasoning as the assignment
+// endpoints above — each is a discrete, auditable step prestige-be can
+// validate and notify on independently, rather than a generic PATCH.
+//
+// Guarded by estimation.update, not leads.* — an Estimator should be able
+// to work this stage without also being able to edit the lead pack (stage
+// 1), which is what leads.update controls. The one exception is
+// assign-coordinator above: it's shared with the Lead module's own
+// coordinator picker, so it should accept either leads.update or
+// estimation.update.
+
+/** body: { received: boolean, checklistKeys?: string[], reason?: string } — reason required when received is false. */
+export async function submitEstimationRequirements(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/requirements`, body));
+}
+
+/** body: { needed: boolean } */
+export async function submitEstimationClientInfo(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/client-info`, body));
+}
+
+/**
+ * body: { checklistValues: Record<string, string>, preSiteInspectionRequired: boolean,
+ *         siteVisitAssigneeId?: number|null, siteVisitCompleted?: boolean }
+ */
+export async function submitEstimatorChecklist(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/checklist`, body));
+}
+
+/** Tells prestige-be to notify whoever holds the Sales Manager role about this lead. */
+export async function notifySalesManager(id) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/notify-sales-manager`));
+}
+
+/** Tells prestige-be to notify whoever holds the Operations Coordinator role about this lead. */
+export async function notifyOperationsCoordinator(id) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/notify-operations-coordinator`));
+}
+
+// ---- Quote (Create Quote / Quote Builder) ------------------------------
+// A nested sub-resource, same pattern as history/meetings/attachments —
+// fetched and stored separately from the opportunity, not embedded.
+// Guarded by estimation.update, same reasoning as the estimation workflow
+// endpoints above.
+
+/** Returns the quote for this opportunity, or null if one hasn't been created yet. */
+export async function getOpportunityQuote(id) {
+  return unwrap(await apiClient.get(`/opportunities/${id}/quote`));
+}
+
+/** Creates the quote — server assigns quoteNumber and prefills customer/estimator/date. */
+export async function createOpportunityQuote(id) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote`));
+}
+
+/** body: { project?, projectType?, projectTypeOther?, quoteDate?, taxTreatment?, gstRatePct? } */
+export async function updateOpportunityQuote(id, body) {
+  return unwrap(await apiClient.patch(`/opportunities/${id}/quote`, body));
+}
+
+/** body: { itemKey, itemName, brand, unit, quantity, unitPrice, discountPct } */
+export async function addQuoteItem(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/items`, body));
+}
+
+export async function updateQuoteItem(id, itemId, body) {
+  return unwrap(await apiClient.patch(`/opportunities/${id}/quote/items/${itemId}`, body));
+}
+
+export async function deleteQuoteItem(id, itemId) {
+  await apiClient.delete(`/opportunities/${id}/quote/items/${itemId}`);
+}
+
+/** body: { costType, calcType: "fixed"|"percentage", value, description } */
+export async function addQuoteCost(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/costs`, body));
+}
+
+export async function updateQuoteCost(id, costId, body) {
+  return unwrap(await apiClient.patch(`/opportunities/${id}/quote/costs/${costId}`, body));
+}
+
+export async function deleteQuoteCost(id, costId) {
+  await apiClient.delete(`/opportunities/${id}/quote/costs/${costId}`);
 }

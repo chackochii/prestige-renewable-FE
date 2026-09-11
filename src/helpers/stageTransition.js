@@ -42,12 +42,38 @@ export function leadCompletenessItems(opp) {
   return missing;
 }
 
+/**
+ * Estimation stage (2) status, derived from the record's own fields rather
+ * than a separate status flag — mirrors advanceState()/leadGateItems() below.
+ */
+export function estimationState(opp) {
+  if (!opp) return "awaiting_requirements";
+  if (opp.estimationRequirementsReceived == null) return "awaiting_requirements";
+  if (opp.estimationRequirementsReceived === false) return "on_hold";
+  if (opp.estimationClientInfoNeeded === false) return "ready";
+  if (opp.estimationClientInfoNeeded === true) return "awaiting_client_info";
+  return "evaluating";
+}
+
+/** Items still missing before an opportunity can leave estimation (stage 2). */
+export function estimationGateItems(opp) {
+  if (!opp) return [];
+  return estimationState(opp) === "ready" ? [] : ["Complete estimation (requirements, checklist, client input)"];
+}
+
+/** Items still missing before an opportunity can leave estimation without a priced quote. */
+export function quoteGateItems(quote) {
+  return quote?.items?.length ? [] : ["Add at least one item to the quote"];
+}
+
 /** Whether the "Advance" action makes sense for this record. */
-export function advanceState(opp) {
+export function advanceState(opp, { quote } = {}) {
   if (!opp) return { canAdvance: false, missing: ["No record"] };
   if (opp.lifecycle && CLOSED_LIFECYCLES.includes(opp.lifecycle))
     return { canAdvance: false, missing: [`Record is ${opp.lifecycle.toLowerCase()}`] };
   if (Number(opp.stage) >= LAST_STAGE) return { canAdvance: false, missing: ["Already at the final stage"] };
-  const missing = Number(opp.stage) === 1 ? leadGateItems(opp) : [];
+  const stage = Number(opp.stage);
+  const missing =
+    stage === 1 ? leadGateItems(opp) : stage === 2 ? [...estimationGateItems(opp), ...quoteGateItems(quote)] : [];
   return { canAdvance: missing.length === 0, missing };
 }

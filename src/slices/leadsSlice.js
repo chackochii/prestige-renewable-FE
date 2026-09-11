@@ -24,6 +24,9 @@ const initialState = {
   attachments: [],
   attachmentsStatus: "idle",
   attachmentsError: null,
+  quote: null,
+  quoteStatus: "idle",
+  quoteError: null,
 };
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
@@ -183,6 +186,156 @@ export const notifyBusinessOwner = createAsyncThunk(
   },
 );
 
+// ---- Estimation stage (2) workflow ------------------------------------
+
+export const submitEstimationRequirements = createAsyncThunk(
+  "leads/estimation/requirements",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.submitEstimationRequirements(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const submitEstimationClientInfo = createAsyncThunk(
+  "leads/estimation/clientInfo",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.submitEstimationClientInfo(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const submitEstimatorChecklist = createAsyncThunk(
+  "leads/estimation/checklist",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.submitEstimatorChecklist(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+/** Fire-and-forget — no opportunity fields change, so nothing to store here. */
+export const notifySalesManager = createAsyncThunk(
+  "leads/notifySalesManager",
+  async (id, { rejectWithValue }) => {
+    try {
+      return await api.notifySalesManager(id);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+/** Fire-and-forget — no opportunity fields change, so nothing to store here. */
+export const notifyOperationsCoordinator = createAsyncThunk(
+  "leads/notifyOperationsCoordinator",
+  async (id, { rejectWithValue }) => {
+    try {
+      return await api.notifyOperationsCoordinator(id);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+// ---- Quote (Create Quote / Quote Builder) ------------------------------
+
+export const fetchOpportunityQuote = createAsyncThunk("leads/quote/fetch", async (id, { rejectWithValue }) => {
+  try {
+    return await api.getOpportunityQuote(id);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const createOpportunityQuote = createAsyncThunk("leads/quote/create", async (id, { rejectWithValue }) => {
+  try {
+    return await api.createOpportunityQuote(id);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const updateOpportunityQuote = createAsyncThunk(
+  "leads/quote/update",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.updateOpportunityQuote(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const addQuoteItem = createAsyncThunk("leads/quote/items/add", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.addQuoteItem(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const updateQuoteItem = createAsyncThunk(
+  "leads/quote/items/update",
+  async ({ id, itemId, body }, { rejectWithValue }) => {
+    try {
+      return await api.updateQuoteItem(id, itemId, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const deleteQuoteItem = createAsyncThunk(
+  "leads/quote/items/delete",
+  async ({ id, itemId }, { rejectWithValue }) => {
+    try {
+      await api.deleteQuoteItem(id, itemId);
+      return itemId;
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const addQuoteCost = createAsyncThunk("leads/quote/costs/add", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.addQuoteCost(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const updateQuoteCost = createAsyncThunk(
+  "leads/quote/costs/update",
+  async ({ id, costId, body }, { rejectWithValue }) => {
+    try {
+      return await api.updateQuoteCost(id, costId, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const deleteQuoteCost = createAsyncThunk(
+  "leads/quote/costs/delete",
+  async ({ id, costId }, { rejectWithValue }) => {
+    try {
+      await api.deleteQuoteCost(id, costId);
+      return costId;
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
 const upsert = (state, opp) => {
   if (!opp) return;
   const idx = state.items.findIndex((o) => o.id === opp.id);
@@ -208,13 +361,17 @@ const leadsSlice = createSlice({
       state.attachments = [];
       state.attachmentsStatus = "idle";
       state.attachmentsError = null;
+      state.quote = null;
+      state.quoteStatus = "idle";
+      state.quoteError = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchOpportunities.pending, (state) => {
+      .addCase(fetchOpportunities.pending, (state, action) => {
         state.status = "loading";
         state.error = null;
+        state.query = action.meta.arg;
       })
       .addCase(fetchOpportunities.fulfilled, (state, action) => {
         state.status = "succeeded";
@@ -294,6 +451,47 @@ const leadsSlice = createSlice({
       .addCase(assignSalesperson.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(assignEstimator.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(assignCoordinator.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(submitEstimationRequirements.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(submitEstimationClientInfo.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(submitEstimatorChecklist.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(fetchOpportunityQuote.pending, (state) => {
+        state.quoteStatus = "loading";
+        state.quoteError = null;
+      })
+      .addCase(fetchOpportunityQuote.fulfilled, (state, action) => {
+        state.quoteStatus = "succeeded";
+        state.quote = action.payload || null;
+      })
+      .addCase(fetchOpportunityQuote.rejected, (state, action) => {
+        state.quoteStatus = "failed";
+        state.quoteError = action.payload;
+      })
+      .addCase(createOpportunityQuote.fulfilled, (state, action) => {
+        state.quote = action.payload;
+      })
+      .addCase(updateOpportunityQuote.fulfilled, (state, action) => {
+        state.quote = action.payload;
+      })
+      .addCase(addQuoteItem.fulfilled, (state, action) => {
+        state.quote?.items.push(action.payload);
+      })
+      .addCase(updateQuoteItem.fulfilled, (state, action) => {
+        const idx = state.quote?.items.findIndex((i) => i.id === action.payload.id);
+        if (idx != null && idx !== -1) state.quote.items[idx] = action.payload;
+      })
+      .addCase(deleteQuoteItem.fulfilled, (state, action) => {
+        if (state.quote) state.quote.items = state.quote.items.filter((i) => i.id !== action.payload);
+      })
+      .addCase(addQuoteCost.fulfilled, (state, action) => {
+        state.quote?.additionalCosts.push(action.payload);
+      })
+      .addCase(updateQuoteCost.fulfilled, (state, action) => {
+        const idx = state.quote?.additionalCosts.findIndex((c) => c.id === action.payload.id);
+        if (idx != null && idx !== -1) state.quote.additionalCosts[idx] = action.payload;
+      })
+      .addCase(deleteQuoteCost.fulfilled, (state, action) => {
+        if (state.quote) state.quote.additionalCosts = state.quote.additionalCosts.filter((c) => c.id !== action.payload);
+      })
       .addCase(logout, () => initialState);
   },
 });
