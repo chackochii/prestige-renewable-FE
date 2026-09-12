@@ -567,6 +567,14 @@
   .login-card h1 { font-weight: 700; letter-spacing: -0.02em; font-size: 30px; margin: 0 0 8px; }
   .login-card .section { margin-top: 20px; }
 
+  /* Public enquiry link: long URLs stay on one line and scroll rather than
+     stretching the table, and wrap instead of overflowing on small screens. */
+  .enquiry-link {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px; color: var(--ink-soft); word-break: break-all;
+  }
+  .enquiry-link:hover { color: var(--brand); }
+
   /* ---- Loading, gates -------------------------------------------------- */
   .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid var(--line-strong); border-top-color: var(--brand); animation: spin 0.8s linear infinite; }
   .loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 40px; color: var(--muted); font-size: 13.5px; }

@@ -11,6 +11,7 @@ import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import LoadingState from "@/components/LoadingState";
 import NumberInput from "@/components/NumberInput";
+import EnquiryLinkCard from "@/features/leads/EnquiryLinkCard";
 import { STAGES } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { getBusinessUnitConfig } from "@/services/api/businessUnitsApi";
@@ -159,6 +160,8 @@ export default function UnitSettingsPage() {
       >
         <p className="lede">Name, legal name, timezone and status are managed by the system administrator.</p>
       </Card>
+
+      <EnquiryLinkCard style={{ marginBottom: 20 }} />
 
       {loadError ? <Alert tone="danger">{loadError}</Alert> : null}
       {!form && !loadError ? <LoadingState label="Loading configuration…" /> : null}

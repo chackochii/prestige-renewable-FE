@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
+import CopyLinkButton from "@/components/CopyLinkButton";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
 import Alert from "@/components/Alert";
@@ -11,8 +12,10 @@ import OppCell from "@/components/OppCell";
 import { QUALIFICATIONS, qualificationMeta } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
+import { enquiryLink } from "@/features/leads/enquiryLink";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
+import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 
@@ -28,6 +31,7 @@ function contactSummary(o) {
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
+  const { unit } = useBusinessUnit();
   const { items, status, error, ready } = useOpportunities({ stage: 1 });
   const { userName } = useUnitUsers();
   const [search, setSearch] = useState("");
@@ -53,9 +57,20 @@ export default function LeadsPage() {
         description="Not yet in the pipeline. Complete the lead pack, mark the lead Qualified and assign an estimator to move it on."
         actions={
           hasPermission(PERMISSIONS.LEADS_CREATE) ? (
-            <Link className="btn btn-primary" to="/leads/new">
-              New lead
-            </Link>
+            <>
+              {/* Hand this to a customer, a partner or a campaign: it files
+                  straight into this unit with no sign-in. */}
+              <CopyLinkButton
+                value={enquiryLink(unit?.code)}
+                label="Copy enquiry link"
+                copiedLabel="Link copied"
+                className="btn btn-ghost"
+                toast={unit?.name ? `Enquiry link for ${unit.name} copied` : "Enquiry link copied"}
+              />
+              <Link className="btn btn-primary" to="/leads/new">
+                New lead
+              </Link>
+            </>
           ) : null
         }
       />
