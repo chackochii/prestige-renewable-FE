@@ -1,5 +1,16 @@
 // Small string helpers.
 
+const HUES = [355, 24, 42, 160, 190, 220, 265, 320];
+
+/** A stable background/foreground color pair derived from a string (same input always gets the same hue). */
+export function hueStyle(text) {
+  const str = String(text || "");
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  const hue = HUES[hash % HUES.length];
+  return { background: `hsl(${hue} 85% 95%)`, color: `hsl(${hue} 55% 38%)` };
+}
+
 export function initials(name = "") {
   return String(name)
     .split(" ")
