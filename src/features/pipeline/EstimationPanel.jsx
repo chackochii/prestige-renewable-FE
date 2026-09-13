@@ -215,16 +215,11 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
   };
 
   const toggleRequirement = (key, on) => {
-    setRequirementsChecklist((prev) => (on ? [...new Set([...prev, key])] : prev.filter((k) => k !== key)));
-  };
-
-  const saveRequirementsChecklist = () => {
-    run(async () => {
-      await dispatch(
-        submitEstimationRequirements({ id: opp.id, body: { received: true, checklistKeys: requirementsChecklist } }),
-      ).unwrap();
-      notify("Checklist saved");
-    });
+    const next = on ? [...new Set([...requirementsChecklist, key])] : requirementsChecklist.filter((k) => k !== key);
+    setRequirementsChecklist(next);
+    run(() =>
+      dispatch(submitEstimationRequirements({ id: opp.id, body: { received: true, checklistKeys: next } })).unwrap(),
+    );
   };
 
   const answerClientInfo = (needed) => {
@@ -341,11 +336,6 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
               />
             ))}
           </div>
-          {canEdit ? (
-            <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={saveRequirementsChecklist}>
-              Save checklist
-            </button>
-          ) : null}
         </div>
       ) : null}
 
@@ -413,10 +403,8 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
               <SectionHead icon={<HardHat size={13} />} title="Pre-site visit" />
 
               <QuestionBlock title="Operations coordinator">
-                {opp.operationalCoordinatorId ? (
-                  <p className="lede">{userName(opp.operationalCoordinatorId) || "Assigned"}</p>
-                ) : canEdit ? (
-                  <select defaultValue="" onChange={(e) => assignCoordinatorPerson(e.target.value)}>
+                {canEdit ? (
+                  <select value={opp.operationalCoordinatorId || ""} onChange={(e) => assignCoordinatorPerson(e.target.value)}>
                     <option value="">Assign a coordinator</option>
                     {siteOps.map((u) => (
                       <option key={u.id} value={u.id}>
@@ -425,7 +413,7 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
                     ))}
                   </select>
                 ) : (
-                  <p className="lede">No coordinator assigned yet.</p>
+                  <p className="lede">{userName(opp.operationalCoordinatorId) || "No coordinator assigned yet."}</p>
                 )}
                 {canEdit ? (
                   <button

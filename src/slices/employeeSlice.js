@@ -72,6 +72,17 @@ const upsert = (state, user) => {
   state.items.sort((a, b) => a.name.localeCompare(b.name));
 };
 
+/**
+ * The directory (see fetchDirectory below) is cached per unit and only
+ * fetched once — useUnitUsers() re-fetches whenever it sees an unloaded
+ * unitId. Resetting it here after any create/update/delete is what makes
+ * that guard trigger a fresh fetch, so a deleted or edited user doesn't
+ * keep showing up (and failing to submit) in the lead-form pickers.
+ */
+const invalidateDirectory = (state) => {
+  state.directory = { items: [], unitId: null, status: "idle", error: null };
+};
+
 const employeeSlice = createSlice({
   name: "employee",
   initialState,
@@ -108,11 +119,18 @@ const employeeSlice = createSlice({
         state.directory.error = action.payload;
         state.directory.unitId = action.meta.arg;
       })
-      .addCase(createUser.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(updateUser.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(createUser.fulfilled, (state, action) => {
+        upsert(state, action.payload);
+        invalidateDirectory(state);
+      })
+      .addCase(updateUser.fulfilled, (state, action) => {
+        upsert(state, action.payload);
+        invalidateDirectory(state);
+      })
       .addCase(deleteUser.fulfilled, (state, action) => {
         state.items = state.items.filter((u) => u.id !== action.payload);
         state.total = Math.max(0, state.total - 1);
+        invalidateDirectory(state);
       })
       .addCase(logout, () => initialState);
   },

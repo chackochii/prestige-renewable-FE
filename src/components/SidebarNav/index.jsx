@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useMemo } from "react";
-import BrandMark from "@/components/BrandMark";
+import UnitBrandMark from "@/components/UnitBrandMark";
 import { useAppSelector } from "@/store";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
@@ -59,13 +59,13 @@ export default function SidebarNav({ open, onClose, onSearch }) {
       </button>
 
       <div className="brand">
-        <BrandMark size={36} />
+        <UnitBrandMark unit={unit} size={36} />
         <div>
           <div className="brand-name">
             Prestige
             {unit?.code ? <span className="brand-tag">{unit.code}</span> : null}
           </div>
-          <div className="brand-sub">Lead to service</div>
+          <div className="brand-sub">{unit?.name || "Lead to service"}</div>
         </div>
       </div>
 

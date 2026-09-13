@@ -220,6 +220,15 @@
     border: 1px solid var(--line-strong); background: var(--surface); border-radius: 7px; padding: 9px 12px; font-size: 13.5px;
     font-family: inherit; color: var(--ink); outline: none; width: 100%; transition: border-color var(--fast), box-shadow var(--fast);
   }
+  /* Chromium/Edge sometimes fails to paint the mouse pointer over text fields
+     when it's left to the default `auto` value — setting it explicitly is the
+     documented workaround. Checkboxes/radios keep their own pointer cursor
+     via .check below. */
+  .search,
+  .field input:not([type="checkbox"]):not([type="radio"]),
+  .field textarea {
+    cursor: text;
+  }
   .search::placeholder, .field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: 0.8; }
   .search { max-width: 280px; }
   .select { width: auto; }
