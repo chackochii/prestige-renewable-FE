@@ -213,6 +213,17 @@ export const submitEstimationClientInfo = createAsyncThunk(
   },
 );
 
+export const collectEstimationInputs = createAsyncThunk(
+  "leads/estimation/collectInputs",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.collectEstimationInputs(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
 export const acceptEstimationInputs = createAsyncThunk(
   "leads/estimation/acceptInputs",
   async (id, { rejectWithValue }) => {
@@ -515,6 +526,7 @@ const leadsSlice = createSlice({
       .addCase(submitEstimationRequirements.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimationClientInfo.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(acknowledgeLeadChange.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(collectEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(acceptEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimatorChecklist.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(fetchOpportunityQuote.pending, (state) => {

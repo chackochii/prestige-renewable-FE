@@ -537,6 +537,19 @@
   .activity-text { font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
   .activity-text b { color: var(--ink); font-weight: 700; }
   .activity-time { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .lead-input-list { display: flex; flex-direction: column; }
+  .input-group + .input-group { margin-top: 18px; }
+  .input-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line-strong); margin-bottom: 2px; }
+  .input-group-head h4 { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-2); }
+  .input-group-head span { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .checklist > .input-group-head { margin: 6px 0 0; }
+  .checklist > .input-group-head:first-child { margin-top: 0; }
+  .lead-input-row { display: grid; grid-template-columns: 24px minmax(140px, 260px) minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .lead-input-row:last-child { border-bottom: 0; }
+  .lead-input-row.is-editing { background: var(--surface-2); border-radius: 10px; padding: 12px 10px; }
+  .lead-input-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .lead-input-value { font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
+  .lead-input-value.is-missing { color: var(--muted); font-style: italic; }
   .rr-list { display: flex; flex-direction: column; gap: 14px; }
   .rr-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface); }
   .rr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
