@@ -1,8 +1,9 @@
 // Stage-1 work: the lead pack, editable while the record lives.
 
 import { useEffect, useState } from "react";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Pencil } from "lucide-react";
 import Alert from "@/components/Alert";
+import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
 import { formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
 import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
@@ -13,16 +14,18 @@ import {
   assignEstimator,
   assignSalesperson,
   fetchOpportunityAttachments,
+  notifyEstimator,
   updateLead,
   uploadOpportunityAttachment,
 } from "@/slices/leadsSlice";
 import { fetchReferrers } from "@/slices/referralsSlice";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
+import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
-  const { estimators, sales } = useUnitUsers();
+  const { estimators, sales, userName } = useUnitUsers();
   const referrers = useAppSelector((s) => s.referrals.items);
   const referrersStatus = useAppSelector((s) => s.referrals.status);
   const attachments = useAppSelector((s) => s.leads.attachments);
@@ -32,11 +35,16 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingBills, setUploadingBills] = useState(false);
+  // A saved lead opens read-only; the pencil unlocks it. Once it is with an
+  // estimator, unlocking asks first — editing under them is a real event.
+  const [editing, setEditing] = useState(false);
+  const [confirmEdit, setConfirmEdit] = useState(false);
 
   // A fresh record (after fetch or save) replaces any unsaved edits.
   useEffect(() => {
     setForm(leadToForm(opp));
     setErrors({});
+    setEditing(false);
   }, [opp]);
 
   useEffect(() => {
@@ -84,7 +92,16 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     setSaving(true);
     setSaveError("");
     try {
-      await dispatch(updateLead({ id: opp.id, body: formToPayload(form) })).unwrap();
+      await dispatch(
+        updateLead({
+          id: opp.id,
+          // The stamp is what the estimation screen reads to know the pack
+          // moved under it; it is cleared when the estimator acknowledges.
+          body: handedOver
+            ? { ...formToPayload(form), leadEditedAt: new Date().toISOString() }
+            : formToPayload(form),
+        }),
+      ).unwrap();
 
       // Every attempt where the client wasn't reached must have its reason
       // recorded in Job History — write one entry per new attempt only.
@@ -128,7 +145,30 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         }
       }
 
-      notify("Lead pack saved");
+      // Sales edited a lead that is already with an estimator — tell them,
+      // and leave a trail on the job.
+      if (handedOver) {
+        try {
+          await dispatch(
+            notifyEstimator({ id: opp.id, body: { summary: "Lead details were updated after handover." } }),
+          ).unwrap();
+        } catch {
+          notify("Lead saved, but the estimator could not be notified.", "danger");
+        }
+        try {
+          await dispatch(
+            addOpportunityHistoryEntry({
+              id: opp.id,
+              body: { note: "Lead pack edited after handover to estimation — estimator notified." },
+            }),
+          ).unwrap();
+        } catch {
+          // The edit itself is saved; a missing history line is not worth failing over.
+        }
+      }
+
+      setEditing(false);
+      notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
     } catch (err) {
       setSaveError(typeof err === "string" ? err : err?.message || "Could not save the lead pack.");
     } finally {
@@ -137,17 +177,33 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   };
 
   const atLeadStage = Number(opp.stage) === 1;
+  // "Handed over" means an estimator owns it now, whether or not the stage moved.
+  const estimatorName = opp.estimator?.name || userName(opp.estimatorId);
+  const handedOver = Boolean(opp.estimatorId);
+  const startEditing = () => (handedOver ? setConfirmEdit(true) : setEditing(true));
+  const cancelEditing = () => {
+    setForm(leadToForm(opp));
+    setErrors({});
+    setEditing(false);
+  };
   const gate = leadGateItems(opp);
   const completeness = leadCompletenessItems(opp);
   const errorList = [...new Set(Object.values(errors))];
 
   return (
     <div className="card card-pad">
-      <div className="card-head">
-        <span className="card-icon">
-          <ClipboardCheck size={16} />
-        </span>
-        <h2>Lead pack</h2>
+      <div className="card-head" style={{ justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span className="card-icon">
+            <ClipboardCheck size={16} />
+          </span>
+          <h2>Lead pack</h2>
+        </div>
+        {canEdit && !editing ? (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={startEditing}>
+            <Pencil size={14} /> Edit
+          </button>
+        ) : null}
       </div>
       <p className="sub">
         {atLeadStage
@@ -163,9 +219,9 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         sales={sales}
         referrers={referrers}
         unit={unit}
-        disabled={!canEdit}
+        disabled={!canEdit || !editing}
         billFiles={billFiles}
-        onUploadBills={canEdit ? uploadBills : undefined}
+        onUploadBills={canEdit && editing ? uploadBills : undefined}
         uploadingBills={uploadingBills}
       />
 
@@ -194,17 +250,56 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         )
       ) : null}
 
-      {canEdit ? (
-        <div style={{ marginTop: 16 }}>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save lead details"}
-          </button>
-        </div>
-      ) : (
+      {!canEdit ? (
         <p className="lede" style={{ marginTop: 16 }}>
           You have read access to this lead. Editing needs the “Update Leads” permission.
         </p>
+      ) : editing ? (
+        <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save lead details"}
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={saving}>
+            Cancel
+          </button>
+          {handedOver ? (
+            <span className="row-meta" style={{ alignSelf: "center" }}>
+              {estimatorName || "The estimator"} is notified when you save.
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <p className="lede" style={{ marginTop: 16 }}>
+          Read-only. Use Edit above to change the lead details.
+        </p>
       )}
+
+      {confirmEdit ? (
+        <Modal
+          title="This lead is with estimation"
+          body={`${estimatorName || "An estimator"} is working from these details${
+            opp.estimatorAssignedAt ? ` (assigned ${formatWhen(opp.estimatorAssignedAt)})` : ""
+          }. Editing now changes what they are pricing, and they will be notified when you save.`}
+          onClose={() => setConfirmEdit(false)}
+          actions={
+            <>
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmEdit(false)}>
+                Leave it as it is
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setConfirmEdit(false);
+                  setEditing(true);
+                }}
+              >
+                Edit anyway
+              </button>
+            </>
+          }
+        />
+      ) : null}
     </div>
   );
 }

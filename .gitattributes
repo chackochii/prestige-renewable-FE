@@ -1,0 +1,19 @@
+# Line endings are LF in the repository and in the working copy, on every
+# platform. Without this, Windows checkouts (core.autocrlf=true) rewrite files
+# to CRLF and Git warns on every add that it will convert them back.
+* text=auto eol=lf
+
+# Binary files Git must never touch.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
+*.mp4  binary
+*.zip  binary

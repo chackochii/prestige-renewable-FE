@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Badge from "@/components/Badge";
 import Alert from "@/components/Alert";
+import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import { stageById } from "@/constants/stages";
 import { formatCurrency, formatPercent } from "@/utils/formatCurrency";
 import { formatDate } from "@/helpers/dateTimeHelpers";
@@ -125,7 +126,7 @@ function StageFacts({ stageId, opp, unit }) {
   }
 }
 
-export default function StagePanel({ stageId, opp, unit }) {
+export default function StagePanel({ stageId, opp, unit, canEdit = false }) {
   const stage = stageById(stageId);
   const Icon = ICONS[stage.id] || FileText;
   const slaDays = unit?.slaDays?.[stage.id];
@@ -145,10 +146,12 @@ export default function StagePanel({ stageId, opp, unit }) {
         </p>
       ) : null}
       <StageFacts stageId={stage.id} opp={opp} unit={unit} />
-      <Alert tone="info" style={{ marginTop: 16, marginBottom: 0 }}>
+      <Alert tone="info" style={{ marginTop: 16 }}>
         The {stage.label.toLowerCase()} workflow records for this stage are not available from the API yet. Stage
         progression, SLA tracking and the details above are live.
       </Alert>
+
+      <StageRequestsPanel opp={opp} stage={stage.id} unit={unit} canEdit={canEdit} />
     </div>
   );
 }

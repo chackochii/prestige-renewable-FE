@@ -208,9 +208,9 @@ export default function OpportunityPage() {
           {viewing === 1 ? (
             <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : viewing === 2 ? (
-            <EstimationPanel key={opp.id} opp={opp} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} />
+            <EstimationPanel key={opp.id} opp={opp} unit={unit} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} />
           ) : (
-            <StagePanel stageId={viewing} opp={opp} unit={unit} />
+            <StagePanel stageId={viewing} opp={opp} unit={unit} canEdit={canEdit} />
           )}
         </div>
       ) : (

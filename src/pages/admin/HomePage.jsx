@@ -1,6 +1,6 @@
 // Home: a quiet view of the business unit — what is live, what is yours, what is late.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, Briefcase, CircleDollarSign, History, Sparkles, Target, TrendingUp, TriangleAlert, UserCheck } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -9,7 +9,9 @@ import Card from "@/components/Card";
 import Avatar from "@/components/Avatar";
 import Alert from "@/components/Alert";
 import LoadingState from "@/components/LoadingState";
+import WaitingFor from "@/features/dashboard/WaitingFor";
 import { oppTitle, oppValue } from "@/helpers/opportunity";
+import { waitingForCount, waitingForGroups } from "@/helpers/waitingFor";
 import { enabledStagesFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { isOverdue, periodStart, slaStatus, timeAgo } from "@/helpers/dateTimeHelpers";
@@ -19,6 +21,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { fetchRaisedRequests } from "@/slices/collaborationSlice";
 
 const PERIODS = [
   { key: "week", label: "This week" },
@@ -32,12 +36,19 @@ const owners = (o) => [o.leadOwnerId, o.estimatorId, o.salespersonId, o.delivery
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { user, hasPermission } = useAuth();
-  const { unit } = useBusinessUnit();
+  const { unit, unitId } = useBusinessUnit();
+  const raisedRequests = useAppSelector((s) => s.collaboration.raised);
   const canReadLeads = hasPermission(PERMISSIONS.LEADS_READ);
   const { items, status, error, ready } = useOpportunities({}, { enabled: canReadLeads });
   const { users, userName } = useUnitUsers();
   const [period, setPeriod] = useState("month");
+
+  // What this person is waiting on from other teams (see the Waiting For card).
+  useEffect(() => {
+    if (unitId) dispatch(fetchRaisedRequests({ businessUnitId: unitId }));
+  }, [unitId, dispatch]);
 
   const data = useMemo(() => {
     const active = items.filter((o) => o.lifecycle === "Active");
@@ -115,8 +126,16 @@ export default function HomePage() {
           cta: o.estimatorId ? "Advance to estimation" : "Assign an estimator",
         })),
     ].slice(0, 6);
-    return { active, leads, pipeline, pipelineValue, overdue, overdueValue, mine, closed, closedValue, onSchedule, byStage, health, team, activity, attention };
-  }, [items, user.id, unit, period, userName]);
+    // Handoffs on the viewer's own jobs that another team has to move.
+    const waiting = waitingForGroups(active, {
+      ownedBy: user.id,
+      userName,
+      timeZone: unit?.timezone,
+      requests: raisedRequests,
+      user,
+    });
+    return { active, leads, pipeline, pipelineValue, overdue, overdueValue, mine, closed, closedValue, onSchedule, byStage, health, team, activity, attention, waiting };
+  }, [items, user, unit, period, userName, raisedRequests]);
 
   const periodLabel = PERIODS.find((p) => p.key === period)?.label.toLowerCase();
   const healthTotal = Math.max(1, data.health.success + data.health.warning + data.health.danger);
@@ -351,6 +370,12 @@ export default function HomePage() {
               </div>
             )}
           </Card>
+
+          <WaitingFor
+            groups={data.waiting}
+            total={waitingForCount(data.waiting)}
+            timeZone={unit?.timezone}
+          />
 
           <Card
             title="Needs attention"

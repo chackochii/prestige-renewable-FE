@@ -1,8 +1,8 @@
-// Stage-2 work: the estimation workflow, as one module — every step (sales
-// requirements, the requirements checklist, client input, the estimator
-// checklist and the pre-site visit) is visible together, in order, so the
-// estimator can see everything they've entered rather than clicking through
-// a wizard.
+// Stage-2 work: the estimation workflow, as one module split into tabs —
+// requirements (from sales, the requirements checklist, client input), the
+// estimator checklist, the pre-site visit and the quote. Every tab can be
+// opened to review what was entered; a step that isn't unlocked yet says what
+// has to happen first rather than disappearing.
 //
 // Backed by the real prestige-be contract designed for this module (see the
 // submitEstimation*/notify* thunks in slices/leadsSlice.js) — the backend
@@ -19,18 +19,39 @@
 // reads the saved opportunity, so advancing still requires an actual save.
 
 import { useEffect, useState } from "react";
-import { Calculator, ClipboardList, FileCheck2, HardHat, ListChecks, MessageCircleQuestion } from "lucide-react";
+import {
+  BadgeDollarSign,
+  Calculator,
+  Check,
+  ClipboardCheck,
+  ClipboardList,
+  FileCheck2,
+  HardHat,
+  HandHelping,
+  ListChecks,
+  Lock,
+  MessageCircleQuestion,
+  Receipt,
+} from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
+import EmptyState from "@/components/EmptyState";
 import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
 import SectionHead from "@/components/SectionHead";
+import Tabs from "@/components/Tabs";
 import ChecklistRow from "@/features/leads/LeadForm/ChecklistRow";
+import EstimationInput from "@/features/estimation/EstimationInput";
+import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
+import VariationCheck from "@/features/pipeline/VariationCheck";
 import { REQUIREMENTS_CHECKLIST, ESTIMATOR_CHECKLIST } from "@/constants/checklists";
+import { DRAWING_CATEGORY, estimationInputFromOpp, estimationInputMissing } from "@/constants/estimationInput";
 import { estimationState } from "@/helpers/stageTransition";
+import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
+  acknowledgeLeadChange,
   assignCoordinator,
   fetchOpportunityAttachments,
   notifyOperationsCoordinator,
@@ -112,6 +133,11 @@ function QuestionBlock({ title, children }) {
   );
 }
 
+/** Shown in a tab whose step isn't unlocked yet. */
+function LockedStep({ title, body }) {
+  return <EmptyState icon={<Lock size={24} strokeWidth={1.5} />} title={title} body={body} />;
+}
+
 const formFromOpp = (opp) => ({
   requirementsChecklist: opp.estimationRequirementsChecklist || [],
   holdReason: opp.estimationOnHoldReason || "",
@@ -121,14 +147,19 @@ const formFromOpp = (opp) => ({
   siteVisitCompleted: opp.estimationSiteVisitCompleted ?? null,
 });
 
-export default function EstimationPanel({ opp, canEdit, onViewLead }) {
+export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const dispatch = useAppDispatch();
   const { notify, error: notifyError } = useNotifications();
   const attachments = useAppSelector((s) => s.leads.attachments);
+  const quote = useAppSelector((s) => s.leads.quote);
   const { active, siteOps, userName } = useUnitUsers();
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadingSketches, setUploadingSketches] = useState(false);
+  const [uploadingDrawings, setUploadingDrawings] = useState(false);
+  // Sales edited the lead pack after this reached estimation. Dismissing
+  // clears it on the record; the local flag hides it straight away.
+  const [leadChangeSeen, setLeadChangeSeen] = useState(false);
   const [askingReceived, setAskingReceived] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -157,9 +188,28 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
     dispatch(fetchOpportunityAttachments(opp.id));
   }, [opp.id, dispatch]);
 
+  useEffect(() => {
+    setLeadChangeSeen(false);
+  }, [opp.leadEditedAt]);
+
+  const leadChanged =
+    Boolean(opp.leadEditedAt) &&
+    !leadChangeSeen &&
+    (!opp.leadChangeAcknowledgedAt || new Date(opp.leadEditedAt) > new Date(opp.leadChangeAcknowledgedAt));
+
+  const dismissLeadChange = async () => {
+    setLeadChangeSeen(true);
+    try {
+      await dispatch(acknowledgeLeadChange(opp.id)).unwrap();
+    } catch {
+      // Cleared on screen either way — the notice is a nudge, not a record.
+    }
+  };
+
   const clientDocuments = attachments.filter((a) => a.category === CLIENT_DOCUMENT_CATEGORY);
   const sitePhotos = attachments.filter((a) => a.category === "photo");
   const siteSketches = attachments.filter((a) => a.category === "sketch");
+  const drawings = attachments.filter((a) => a.category === DRAWING_CATEGORY);
 
   const uploadCategory = (category, setUploading) => async (files) => {
     setUploading(true);
@@ -177,6 +227,7 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
   const uploadClientDocuments = uploadCategory(CLIENT_DOCUMENT_CATEGORY, setUploadingDocs);
   const uploadSitePhotos = uploadCategory("photo", setUploadingPhotos);
   const uploadSiteSketches = uploadCategory("sketch", setUploadingSketches);
+  const uploadDrawings = uploadCategory(DRAWING_CATEGORY, setUploadingDrawings);
 
   const run = async (action) => {
     setSaving(true);
@@ -271,6 +322,60 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
     preSiteInspectionRequired === false || (preSiteInspectionRequired === true && siteVisitCompleted === true);
   const showQuoteBuilder = state === "ready" || (showEstimatorChecklist && preSiteResolved);
 
+  // One flag per tab, for the tick on the tab and for choosing where to open.
+  const requirementsDone =
+    opp.estimationRequirementsReceived === true &&
+    requirementsChecklistComplete &&
+    opp.estimationClientInfoNeeded != null;
+  const checklistDone = showEstimatorChecklist && estimatorChecklistDone === ESTIMATOR_CHECKLIST.length;
+  const siteVisitDone = showEstimatorChecklist && preSiteResolved;
+  const quoteDone = Boolean(quote?.items?.length);
+  const savedInput = estimationInputFromOpp(opp);
+  const inputDone =
+    savedInput.readyForBoq && estimationInputMissing(savedInput, { drawingsCount: drawings.length }).length === 0;
+
+  // Open on the first step that still needs work.
+  const [tab, setTab] = useState(() => {
+    if (!requirementsDone) return "requirements";
+    if (!inputDone) return "input";
+    if (showEstimatorChecklist && !checklistDone) return "checklist";
+    if (showEstimatorChecklist && !siteVisitDone) return "site-visit";
+    return showQuoteBuilder ? "quote" : "requirements";
+  });
+
+  const tabIcon = (done, icon) => (done ? <Check size={14} /> : icon);
+  const tabs = [
+    { key: "requirements", label: "Requirements", icon: tabIcon(requirementsDone, <ClipboardList size={14} />) },
+    { key: "input", label: "Estimation input", icon: tabIcon(inputDone, <ClipboardCheck size={14} />) },
+    { key: "checklist", label: "Estimator checklist", icon: tabIcon(checklistDone, <ListChecks size={14} />) },
+    { key: "site-visit", label: "Pre-site visit", icon: tabIcon(siteVisitDone, <HardHat size={14} />) },
+    { key: "quote", label: "Quote", icon: tabIcon(quoteDone, <Receipt size={14} />) },
+    { key: "requests", label: "Requests", icon: <HandHelping size={14} /> },
+    { key: "variations", label: "Variations", icon: <BadgeDollarSign size={14} /> },
+  ];
+
+  // Why the checklist and site-visit tabs are closed, depending on how far
+  // the requirements step got.
+  const estimatorLocked =
+    opp.estimationClientInfoNeeded === false ? (
+      <LockedStep
+        title="Not needed for this lead"
+        body="The client didn't need to provide more input, so estimation went straight to the quote."
+      />
+    ) : (
+      <LockedStep
+        title="Finish the requirements first"
+        body="This opens once sales has provided the requirements, the requirements checklist is complete and the client input question is answered."
+      />
+    );
+
+  const saveButton = (label) =>
+    canEdit ? (
+      <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={saveEstimatorChecklist}>
+        {label}
+      </button>
+    ) : null;
+
   return (
     <div className="card card-pad">
       <div className="card-head" style={{ justifyContent: "space-between" }}>
@@ -285,201 +390,307 @@ export default function EstimationPanel({ opp, canEdit, onViewLead }) {
       <p className="sub">Solution options, cost build-up, sell price and target margin, verified before a proposal is prepared.</p>
 
       {onViewLead ? (
-        <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 20 }} onClick={onViewLead}>
+        <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={onViewLead}>
           Review the lead pack sales collected
         </button>
       ) : null}
 
+      {leadChanged ? (
+        <Alert tone="warning" style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <span>
+              Some information changed — sales edited the lead pack on{" "}
+              {formatDate(opp.leadEditedAt, { withTime: true, timeZone: unit?.timezone })}. Check it before you price
+              the job.
+            </span>
+            <span style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              {onViewLead ? (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={onViewLead}>
+                  Review the lead pack
+                </button>
+              ) : null}
+              <button type="button" className="btn btn-ghost btn-sm" onClick={dismissLeadChange}>
+                Dismiss
+              </button>
+            </span>
+          </div>
+        </Alert>
+      ) : null}
+
       {onHold ? (
-        <Alert tone="warning" style={{ marginBottom: 20 }}>
+        <Alert tone="warning" style={{ marginBottom: 12 }}>
           Estimation is on hold and sales has been notified. {opp.estimationOnHoldReason}
         </Alert>
       ) : null}
 
-      <div className="section">
-        <SectionHead icon={<ClipboardList size={13} />} title="Requirements from sales" />
-        <QuestionBlock title="Did sales provide the minimum required information for this lead?">
-          <YesNo value={opp.estimationRequirementsReceived} onChange={answerReceived} disabled={!canEdit || saving} />
-          {askingReceived ? (
-            <div style={{ marginTop: 14 }}>
-              <Field label="What's missing?" hint="sent to sales with the notification">
-                <textarea rows={2} value={holdReason} disabled={!canEdit} onChange={(e) => setHoldReason(e.target.value)} />
-              </Field>
-              {canEdit ? (
-                <button
-                  type="button"
-                  className="btn btn-danger btn-sm"
-                  style={{ marginTop: 12 }}
-                  disabled={saving || !holdReason.trim()}
-                  onClick={confirmNotReceived}
-                >
-                  Send back to sales
+      <Tabs items={tabs} value={tab} onChange={setTab} />
+
+      {tab === "requirements" ? (
+        <>
+          <div className="section">
+            <SectionHead icon={<ClipboardList size={13} />} title="Requirements from sales" />
+            <QuestionBlock title="Did sales provide the minimum required information for this lead?">
+              <YesNo value={opp.estimationRequirementsReceived} onChange={answerReceived} disabled={!canEdit || saving} />
+              {askingReceived ? (
+                <div style={{ marginTop: 14 }}>
+                  <Field label="What's missing?" hint="sent to sales with the notification">
+                    <textarea rows={2} value={holdReason} disabled={!canEdit} onChange={(e) => setHoldReason(e.target.value)} />
+                  </Field>
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      style={{ marginTop: 12 }}
+                      disabled={saving || !holdReason.trim()}
+                      onClick={confirmNotReceived}
+                    >
+                      Send back to sales
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </QuestionBlock>
+          </div>
+
+          {showRequirementsChecklist ? (
+            <div className="section" style={{ marginTop: 24 }}>
+              <SectionHead icon={<ListChecks size={13} />} title="Requirements checklist" />
+              <ChecklistProgress done={requirementsChecklist.length} total={REQUIREMENTS_CHECKLIST.length} />
+              <div className="checklist" style={{ margin: "16px 0" }}>
+                {REQUIREMENTS_CHECKLIST.map((item) => (
+                  <CheckItem
+                    key={item.key}
+                    label={item.label}
+                    checked={requirementsChecklist.includes(item.key)}
+                    disabled={!canEdit}
+                    onToggle={(on) => toggleRequirement(item.key, on)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {showClientInfoGate ? (
+            <div className="section" style={{ marginTop: 24 }}>
+              <SectionHead icon={<MessageCircleQuestion size={13} />} title="Client input" />
+              <QuestionBlock title="Does the client need to provide more input before this can be estimated?">
+                <YesNo value={opp.estimationClientInfoNeeded} onChange={answerClientInfo} disabled={!canEdit || saving} />
+              </QuestionBlock>
+            </div>
+          ) : null}
+
+          {requirementsDone ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => setTab("input")}
+            >
+              Continue to estimation input
+            </button>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "input" ? (
+        <EstimationInput
+          opp={opp}
+          canEdit={canEdit}
+          drawings={drawings}
+          onUploadDrawings={canEdit ? uploadDrawings : undefined}
+          uploadingDrawings={uploadingDrawings}
+        />
+      ) : null}
+
+      {tab === "requests" ? (
+        <StageRequestsPanel
+          opp={opp}
+          stage={2}
+          unit={unit}
+          canEdit={canEdit}
+          title="Requests raised from estimation"
+        />
+      ) : null}
+
+      {tab === "checklist" ? (
+        showEstimatorChecklist ? (
+          <>
+            <div className="section">
+              <SectionHead icon={<FileCheck2 size={13} />} title="Documents collected from client" />
+              <p className="lede" style={{ marginBottom: 16 }}>
+                As the client sends over what's missing, attach it here so it's on the record.
+              </p>
+              <FileDropzone files={clientDocuments} onSelect={uploadClientDocuments} disabled={!canEdit} uploading={uploadingDocs} />
+            </div>
+
+            <div className="section" style={{ marginTop: 24 }}>
+              <SectionHead icon={<ListChecks size={13} />} title="Estimator checklist" />
+              <p className="lede" style={{ marginBottom: 16 }}>
+                Work through this while the client's input is pending, or to record the site assessment.
+              </p>
+              <ChecklistProgress done={estimatorChecklistDone} total={ESTIMATOR_CHECKLIST.length} />
+              <div className="checklist" style={{ margin: "16px 0" }}>
+                {ESTIMATOR_CHECKLIST.map((item) => {
+                  const value = checklistValues[item.key] || "";
+                  return (
+                    <ChecklistRow key={item.key} done={!!value.trim()} label={item.label}>
+                      <Field>
+                        {item.type === "textarea" ? (
+                          <textarea
+                            rows={2}
+                            value={value}
+                            disabled={!canEdit}
+                            placeholder={item.placeholder}
+                            onChange={(e) => setChecklistValue(item.key, e.target.value)}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={value}
+                            disabled={!canEdit}
+                            placeholder={item.placeholder}
+                            onChange={(e) => setChecklistValue(item.key, e.target.value)}
+                          />
+                        )}
+                      </Field>
+                    </ChecklistRow>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {saveButton("Save checklist")}
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setTab("site-visit")}>
+                  Continue to pre-site visit
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          estimatorLocked
+        )
+      ) : null}
+
+      {tab === "site-visit" ? (
+        showEstimatorChecklist ? (
+          <div className="section">
+            <QuestionBlock title="Is a pre-site inspection required?">
+              <YesNo value={preSiteInspectionRequired} onChange={setPreSiteInspectionRequired} disabled={!canEdit} />
+            </QuestionBlock>
+
+            {preSiteInspectionRequired === true ? (
+              <div style={{ marginTop: 24, marginBottom: 20 }}>
+                <SectionHead icon={<HardHat size={13} />} title="Pre-site visit" />
+
+                <QuestionBlock title="Operations coordinator">
+                  {canEdit ? (
+                    <select value={opp.operationalCoordinatorId || ""} onChange={(e) => assignCoordinatorPerson(e.target.value)}>
+                      <option value="">Assign a coordinator</option>
+                      {siteOps.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="lede">{userName(opp.operationalCoordinatorId) || "No coordinator assigned yet."}</p>
+                  )}
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ marginTop: 12 }}
+                      disabled={saving}
+                      onClick={notifyCoordinator}
+                    >
+                      Notify operations coordinator
+                    </button>
+                  ) : null}
+                </QuestionBlock>
+
+                <QuestionBlock title="Site team member">
+                  {canEdit ? (
+                    <select
+                      value={siteVisitAssigneeId || ""}
+                      onChange={(e) => setSiteVisitAssigneeId(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Not assigned</option>
+                      {active.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="lede">{userName(siteVisitAssigneeId) || "Not assigned yet"}</p>
+                  )}
+                </QuestionBlock>
+
+                <QuestionBlock title="Site photos">
+                  <p className="lede" style={{ marginBottom: 12 }}>
+                    Photos from the site visit — access, electrical conditions, constraints.
+                  </p>
+                  <FileDropzone files={sitePhotos} onSelect={uploadSitePhotos} disabled={!canEdit} uploading={uploadingPhotos} />
+                </QuestionBlock>
+
+                <QuestionBlock title="Sketches & drawings">
+                  <p className="lede" style={{ marginBottom: 12 }}>
+                    Hand sketches, plans or design outputs from the site visit.
+                  </p>
+                  <FileDropzone
+                    files={siteSketches}
+                    onSelect={uploadSiteSketches}
+                    disabled={!canEdit}
+                    uploading={uploadingSketches}
+                  />
+                </QuestionBlock>
+
+                <QuestionBlock title="Has the site visit been completed?">
+                  <YesNo value={siteVisitCompleted} onChange={setSiteVisitCompleted} disabled={!canEdit} />
+                </QuestionBlock>
+              </div>
+            ) : null}
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {saveButton("Save site visit")}
+              {showQuoteBuilder ? (
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setTab("quote")}>
+                  Continue to quote
                 </button>
               ) : null}
             </div>
-          ) : null}
-        </QuestionBlock>
-      </div>
-
-      {showRequirementsChecklist ? (
-        <div className="section" style={{ marginTop: 24 }}>
-          <SectionHead icon={<ListChecks size={13} />} title="Requirements checklist" />
-          <ChecklistProgress done={requirementsChecklist.length} total={REQUIREMENTS_CHECKLIST.length} />
-          <div className="checklist" style={{ margin: "16px 0" }}>
-            {REQUIREMENTS_CHECKLIST.map((item) => (
-              <CheckItem
-                key={item.key}
-                label={item.label}
-                checked={requirementsChecklist.includes(item.key)}
-                disabled={!canEdit}
-                onToggle={(on) => toggleRequirement(item.key, on)}
-              />
-            ))}
           </div>
-        </div>
+        ) : (
+          estimatorLocked
+        )
       ) : null}
 
-      {showClientInfoGate ? (
-        <div className="section" style={{ marginTop: 24 }}>
-          <SectionHead icon={<MessageCircleQuestion size={13} />} title="Client input" />
-          <QuestionBlock title="Does the client need to provide more input before this can be estimated?">
-            <YesNo value={opp.estimationClientInfoNeeded} onChange={answerClientInfo} disabled={!canEdit || saving} />
-          </QuestionBlock>
-        </div>
+      {tab === "quote" ? (
+        showQuoteBuilder ? (
+          <>
+            <QuoteBuilder opp={opp} canEdit={canEdit} />
+            {quoteDone ? (
+              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("variations")}>
+                Continue to variation check
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <LockedStep
+            title="Quote not open yet"
+            body="The quote opens once estimation is ready — requirements confirmed and, if one is needed, the pre-site inspection completed."
+          />
+        )
       ) : null}
 
-      {showEstimatorChecklist ? (
-        <div className="section" style={{ marginTop: 24 }}>
-          <SectionHead icon={<FileCheck2 size={13} />} title="Documents collected from client" />
-          <p className="lede" style={{ marginBottom: 16 }}>
-            As the client sends over what's missing, attach it here so it's on the record.
-          </p>
-          <FileDropzone files={clientDocuments} onSelect={uploadClientDocuments} disabled={!canEdit} uploading={uploadingDocs} />
-        </div>
+      {tab === "variations" ? (
+        showQuoteBuilder && quoteDone ? (
+          <VariationCheck opp={opp} canEdit={canEdit} />
+        ) : (
+          <LockedStep
+            title="Nothing to check yet"
+            body="The variation check compares the quote with the default price list — create the quote and add items first."
+          />
+        )
       ) : null}
-
-      {showEstimatorChecklist ? (
-        <div className="section" style={{ marginTop: 24 }}>
-          <SectionHead icon={<ListChecks size={13} />} title="Estimator checklist" />
-          <p className="lede" style={{ marginBottom: 16 }}>
-            Work through this while the client's input is pending, or to record the site assessment.
-          </p>
-          <ChecklistProgress done={estimatorChecklistDone} total={ESTIMATOR_CHECKLIST.length} />
-          <div className="checklist" style={{ margin: "16px 0" }}>
-            {ESTIMATOR_CHECKLIST.map((item) => {
-              const value = checklistValues[item.key] || "";
-              return (
-                <ChecklistRow key={item.key} done={!!value.trim()} label={item.label}>
-                  <Field>
-                    {item.type === "textarea" ? (
-                      <textarea
-                        rows={2}
-                        value={value}
-                        disabled={!canEdit}
-                        placeholder={item.placeholder}
-                        onChange={(e) => setChecklistValue(item.key, e.target.value)}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={value}
-                        disabled={!canEdit}
-                        placeholder={item.placeholder}
-                        onChange={(e) => setChecklistValue(item.key, e.target.value)}
-                      />
-                    )}
-                  </Field>
-                </ChecklistRow>
-              );
-            })}
-          </div>
-
-          <QuestionBlock title="Is a pre-site inspection required?">
-            <YesNo value={preSiteInspectionRequired} onChange={setPreSiteInspectionRequired} disabled={!canEdit} />
-          </QuestionBlock>
-
-          {preSiteInspectionRequired === true ? (
-            <div style={{ marginTop: 24, marginBottom: 20 }}>
-              <SectionHead icon={<HardHat size={13} />} title="Pre-site visit" />
-
-              <QuestionBlock title="Operations coordinator">
-                {canEdit ? (
-                  <select value={opp.operationalCoordinatorId || ""} onChange={(e) => assignCoordinatorPerson(e.target.value)}>
-                    <option value="">Assign a coordinator</option>
-                    {siteOps.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="lede">{userName(opp.operationalCoordinatorId) || "No coordinator assigned yet."}</p>
-                )}
-                {canEdit ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ marginTop: 12 }}
-                    disabled={saving}
-                    onClick={notifyCoordinator}
-                  >
-                    Notify operations coordinator
-                  </button>
-                ) : null}
-              </QuestionBlock>
-
-              <QuestionBlock title="Site team member">
-                {canEdit ? (
-                  <select
-                    value={siteVisitAssigneeId || ""}
-                    onChange={(e) => setSiteVisitAssigneeId(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Not assigned</option>
-                    {active.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="lede">{userName(siteVisitAssigneeId) || "Not assigned yet"}</p>
-                )}
-              </QuestionBlock>
-
-              <QuestionBlock title="Site photos">
-                <p className="lede" style={{ marginBottom: 12 }}>
-                  Photos from the site visit — access, electrical conditions, constraints.
-                </p>
-                <FileDropzone files={sitePhotos} onSelect={uploadSitePhotos} disabled={!canEdit} uploading={uploadingPhotos} />
-              </QuestionBlock>
-
-              <QuestionBlock title="Sketches & drawings">
-                <p className="lede" style={{ marginBottom: 12 }}>
-                  Hand sketches, plans or design outputs from the site visit.
-                </p>
-                <FileDropzone
-                  files={siteSketches}
-                  onSelect={uploadSiteSketches}
-                  disabled={!canEdit}
-                  uploading={uploadingSketches}
-                />
-              </QuestionBlock>
-
-              <QuestionBlock title="Has the site visit been completed?">
-                <YesNo value={siteVisitCompleted} onChange={setSiteVisitCompleted} disabled={!canEdit} />
-              </QuestionBlock>
-            </div>
-          ) : null}
-
-          {canEdit ? (
-            <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={saveEstimatorChecklist}>
-              Save checklist &amp; site visit
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {showQuoteBuilder ? <QuoteBuilder opp={opp} canEdit={canEdit} /> : null}
 
       {state === "ready" ? (
         <Alert tone="success" style={{ marginTop: 24 }}>

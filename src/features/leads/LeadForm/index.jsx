@@ -1,6 +1,11 @@
-// Lead pack form: customer details, then the mandatory checklist — which
+// Lead pack form: the customer and site, then the mandatory checklist — which
 // folds in the optional client-visit capture and the potential-client
 // decision, in that order.
+//
+// Type of lead comes first: it decides whether the customer is a business
+// (business name + ABN) or a person, so nothing below it can be filled in
+// wrongly. The checklist below is what Estimation needs confirmed with the
+// customer before the lead can be marked Potential.
 
 import { useEffect, useState } from "react";
 import { Building2, Check, ClipboardCheck, PhoneCall, Plus, X } from "lucide-react";
@@ -10,7 +15,22 @@ import SectionHead from "@/components/SectionHead";
 import NumberInput from "@/components/NumberInput";
 import FileDropzone from "@/components/FileDropzone";
 import { AU_STATES } from "@/constants/stages";
-import { commissionTiersFor, leadSourceLabel, MANUAL_LEAD_SOURCES } from "@/features/leads/leadSourceOptions";
+import {
+  commissionTiersFor,
+  isBusinessLead,
+  LEAD_TYPES,
+  leadSourceLabel,
+  MANUAL_LEAD_SOURCES,
+} from "@/features/leads/leadSourceOptions";
+import {
+  ELECTRICAL_PHASES,
+  FINANCE_OPTIONS,
+  INSTALL_TIMEFRAMES,
+  ROOF_TYPES,
+  SERVICE_REQUIREMENTS,
+  STOREY_OPTIONS,
+} from "@/features/leads/propertyOptions";
+import { COMMON_LANGUAGES, DEFAULT_LANGUAGE } from "@/constants/languages";
 import { isAutomatedSource } from "@/features/leads/leadFormModel";
 import { isBlank } from "@/utils/validators";
 import ChecklistRow from "./ChecklistRow";
@@ -20,8 +40,73 @@ const SECTIONS = [
   { id: "lf-checklist", label: "Checklist", icon: ClipboardCheck },
 ];
 
+const BILLING_OPTIONS = [
+  { key: "yes", label: "Yes — bill to the site address" },
+  { key: "no", label: "No — different billing address" },
+];
+
 function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/**
+ * Radio group for a short set of answers (storeys, roof, phase, …), always
+ * ending in "Other". An "Other" answer is stored as the text the user types,
+ * so it reads naturally everywhere the value is shown; until something is
+ * typed the question counts as unanswered.
+ */
+function ChoiceGroup({ name, options, value, otherLabel = "answer", disabled, error, onChange }) {
+  const known = options.some((o) => o.key === value);
+  const [otherPicked, setOtherPicked] = useState(false);
+  const isOther = otherPicked || (!isBlank(value) && !known);
+
+  return (
+    <Field error={error}>
+      <div className="choice-grid">
+        {options.map((o) => (
+          <label key={o.key} className="choice">
+            <input
+              type="radio"
+              name={name}
+              checked={!isOther && value === o.key}
+              disabled={disabled}
+              onChange={() => {
+                setOtherPicked(false);
+                onChange(o.key);
+              }}
+            />
+            <span>
+              {o.label}
+              {o.hint ? <small>{o.hint}</small> : null}
+            </span>
+          </label>
+        ))}
+        <label className="choice">
+          <input
+            type="radio"
+            name={name}
+            checked={isOther}
+            disabled={disabled}
+            onChange={() => {
+              setOtherPicked(true);
+              if (known) onChange("");
+            }}
+          />
+          <span>Other</span>
+        </label>
+      </div>
+      {isOther ? (
+        <input
+          style={{ marginTop: 8 }}
+          value={known ? "" : value}
+          disabled={disabled}
+          autoFocus={otherPicked && isBlank(value)}
+          placeholder={`Type ${otherLabel}`}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : null}
+    </Field>
+  );
 }
 
 export default function LeadForm({
@@ -44,6 +129,12 @@ export default function LeadForm({
   const [active, setActive] = useState(visibleSections[0].id);
   const automated = isAutomatedSource(form.leadSource);
   const tiers = commissionTiersFor(unit);
+  const business = isBusinessLead(form.leadType);
+  // Records captured under an older, longer list (industrial, other) keep
+  // their type rather than silently reverting to "Select type".
+  const leadTypeOptions = LEAD_TYPES.some((t) => t.key === form.leadType) || isBlank(form.leadType)
+    ? LEAD_TYPES
+    : [...LEAD_TYPES, { key: form.leadType, label: form.leadType }];
 
   useEffect(() => {
     const nodes = visibleSections.map((s) => document.getElementById(s.id)).filter(Boolean);
@@ -72,6 +163,10 @@ export default function LeadForm({
     />
   );
 
+  const textarea = (field, props = {}) => (
+    <textarea rows={2} value={form[field]} disabled={disabled} onChange={(e) => set(field, e.target.value)} {...props} />
+  );
+
   const customFields = form.customFields || [];
   const setCustomField = (i, key, value) =>
     set(
@@ -81,8 +176,14 @@ export default function LeadForm({
   const addCustomField = () => set("customFields", [...customFields, { label: "", value: "" }]);
   const removeCustomField = (i) => set("customFields", customFields.filter((_, idx) => idx !== i));
 
+  // "Other" stays open while the language is being typed, so the picker
+  // doesn't snap back to English on the first keystroke.
+  const languageListed = COMMON_LANGUAGES.includes(form.preferredLanguage);
+  const [languageOther, setLanguageOther] = useState(false);
+  const languageIsOther = languageOther || (!isBlank(form.preferredLanguage) && !languageListed);
+
   const contactAttempts = form.contactAttempts || [];
-  const emptyAttemptDraft = { method: "", contactedAt: "", reached: true, reason: "" };
+  const emptyAttemptDraft = { method: "", contactedAt: "", reached: true, reason: "", notes: "" };
   const [attemptDraft, setAttemptDraft] = useState(emptyAttemptDraft);
   const attemptDraftValid =
     attemptDraft.method.trim() && attemptDraft.contactedAt && (attemptDraft.reached || attemptDraft.reason.trim());
@@ -96,17 +197,73 @@ export default function LeadForm({
   // One boolean per mandatory row — the single source of truth for both the
   // row ticks and the "Potential" gate/progress bar below.
   const doneContact = !form.needsClientContact || contactAttempts.length > 0;
-  const doneType = !isBlank(form.leadType);
+  const doneName = !isBlank(form.customerFirstName) && !isBlank(form.customerLastName);
   const doneAddress = !isBlank(form.siteLine1) && !isBlank(form.siteSuburb) && !isBlank(form.sitePostcode);
+  const siteAddressLine = [form.siteLine1, form.siteSuburb, `${form.siteState || ""} ${form.sitePostcode || ""}`.trim()]
+    .filter((part) => !isBlank(part))
+    .join(", ");
+  const doneService = !isBlank(form.serviceRequirement);
+  const doneBilling =
+    form.billingSameAsSite === "no"
+      ? !isBlank(form.customerBillingAddress)
+      : !isBlank(form.billingSameAsSite);
   const doneEmail = !isBlank(form.customerEmail);
   const donePhone = !isBlank(form.customerPhone);
+  const doneStoreys = !isBlank(form.propertyStoreys);
+  const doneRoof = !isBlank(form.roofType);
+  const donePhase = !isBlank(form.electricalPhase);
   const doneBills = form.energyHasBills || billFiles.length > 0;
   const doneUsage = !isBlank(form.energyAnnualKwh);
+  const doneFinance = !isBlank(form.financeAssistance) && (form.financeAssistance !== "yes" || !isBlank(form.financeNotes));
+  const doneSiteRequirements = form.siteRequirementsNone || !isBlank(form.siteSpecificRequirements);
+  const doneTimeframe = !isBlank(form.preferredInstallTimeframe);
+  const doneLocation = !isBlank(form.preferredInstallLocation);
+  const doneComments = !isBlank(form.customerComments);
+  const doneIntent = Boolean(form.customerIntentConfirmed);
   const doneSource = !isBlank(form.leadSource) && (automated || !isBlank(form.leadSourceDetails));
+  // Offers and budget are recorded when there are any — never a blocker.
+  const doneOffers = !isBlank(form.businessOffers) || !isBlank(form.customerBudget);
 
-  const requiredDone = [doneContact, doneType, doneAddress, doneEmail, donePhone, doneBills, doneUsage, doneSource];
-  const doneCount = requiredDone.filter(Boolean).length;
-  const checklistComplete = doneCount === requiredDone.length;
+  // Customer details are entered at the top of the form; the checklist row only
+  // confirms them, so it must say exactly which part is still missing.
+  const customerMissing = [
+    [!isBlank(form.leadType), "type of lead"],
+    [!business || !isBlank(form.customerLegalName), "business name"],
+    [!isBlank(form.customerFirstName), "first name"],
+    [!isBlank(form.customerLastName), "last name"],
+    [donePhone, "phone"],
+    [doneEmail, "email"],
+    [!isBlank(form.siteLine1), "site street"],
+    [!isBlank(form.siteSuburb), "suburb"],
+    [!isBlank(form.sitePostcode), "postcode"],
+  ]
+    .filter(([done]) => !done)
+    .map(([, label]) => label);
+  const doneCustomer = customerMissing.length === 0;
+
+  // One entry per mandatory row — the single source of truth for the row
+  // ticks, the progress bar and the "Potential" gate below.
+  const requiredRows = [
+    { label: "Contact client", done: doneContact },
+    { label: "Customer details", done: doneCustomer, missing: customerMissing },
+    { label: "Service requirement", done: doneService },
+    { label: "Billing address", done: doneBilling },
+    { label: "House type", done: doneStoreys },
+    { label: "Roof type", done: doneRoof },
+    { label: "Electrical phase", done: donePhase },
+    { label: "Electricity bills", done: doneBills },
+    { label: "Annual usage", done: doneUsage },
+    { label: "Finance assistance", done: doneFinance },
+    { label: "Site requirements & extra costs", done: doneSiteRequirements },
+    { label: "Preferred timeframe", done: doneTimeframe },
+    { label: "Preferred location", done: doneLocation },
+    { label: "Genuine interest", done: doneIntent },
+    { label: "Initial requirements & comments", done: doneComments },
+    { label: "Where they got our details", done: doneSource },
+  ];
+  const outstanding = requiredRows.filter((r) => !r.done);
+  const doneCount = requiredRows.length - outstanding.length;
+  const checklistComplete = outstanding.length === 0;
 
   return (
     <>
@@ -129,19 +286,61 @@ export default function LeadForm({
       <div className="section" id="lf-customer">
         <SectionHead icon={<Building2 size={13} />} title="Customer" />
         <div className="form-grid">
-          <Field label="Name" error={err("customerLegalName")}>
-            {input("customerLegalName")}
+          {/* First: a commercial lead is a business with an ABN, a
+              residential one is a person — the rest of the section follows. */}
+          <Field label="Type of lead" className="span-2" error={err("leadType")}>
+            <select value={form.leadType} disabled={disabled} onChange={(e) => set("leadType", e.target.value)}>
+              <option value="">Select type</option>
+              {leadTypeOptions.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="ABN">{input("customerAbn")}</Field>
+
+          {business ? (
+            <>
+              <Field label="Business name" error={err("customerLegalName")}>
+                {input("customerLegalName")}
+              </Field>
+              <Field label="ABN" hint="commercial leads only">
+                {input("customerAbn")}
+              </Field>
+            </>
+          ) : null}
+
+          <Field label={business ? "Contact first name" : "First name"} error={err("customerFirstName")}>
+            {input("customerFirstName", { autoComplete: "given-name" })}
+          </Field>
+          <Field label={business ? "Contact last name" : "Last name"} error={err("customerLastName")}>
+            {input("customerLastName", { autoComplete: "family-name" })}
+          </Field>
+
           <Field label="Phone" error={err("customerPhone")}>
             {input("customerPhone")}
           </Field>
-          <Field label="Email" className="span-2" error={err("customerEmail")}>
+          <Field label="Email" error={err("customerEmail")}>
             {input("customerEmail", { type: "email" })}
           </Field>
-          <Field label="Billing address" className="span-2">
-            {input("customerBillingAddress")}
+
+          <Field label="Site address" className="span-2" error={err("siteLine1")}>
+            {input("siteLine1", { placeholder: "Street" })}
           </Field>
+          <Field label="Suburb" error={err("siteSuburb")}>{input("siteSuburb", { placeholder: "Suburb" })}</Field>
+          <div className="form-grid" style={{ gap: 12 }}>
+            <Field label="State">
+              <select value={form.siteState} disabled={disabled} onChange={(e) => set("siteState", e.target.value)}>
+                {AU_STATES.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Postcode" error={err("sitePostcode")}>
+              {input("sitePostcode", { placeholder: "Postcode", inputMode: "numeric", maxLength: 4 })}
+            </Field>
+          </div>
+
           <Field label="Salesperson" hint="unlocks the mandatory checklist once set">
             <select value={form.salespersonId} disabled={disabled} onChange={(e) => set("salespersonId", e.target.value)}>
               <option value="">Later</option>
@@ -169,15 +368,16 @@ export default function LeadForm({
         <div className="section" id="lf-checklist">
           <SectionHead icon={<ClipboardCheck size={13} />} title="Mandatory checklist" />
           <p className="lede" style={{ marginBottom: 16 }}>
-            What Estimation needs before this lead can move forward — enter it directly, or upload the document.
+            What Estimation needs before this lead can move forward — confirm each one with the customer, or upload the
+            document.
           </p>
 
           <div className="checklist-progress">
             <span className="cp-label">
-              {doneCount} of {requiredDone.length} complete
+              {doneCount} of {requiredRows.length} complete
             </span>
             <div className="cp-track">
-              <i style={{ width: `${(doneCount / requiredDone.length) * 100}%` }} />
+              <i style={{ width: `${(doneCount / requiredRows.length) * 100}%` }} />
             </div>
           </div>
 
@@ -210,6 +410,7 @@ export default function LeadForm({
                                 {formatDate(a.contactedAt)}
                                 {a.reached === false && a.reason ? ` — ${a.reason}` : ""}
                               </div>
+                              {a.notes ? <div className="row-meta">{a.notes}</div> : null}
                             </div>
                           </div>
                           <button
@@ -270,6 +471,14 @@ export default function LeadForm({
                       />
                     </Field>
                   ) : null}
+                  <Field label="Notes" hint="what was discussed on this attempt">
+                    <textarea
+                      rows={2}
+                      value={attemptDraft.notes}
+                      disabled={disabled}
+                      onChange={(e) => setAttemptDraft((a) => ({ ...a, notes: e.target.value }))}
+                    />
+                  </Field>
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
@@ -283,51 +492,145 @@ export default function LeadForm({
               ) : null}
             </ChecklistRow>
 
-            <ChecklistRow done={doneType} label="Type">
-              <Field error={err("leadType")}>
-                <select value={form.leadType} disabled={disabled} onChange={(e) => set("leadType", e.target.value)}>
-                  <option value="">Select type</option>
-                  <option value="residential">Residential</option>
-                  <option value="commercial">Commercial</option>
-                  <option value="industrial">Industrial</option>
-                  <option value="other">Other</option>
-                </select>
-              </Field>
+            {/* Name, phone and email are captured once, at the top of the form —
+                this row only confirms them, it never asks again. */}
+            <ChecklistRow done={doneCustomer} label="Customer details">
+              <p className="lede" style={{ margin: 0 }}>
+                {business ? "Commercial" : form.leadType ? "Residential" : "Type not set"}
+                {business && form.customerLegalName ? ` · ${form.customerLegalName}` : ""}
+                {doneName ? ` · ${form.customerFirstName} ${form.customerLastName}` : " · Name incomplete"}
+                {business ? ` · ABN ${form.customerAbn || "not supplied"}` : ""}
+              </p>
+              <p className="lede" style={{ margin: "4px 0 0" }}>
+                {donePhone ? form.customerPhone : "Phone not entered"} · {doneEmail ? form.customerEmail : "Email not entered"}
+              </p>
+              <p className="lede" style={{ margin: "4px 0 0" }}>
+                {doneAddress ? siteAddressLine : "Site address incomplete"}
+              </p>
+              {customerMissing.length ? (
+                <p className="field-error" style={{ marginTop: 6 }}>
+                  Still needed above: {customerMissing.join(", ")}
+                </p>
+              ) : null}
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => scrollTo("lf-customer")}>
+                Edit above
+              </button>
             </ChecklistRow>
 
-            <ChecklistRow done={doneAddress} label="Address">
+            <ChecklistRow done={doneService} label="Service requirement">
+              <ChoiceGroup
+                name="lf-service"
+                otherLabel="service requirement"
+                options={SERVICE_REQUIREMENTS}
+                value={form.serviceRequirement}
+                disabled={disabled}
+                error={err("serviceRequirement")}
+                onChange={(v) => set("serviceRequirement", v)}
+              />
+            </ChecklistRow>
+
+            {/* The site address is captured above — only billing is asked here. */}
+            <ChecklistRow done={doneBilling} label="Billing address">
+              <p className="lede" style={{ margin: "0 0 10px" }}>
+                Is the site address also the billing address?
+              </p>
+              <ChoiceGroup
+                name="lf-billing"
+                otherLabel="billing address"
+                options={BILLING_OPTIONS}
+                value={form.billingSameAsSite}
+                disabled={disabled}
+                error={err("billingSameAsSite")}
+                onChange={(v) => set("billingSameAsSite", v)}
+              />
+              {form.billingSameAsSite === "no" ? (
+                <div style={{ marginTop: 10 }}>
+                  <Field label="Billing address" error={err("customerBillingAddress")}>
+                    {input("customerBillingAddress", { placeholder: "Street, suburb, state and postcode" })}
+                  </Field>
+                </div>
+              ) : null}
+            </ChecklistRow>
+
+            {/* Optional: only recorded when the customer would rather not deal
+                in English, so the lead can go to a native speaker. */}
+            <ChecklistRow done label="Preferred language">
+              <Field hint="optional — leave as English unless the customer asked otherwise">
+                <select
+                  value={languageIsOther ? "__other" : form.preferredLanguage}
+                  disabled={disabled}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setLanguageOther(value === "__other");
+                    set("preferredLanguage", value === "__other" ? "" : value);
+                  }}
+                >
+                  <option value="">{DEFAULT_LANGUAGE}</option>
+                  {COMMON_LANGUAGES.map((language) => (
+                    <option key={language} value={language}>
+                      {language}
+                    </option>
+                  ))}
+                  <option value="__other">Other…</option>
+                </select>
+              </Field>
+              {languageIsOther ? (
+                <div style={{ marginTop: 10 }}>
+                  <Field label="Language">
+                    {input("preferredLanguage", { placeholder: "Type the language", autoFocus: true })}
+                  </Field>
+                </div>
+              ) : null}
+            </ChecklistRow>
+
+            <ChecklistRow done={!isBlank(form.siteMapUrl)} label="Site access">
               <div className="form-grid">
-                <Field className="span-2" error={err("siteLine1")}>
-                  {input("siteLine1", { placeholder: "Street" })}
+                <Field label="Map location" className="span-2" error={err("siteMapUrl")}>
+                  {input("siteMapUrl", { placeholder: "Paste a Google Maps link" })}
                 </Field>
-                <Field error={err("siteSuburb")}>{input("siteSuburb", { placeholder: "Suburb" })}</Field>
-                <Field>
-                  <select value={form.siteState} disabled={disabled} onChange={(e) => set("siteState", e.target.value)}>
-                    {AU_STATES.map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
+                <Field label="Site contact" hint="if someone else meets us there">
+                  {input("siteContact", { placeholder: "Name and number" })}
                 </Field>
-                <Field>{input("sitePostcode", { placeholder: "Postcode" })}</Field>
-                <Field>{input("siteContact", { placeholder: "Site contact" })}</Field>
-                <Field className="span-2" label="Access notes" hint="gate codes, parking, hours">
+                <Field label="Access notes" hint="gate codes, parking, hours">
                   {input("siteAccessNotes")}
                 </Field>
               </div>
             </ChecklistRow>
 
-            <ChecklistRow done={!isBlank(form.siteMapUrl)} label="Map location">
-              <Field error={err("siteMapUrl")}>
-                {input("siteMapUrl", { placeholder: "Paste a Google Maps link" })}
-              </Field>
+            <ChecklistRow done={doneStoreys} label="House type">
+              <ChoiceGroup
+                name="lf-storeys"
+                otherLabel="house type"
+                options={STOREY_OPTIONS}
+                value={form.propertyStoreys}
+                disabled={disabled}
+                error={err("propertyStoreys")}
+                onChange={(v) => set("propertyStoreys", v)}
+              />
             </ChecklistRow>
 
-            <ChecklistRow done={doneEmail} label="Email">
-              <Field error={err("customerEmail")}>{input("customerEmail", { type: "email", placeholder: "Email" })}</Field>
+            <ChecklistRow done={doneRoof} label="Roof type">
+              <ChoiceGroup
+                name="lf-roof"
+                otherLabel="roof type"
+                options={ROOF_TYPES}
+                value={form.roofType}
+                disabled={disabled}
+                error={err("roofType")}
+                onChange={(v) => set("roofType", v)}
+              />
             </ChecklistRow>
 
-            <ChecklistRow done={donePhone} label="Phone number">
-              <Field error={err("customerPhone")}>{input("customerPhone", { placeholder: "Phone number" })}</Field>
+            <ChecklistRow done={donePhase} label="Electrical phase">
+              <ChoiceGroup
+                name="lf-phase"
+                otherLabel="electrical phase"
+                options={ELECTRICAL_PHASES}
+                value={form.electricalPhase}
+                disabled={disabled}
+                error={err("electricalPhase")}
+                onChange={(v) => set("electricalPhase", v)}
+              />
             </ChecklistRow>
 
             <ChecklistRow done={doneBills} label="Electricity bills">
@@ -360,8 +663,96 @@ export default function LeadForm({
               </Field>
             </ChecklistRow>
 
-            <ChecklistRow done={doneSource} label="Lead source">
-              <Field error={err("leadSource")}>
+            <ChecklistRow done={doneFinance} label="Finance assistance">
+              <ChoiceGroup
+                name="lf-finance"
+                otherLabel="finance assistance"
+                options={FINANCE_OPTIONS}
+                value={form.financeAssistance}
+                disabled={disabled}
+                error={err("financeAssistance")}
+                onChange={(v) => set("financeAssistance", v)}
+              />
+              {form.financeAssistance === "yes" ? (
+                <div style={{ marginTop: 10 }}>
+                  <Field label="What they need" hint="lender, loan type, deposit" error={err("financeNotes")}>
+                    {textarea("financeNotes", { placeholder: "e.g. zero-interest loan, 24 months" })}
+                  </Field>
+                </div>
+              ) : null}
+            </ChecklistRow>
+
+            <ChecklistRow done={doneSiteRequirements} label="Site requirements & extra costs">
+              <label className="check" style={{ marginBottom: form.siteRequirementsNone ? 0 : 10 }}>
+                <input
+                  type="checkbox"
+                  checked={form.siteRequirementsNone}
+                  disabled={disabled}
+                  onChange={(e) => set("siteRequirementsNone", e.target.checked)}
+                />
+                None identified at this site
+              </label>
+              {!form.siteRequirementsNone ? (
+                <Field
+                  hint="switchboard upgrade, asbestos, crane or scaffold access, long cable runs"
+                  error={err("siteSpecificRequirements")}
+                >
+                  {textarea("siteSpecificRequirements", { placeholder: "Anything that could add cost on site" })}
+                </Field>
+              ) : null}
+            </ChecklistRow>
+
+            <ChecklistRow done={doneTimeframe} label="Preferred timeframe">
+              <Field error={err("preferredInstallTimeframe")}>
+                <select
+                  value={form.preferredInstallTimeframe}
+                  disabled={disabled}
+                  onChange={(e) => set("preferredInstallTimeframe", e.target.value)}
+                >
+                  <option value="">When does the customer want it installed?</option>
+                  {INSTALL_TIMEFRAMES.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </ChecklistRow>
+
+            <ChecklistRow done={doneLocation} label="Preferred location">
+              <Field hint="where on site the system goes" error={err("preferredInstallLocation")}>
+                {input("preferredInstallLocation", { placeholder: "e.g. north-facing roof, garage wall for the battery" })}
+              </Field>
+            </ChecklistRow>
+
+            <ChecklistRow done={doneIntent} label="Genuine interest">
+              <label className="check" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={form.customerIntentConfirmed}
+                  disabled={disabled}
+                  onChange={(e) => set("customerIntentConfirmed", e.target.checked)}
+                />
+                Customer confirmed they are genuinely interested in proceeding
+              </label>
+              {err("customerIntentConfirmed") ? (
+                <p className="field-error" style={{ marginTop: 6 }}>
+                  {err("customerIntentConfirmed")}
+                </p>
+              ) : null}
+            </ChecklistRow>
+
+            <ChecklistRow done={doneComments} label="Initial requirements & comments">
+              <Field
+                hint="what they want from the system, anything else they asked for, financial options discussed"
+                error={err("customerComments")}
+              >
+                {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
+              </Field>
+            </ChecklistRow>
+
+            <ChecklistRow done={doneSource} label="Where they got our details">
+              <Field hint="feeds the referral reward program" error={err("leadSource")}>
                 {automated ? (
                   <input value={leadSourceLabel(form.leadSource)} disabled />
                 ) : (
@@ -415,35 +806,20 @@ export default function LeadForm({
               ) : null}
             </ChecklistRow>
 
-            <ChecklistRow done label="Discount from business owner?">
-              <label className="check" style={{ marginBottom: form.hasOwnerDiscount ? 10 : 0 }}>
-                <input
-                  type="checkbox"
-                  checked={form.hasOwnerDiscount}
-                  disabled={disabled}
-                  onChange={(e) => set("hasOwnerDiscount", e.target.checked)}
-                />
-                Any discount provided by the business owner
-              </label>
-              {form.hasOwnerDiscount ? (
-                <div className="form-grid">
-                  <Field label="Owner name" error={err("ownerDiscountName")}>
-                    <input
-                      value={form.ownerDiscountName}
-                      disabled={disabled}
-                      onChange={(e) => set("ownerDiscountName", e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Discount amount" error={err("ownerDiscountAmount")}>
-                    <NumberInput
-                      value={form.ownerDiscountAmount}
-                      disabled={disabled}
-                      min={0}
-                      onChange={(v) => set("ownerDiscountAmount", v)}
-                    />
-                  </Field>
-                </div>
-              ) : null}
+            <ChecklistRow done={doneOffers} label="Business offers & budget">
+              <div className="form-grid">
+                <Field label="Offers made" className="span-2" hint="promotions or pricing the customer was offered — leave blank if none">
+                  {textarea("businessOffers", { rows: 2, placeholder: "e.g. free monitoring for 12 months" })}
+                </Field>
+                <Field label="Customer budget" hint="if they gave one" error={err("customerBudget")}>
+                  <NumberInput
+                    value={form.customerBudget}
+                    disabled={disabled}
+                    min={0}
+                    onChange={(v) => set("customerBudget", v)}
+                  />
+                </Field>
+              </div>
             </ChecklistRow>
           </div>
 
@@ -492,9 +868,17 @@ export default function LeadForm({
           <div className="decision-card">
             <SectionHead icon={<Check size={13} />} title="Potential client?" />
             {!checklistComplete ? (
-              <p className="lede" style={{ marginBottom: 12 }}>
-                Complete the checklist above before deciding.
-              </p>
+              <div className="alert warning" style={{ marginBottom: 12 }}>
+                Complete the checklist before marking this lead Potential — Estimation needs all of it. Still open:
+                <ul>
+                  {outstanding.map((r) => (
+                    <li key={r.label}>
+                      {r.label}
+                      {r.missing?.length ? ` (${r.missing.join(", ")})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
             <div className="decision-actions">
               <button

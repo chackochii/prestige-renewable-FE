@@ -124,6 +124,28 @@ export async function submitEstimatorChecklist(id, body) {
   return unwrap(await apiClient.post(`/opportunities/${id}/estimation/checklist`, body));
 }
 
+/**
+ * Estimation Input — the pack an estimator gathers before BOQ preparation
+ * (see constants/estimationInput.js). body: { input } — the whole section is
+ * saved at once, the same way the estimator checklist is.
+ */
+export async function submitEstimationInput(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/input`, body));
+}
+
+/**
+ * Tells the assigned estimator the lead pack changed under them.
+ * body: { summary? } — sent after a save that edits a lead already handed over.
+ */
+export async function notifyEstimator(id, body = {}) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/notify-estimator`, body));
+}
+
+/** The estimator clearing the "lead details changed" notice on their screen. */
+export async function acknowledgeLeadChange(id) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/acknowledge-lead-change`));
+}
+
 /** Tells prestige-be to notify whoever holds the Sales Manager role about this lead. */
 export async function notifySalesManager(id) {
   return unwrap(await apiClient.post(`/opportunities/${id}/notify-sales-manager`));
@@ -179,4 +201,23 @@ export async function updateQuoteCost(id, costId, body) {
 
 export async function deleteQuoteCost(id, costId) {
   await apiClient.delete(`/opportunities/${id}/quote/costs/${costId}`);
+}
+
+// ---- Quote versions ------------------------------------------------------
+// A saved version is a frozen snapshot of the quote (see
+// helpers/invoice.js#invoiceSnapshot). The PDF is rebuilt from that snapshot
+// on view/download, so nothing needs storing but the snapshot itself.
+
+/** Saved quote versions for this opportunity, newest first. */
+export async function listQuoteVersions(id) {
+  return unwrap(await apiClient.get(`/opportunities/${id}/quote/versions`));
+}
+
+/**
+ * body: { quoteNumber, version, grandTotal, snapshot } — the server owns the
+ * version number (ours is a hint, so two people saving at once can't collide)
+ * and fills in createdAt and createdByName.
+ */
+export async function createQuoteVersion(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/versions`, body));
 }

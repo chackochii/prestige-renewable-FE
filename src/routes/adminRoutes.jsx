@@ -35,6 +35,7 @@ const WarrantyPage = lazy(() => import("@/pages/admin/WarrantyPage"));
 const ReferralsPage = lazy(() => import("@/pages/admin/ReferralsPage"));
 const DashboardsPage = lazy(() => import("@/pages/admin/DashboardsPage"));
 const NotificationsPage = lazy(() => import("@/pages/admin/NotificationsPage"));
+const RequestsPage = lazy(() => import("@/pages/admin/RequestsPage"));
 const UsersPage = lazy(() => import("@/pages/admin/UsersPage"));
 const RolesPage = lazy(() => import("@/pages/admin/RolesPage"));
 const PagesPage = lazy(() => import("@/pages/admin/PagesPage"));
@@ -61,6 +62,10 @@ export const workspaceRoutes = [
   { path: "referrers", element: page(PAGE_CODES.REFERRERS, <ReferralsPage />) },
   { path: "dashboards", element: page(PAGE_CODES.DASHBOARDS, <DashboardsPage />) },
   { path: "notifications", element: <NotificationsPage /> },
+  // Cross-department requests. Guarded by leads.read rather than a registry
+  // page so it works before the page catalog has a "requests" entry; add one
+  // to put it in the sidebar.
+  { path: "requests", element: permission(PERMISSIONS.LEADS_READ, <RequestsPage />) },
   { path: "admin", element: page(PAGE_CODES.ADMIN, <UsersPage />) },
   { path: "admin/users", element: <Navigate to="/admin" replace /> },
   { path: "admin/roles", element: page(PAGE_CODES.ADMIN, <RolesPage />) },
