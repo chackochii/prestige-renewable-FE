@@ -13,16 +13,25 @@
 // typing doesn't fire a request per keystroke.
 
 import { useEffect, useState } from "react";
-import { Download, FileSpreadsheet, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
+import { BadgePercent, Download, Eye, FileSpreadsheet, HandCoins, History, Pencil, Plus, Receipt, Save, Trash2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
+import LoadingState from "@/components/LoadingState";
 import Modal from "@/components/Modal";
 import NumberInput from "@/components/NumberInput";
 import SectionHead from "@/components/SectionHead";
-import { ADDITIONAL_COST_TYPES, PROJECT_TYPES, TAX_TREATMENTS } from "@/constants/catalog";
-import { additionalCostAmount, findCatalogItem, itemsSubtotal, lineTotal, quoteGstBreakdown } from "@/helpers/quote";
-import { downloadInvoice } from "@/helpers/invoice";
+import { COST_KINDS, PROJECT_TYPES, TAX_TREATMENTS } from "@/constants/catalog";
+import {
+  additionalCostAmount,
+  costsOfKind,
+  findCatalogItem,
+  itemsSubtotal,
+  lineTotal,
+  quoteGstBreakdown,
+} from "@/helpers/quote";
+import { downloadInvoice, invoicePreviewUrl, invoiceSnapshot, matchesSnapshot, versionOf } from "@/helpers/invoice";
+import { formatDate } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { fetchCatalog } from "@/slices/catalogSlice";
@@ -32,6 +41,8 @@ import {
   createOpportunityQuote,
   deleteQuoteCost,
   deleteQuoteItem,
+  fetchQuoteVersions,
+  saveQuoteVersion,
   updateOpportunityQuote,
   updateQuoteCost,
   updateQuoteItem,
@@ -170,6 +181,45 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
   );
 }
 
+const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
+
+/**
+ * Shows the quote PDF in the browser. `source` is { version } for a saved
+ * version or {} for the live quote; the blob URL is released on close.
+ */
+function QuotePreviewModal({ opp, quote, source, title, actions, onClose }) {
+  const [url, setUrl] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let created = null;
+    invoicePreviewUrl({ opp, quote, version: source.version })
+      .then((next) => {
+        created = next;
+        if (cancelled) URL.revokeObjectURL(next);
+        else setUrl(next);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(errText(err, "Could not build the quote PDF."));
+      });
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+    // Built once per open — the modal is remounted for each preview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Modal title={title} className="document" onClose={onClose} actions={actions}>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {!url && !error ? <LoadingState label="Building the PDF…" /> : null}
+      {url ? <iframe className="invoice-frame" src={url} title={title} /> : null}
+    </Modal>
+  );
+}
+
 const TAX_TREATMENT_HINT = {
   exclusive: "Prices below are GST-exclusive — GST is added on top.",
   inclusive: "Prices below are GST-inclusive — GST is already included in the total.",
@@ -178,14 +228,19 @@ const TAX_TREATMENT_HINT = {
 
 export default function QuoteBuilder({ opp, canEdit }) {
   const dispatch = useAppDispatch();
-  const { error: notifyError } = useNotifications();
+  const { notify, error: notifyError } = useNotifications();
   const quote = useAppSelector((s) => s.leads.quote);
   const catalogItems = useAppSelector((s) => s.catalog.items);
   const catalogStatus = useAppSelector((s) => s.catalog.status);
   const [modal, setModal] = useState(null); // null closed, { item } open (item null = add, set = edit)
   const [deleteId, setDeleteId] = useState(null);
   const [deletingItemBusy, setDeletingItemBusy] = useState(false);
-  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [downloading, setDownloading] = useState(null); // "draft" | version id
+  const [savingVersion, setSavingVersion] = useState(false);
+  const [preview, setPreview] = useState(null); // null closed, { version? } open
+  const versions = useAppSelector((s) => s.leads.versions);
+  const versionsStatus = useAppSelector((s) => s.leads.versionsStatus);
+  const versionsError = useAppSelector((s) => s.leads.versionsError);
   const [creating, setCreating] = useState(false);
   const [projectDraft, setProjectDraft] = useState("");
   const [projectTypeOtherDraft, setProjectTypeOtherDraft] = useState("");
@@ -195,6 +250,11 @@ export default function QuoteBuilder({ opp, canEdit }) {
   useEffect(() => {
     if (catalogStatus === "idle") dispatch(fetchCatalog());
   }, [catalogStatus, dispatch]);
+
+  const hasQuote = Boolean(quote);
+  useEffect(() => {
+    if (hasQuote) dispatch(fetchQuoteVersions(opp.id));
+  }, [hasQuote, opp.id, dispatch]);
 
   useEffect(() => {
     if (!quote) return;
@@ -232,6 +292,13 @@ export default function QuoteBuilder({ opp, canEdit }) {
       </div>
     );
   }
+
+  // The server numbers the versions; the list comes back newest first, so a
+  // row with no number falls back to its position in the list.
+  const latestVersion = versions.reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0);
+  const nextVersion = (latestVersion || versions.length) + 1;
+  const savedMatch = versions.some((version) => matchesSnapshot({ opp, quote }, version));
+  const versionLabel = (version) => `Version ${versionOf(version) ?? versions.length - versions.indexOf(version)}`;
 
   const items = itemsSubtotal(quote.items);
   const gst = quoteGstBreakdown({
@@ -273,16 +340,16 @@ export default function QuoteBuilder({ opp, canEdit }) {
     }
   };
 
-  const addCost = async () => {
+  const addCost = async (kind) => {
     try {
       await dispatch(
         addQuoteCost({
           id: opp.id,
-          body: { costType: ADDITIONAL_COST_TYPES[0], calcType: "fixed", value: 0, description: "" },
+          body: { kind, costType: COST_KINDS[kind].types[0], calcType: "fixed", value: 0, description: "" },
         }),
       ).unwrap();
     } catch (err) {
-      notifyError(typeof err === "string" ? err : err?.message || "Could not add the cost.");
+      notifyError(errText(err, `Could not add the ${COST_KINDS[kind].label.toLowerCase()}.`));
     }
   };
 
@@ -302,18 +369,159 @@ export default function QuoteBuilder({ opp, canEdit }) {
     try {
       await dispatch(deleteQuoteCost({ id: opp.id, costId })).unwrap();
     } catch (err) {
-      notifyError(typeof err === "string" ? err : err?.message || "Could not remove the cost.");
+      notifyError(errText(err, "Could not remove the line."));
     }
   };
 
-  const handleDownloadInvoice = async () => {
-    setDownloadingInvoice(true);
+  /**
+   * One of the three cost sections. They work the same way — only the cost
+   * types on offer and whether the amount is added or deducted differ.
+   */
+  const costSection = ({ kind, icon, addLabel, emptyText, hint }) => {
+    const meta = COST_KINDS[kind];
+    const rows = costsOfKind(quote.additionalCosts, kind);
+    return (
+      <div style={{ marginTop: 24 }}>
+        <SectionHead icon={icon} title={`${meta.label}s`} />
+        {hint ? (
+          <p className="lede" style={{ marginBottom: 12 }}>
+            {hint}
+          </p>
+        ) : null}
+        {canEdit ? (
+          <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={() => addCost(kind)}>
+            <Plus size={14} /> {addLabel}
+          </button>
+        ) : null}
+
+        {rows.length ? (
+          <div className="table-wrap">
+            <table className="table stack">
+              <thead>
+                <tr>
+                  <th>{meta.label} type</th>
+                  <th>Calculation Type</th>
+                  <th>Value</th>
+                  <th>{meta.deduction ? "Deducted" : "Calculated Amount"}</th>
+                  <th>Description</th>
+                  {canEdit ? <th>Actions</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((cost) => {
+                  const draft = costDrafts[cost.id] || { value: cost.value, description: cost.description };
+                  return (
+                    <tr key={cost.id}>
+                      <td data-label={`${meta.label} type`}>
+                        {canEdit ? (
+                          <select value={cost.costType} onChange={(e) => patchCostField(cost.id, { costType: e.target.value })}>
+                            {[...new Set([...meta.types, cost.costType].filter(Boolean))].map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          cost.costType
+                        )}
+                      </td>
+                      <td data-label="Calculation Type">
+                        {canEdit ? (
+                          <select value={cost.calcType} onChange={(e) => patchCostField(cost.id, { calcType: e.target.value })}>
+                            <option value="fixed">Fixed Amount</option>
+                            <option value="percentage">Percentage</option>
+                          </select>
+                        ) : cost.calcType === "percentage" ? (
+                          "Percentage"
+                        ) : (
+                          "Fixed Amount"
+                        )}
+                      </td>
+                      <td data-label="Value">
+                        {canEdit ? (
+                          <NumberInput
+                            value={draft.value}
+                            min={0}
+                            max={cost.calcType === "percentage" ? 100 : undefined}
+                            onChange={(v) => setCostDraftField(cost.id, "value", v)}
+                            onBlur={() => blurCostField(cost, "value")}
+                          />
+                        ) : cost.calcType === "percentage" ? (
+                          `${cost.value}%`
+                        ) : (
+                          formatCurrency(cost.value, { withCents: true })
+                        )}
+                      </td>
+                      <td data-label={meta.deduction ? "Deducted" : "Calculated Amount"}>
+                        {formatCurrency(additionalCostAmount(cost, items.total), { withCents: true })}
+                      </td>
+                      <td data-label="Description">
+                        {canEdit ? (
+                          <input
+                            type="text"
+                            value={draft.description}
+                            placeholder="Optional"
+                            onChange={(e) => setCostDraftField(cost.id, "description", e.target.value)}
+                            onBlur={() => blurCostField(cost, "description")}
+                          />
+                        ) : (
+                          cost.description || "—"
+                        )}
+                      </td>
+                      {canEdit ? (
+                        <td data-label="Actions">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => removeCost(cost.id)}
+                            aria-label={`Delete ${meta.label.toLowerCase()}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="lede">{emptyText}</p>
+        )}
+      </div>
+    );
+  };
+
+  /** Downloads the live quote as a draft, or one of the saved versions. */
+  const handleDownload = async (version) => {
+    setDownloading(version?.id ?? "draft");
     try {
-      await downloadInvoice({ opp, quote });
+      await downloadInvoice({ opp, quote, version });
     } catch (err) {
-      notifyError(typeof err === "string" ? err : err?.message || "Could not generate the invoice.");
+      notifyError(errText(err, "Could not generate the PDF."));
     } finally {
-      setDownloadingInvoice(false);
+      setDownloading(null);
+    }
+  };
+
+  /** Freezes the quote as it stands into a new version. */
+  const handleSaveVersion = async () => {
+    setSavingVersion(true);
+    try {
+      const snapshot = invoiceSnapshot({ opp, quote });
+      const saved = await dispatch(
+        saveQuoteVersion({
+          id: opp.id,
+          body: { quoteNumber: quote.quoteNumber, version: nextVersion, grandTotal: snapshot.grandTotal, snapshot },
+        }),
+      ).unwrap();
+      notify(`Version ${versionOf(saved) ?? nextVersion} saved`);
+      setPreview(null);
+    } catch (err) {
+      notifyError(errText(err, "Could not save the version."));
+    } finally {
+      setSavingVersion(false);
     }
   };
 
@@ -370,6 +578,39 @@ export default function QuoteBuilder({ opp, canEdit }) {
             onChange={(e) => patchHeaderField("quoteDate", e.target.value)}
           />
         </Field>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <SectionHead icon={<Receipt size={13} />} title="Tax treatment" />
+        <p className="lede" style={{ marginBottom: 12 }}>
+          Set this before adding items — it decides how every price below is read.
+        </p>
+        <div className="form-grid" style={{ marginBottom: 8 }}>
+          <Field label="Tax treatment">
+            <select
+              value={quote.taxTreatment}
+              disabled={!canEdit}
+              onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
+            >
+              {TAX_TREATMENTS.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="GST rate">
+            <NumberInput
+              value={gstRateDraft}
+              min={0}
+              max={100}
+              disabled={!canEdit || quote.taxTreatment === "no_gst"}
+              onChange={setGstRateDraft}
+              onBlur={blurGstRate}
+            />
+          </Field>
+        </div>
+        <Badge tone="neutral">{TAX_TREATMENT_HINT[quote.taxTreatment]}</Badge>
       </div>
 
       {canEdit ? (
@@ -434,138 +675,28 @@ export default function QuoteBuilder({ opp, canEdit }) {
         <p className="lede">No items yet — add the first line item.</p>
       )}
 
-      <div style={{ marginTop: 24 }}>
-        <SectionHead icon={<Receipt size={13} />} title="Additional costs" />
-        {canEdit ? (
-          <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={addCost}>
-            <Plus size={14} /> Add Cost
-          </button>
-        ) : null}
+      {costSection({
+        kind: "cost",
+        icon: <Receipt size={13} />,
+        addLabel: "Add Cost",
+        emptyText: "No additional costs yet.",
+      })}
 
-        {quote.additionalCosts.length ? (
-          <div className="table-wrap">
-            <table className="table stack">
-              <thead>
-                <tr>
-                  <th>Cost Type</th>
-                  <th>Calculation Type</th>
-                  <th>Value</th>
-                  <th>Calculated Amount</th>
-                  <th>Description</th>
-                  {canEdit ? <th>Actions</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {quote.additionalCosts.map((cost) => {
-                  const draft = costDrafts[cost.id] || { value: cost.value, description: cost.description };
-                  return (
-                    <tr key={cost.id}>
-                      <td data-label="Cost Type">
-                        {canEdit ? (
-                          <select value={cost.costType} onChange={(e) => patchCostField(cost.id, { costType: e.target.value })}>
-                            {ADDITIONAL_COST_TYPES.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          cost.costType
-                        )}
-                      </td>
-                      <td data-label="Calculation Type">
-                        {canEdit ? (
-                          <select value={cost.calcType} onChange={(e) => patchCostField(cost.id, { calcType: e.target.value })}>
-                            <option value="fixed">Fixed Amount</option>
-                            <option value="percentage">Percentage</option>
-                          </select>
-                        ) : cost.calcType === "percentage" ? (
-                          "Percentage"
-                        ) : (
-                          "Fixed Amount"
-                        )}
-                      </td>
-                      <td data-label="Value">
-                        {canEdit ? (
-                          <NumberInput
-                            value={draft.value}
-                            min={0}
-                            max={cost.calcType === "percentage" ? 100 : undefined}
-                            onChange={(v) => setCostDraftField(cost.id, "value", v)}
-                            onBlur={() => blurCostField(cost, "value")}
-                          />
-                        ) : cost.calcType === "percentage" ? (
-                          `${cost.value}%`
-                        ) : (
-                          formatCurrency(cost.value, { withCents: true })
-                        )}
-                      </td>
-                      <td data-label="Calculated Amount">{formatCurrency(additionalCostAmount(cost, items.total), { withCents: true })}</td>
-                      <td data-label="Description">
-                        {canEdit ? (
-                          <input
-                            type="text"
-                            value={draft.description}
-                            placeholder="Optional"
-                            onChange={(e) => setCostDraftField(cost.id, "description", e.target.value)}
-                            onBlur={() => blurCostField(cost, "description")}
-                          />
-                        ) : (
-                          cost.description || "—"
-                        )}
-                      </td>
-                      {canEdit ? (
-                        <td data-label="Actions">
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => removeCost(cost.id)}
-                            aria-label="Delete cost"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      ) : null}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="lede">No additional costs yet.</p>
-        )}
-      </div>
+      {costSection({
+        kind: "rebate",
+        icon: <HandCoins size={13} />,
+        addLabel: "Add Rebate",
+        emptyText: "No rebates yet.",
+        hint: "Entered as positive values and taken off the quote before GST.",
+      })}
 
-      <div style={{ marginTop: 24 }}>
-        <SectionHead icon={<Receipt size={13} />} title="Tax treatment" />
-        <div className="form-grid" style={{ marginBottom: 8 }}>
-          <Field label="Tax treatment">
-            <select
-              value={quote.taxTreatment}
-              disabled={!canEdit}
-              onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
-            >
-              {TAX_TREATMENTS.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="GST rate">
-            <NumberInput
-              value={gstRateDraft}
-              min={0}
-              max={100}
-              disabled={!canEdit || quote.taxTreatment === "no_gst"}
-              onChange={setGstRateDraft}
-              onBlur={blurGstRate}
-            />
-          </Field>
-        </div>
-        <Badge tone="neutral">{TAX_TREATMENT_HINT[quote.taxTreatment]}</Badge>
-      </div>
+      {costSection({
+        kind: "discount",
+        icon: <BadgePercent size={13} />,
+        addLabel: "Add Discount",
+        emptyText: "No discounts yet.",
+        hint: "Entered as positive values and taken off the quote before GST.",
+      })}
 
       <div className="list-stack" style={{ marginTop: 20, maxWidth: 320, marginLeft: "auto" }}>
         <div className="list-row">
@@ -578,8 +709,20 @@ export default function QuoteBuilder({ opp, canEdit }) {
         </div>
         <div className="list-row">
           <span className="row-title">Additional costs</span>
-          <span className="row-meta">{formatCurrency(gst.costsTotal, { withCents: true })}</span>
+          <span className="row-meta">{formatCurrency(gst.chargesTotal, { withCents: true })}</span>
         </div>
+        {gst.rebatesTotal ? (
+          <div className="list-row">
+            <span className="row-title">Rebates</span>
+            <span className="row-meta">-{formatCurrency(gst.rebatesTotal, { withCents: true })}</span>
+          </div>
+        ) : null}
+        {gst.discountsTotal ? (
+          <div className="list-row">
+            <span className="row-title">Discounts</span>
+            <span className="row-meta">-{formatCurrency(gst.discountsTotal, { withCents: true })}</span>
+          </div>
+        ) : null}
         <div className="list-row">
           <span className="row-title">Pre-Tax Total</span>
           <span className="row-meta">{formatCurrency(gst.preTaxTotal, { withCents: true })}</span>
@@ -596,11 +739,142 @@ export default function QuoteBuilder({ opp, canEdit }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 16, textAlign: "right" }}>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={handleDownloadInvoice} disabled={downloadingInvoice}>
-          <Download size={14} /> {downloadingInvoice ? "Preparing…" : "Download Invoice"}
+      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {savedMatch ? (
+          <Badge tone="success">Saved as a version</Badge>
+        ) : versions.length ? (
+          <Badge tone="warning">Edited since version {latestVersion || versions.length}</Badge>
+        ) : null}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPreview({})}>
+          <Eye size={14} /> View current quote
         </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => handleDownload(null)}
+          disabled={downloading === "draft"}
+        >
+          <Download size={14} /> {downloading === "draft" ? "Preparing…" : "Download draft"}
+        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={handleSaveVersion}
+            disabled={savingVersion || savedMatch}
+            title={savedMatch ? "Nothing has changed since the last saved version" : undefined}
+          >
+            <Save size={14} /> {savingVersion ? "Saving…" : `Save version ${nextVersion}`}
+          </button>
+        ) : null}
       </div>
+
+      <div style={{ marginTop: 28 }}>
+        <SectionHead icon={<History size={13} />} title="Quote versions" />
+        <p className="lede" style={{ marginBottom: 12 }}>
+          Every saved version keeps the quote exactly as it was — open one to preview it, or download it as a PDF.
+          Editing the quote lets you save the next version.
+        </p>
+        {versionsStatus === "loading" && !versions.length ? (
+          <LoadingState label="Loading versions…" />
+        ) : versionsError ? (
+          <Alert tone="warning">Saved versions could not be loaded ({versionsError}).</Alert>
+        ) : versions.length ? (
+          <div className="table-wrap">
+            <table className="table stack">
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Saved</th>
+                  <th>Saved by</th>
+                  <th>Total</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versions.map((version) => (
+                  <tr key={version.id}>
+                    <td data-label="Version">
+                      <button
+                        type="button"
+                        className="enquiry-link quote-version-link"
+                        onClick={() => setPreview({ version })}
+                        disabled={!version.snapshot}
+                      >
+                        {versionLabel(version)}
+                      </button>
+                      <div className="row-meta">
+                        Quote {version.quoteNumber || version.snapshot?.quote?.quoteNumber || "—"}
+                        {version.invoiceNumber ? ` · Invoice ${version.invoiceNumber}` : ""}
+                        {matchesSnapshot({ opp, quote }, version) ? " · matches the quote now" : ""}
+                      </div>
+                    </td>
+                    <td data-label="Saved">{formatDate(version.createdAt, { withTime: true })}</td>
+                    <td data-label="Saved by">{version.createdByName || "—"}</td>
+                    <td data-label="Total">
+                      {formatCurrency(version.grandTotal ?? version.snapshot?.grandTotal, { withCents: true })}
+                    </td>
+                    <td data-label="Actions">
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setPreview({ version })}
+                          disabled={!version.snapshot}
+                          aria-label={`Preview ${versionLabel(version)}`}
+                        >
+                          <Eye size={14} /> Preview
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => handleDownload(version)}
+                          disabled={!version.snapshot || downloading === version.id}
+                          aria-label={`Download ${versionLabel(version)}`}
+                        >
+                          <Download size={14} /> {downloading === version.id ? "Preparing…" : "Download"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="lede">No versions saved yet. Use “Save version 1” to keep a copy of the quote as it stands.</p>
+        )}
+      </div>
+
+      {preview ? (
+        <QuotePreviewModal
+          opp={opp}
+          quote={quote}
+          source={preview}
+          title={preview.version ? `${quote.quoteNumber} · ${versionLabel(preview.version)}` : `${quote.quoteNumber} · current quote`}
+          onClose={() => setPreview(null)}
+          actions={
+            <>
+              <button type="button" className="btn btn-ghost" onClick={() => setPreview(null)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => handleDownload(preview.version || null)}
+                disabled={downloading !== null}
+              >
+                <Download size={14} /> Download
+              </button>
+              {!preview.version && canEdit && !savedMatch ? (
+                <button type="button" className="btn btn-primary" onClick={handleSaveVersion} disabled={savingVersion}>
+                  <Save size={14} /> {savingVersion ? "Saving…" : `Save version ${nextVersion}`}
+                </button>
+              ) : null}
+            </>
+          }
+        />
+      ) : null}
 
       {modal ? (
         <ItemModal

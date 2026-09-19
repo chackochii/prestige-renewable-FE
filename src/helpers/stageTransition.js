@@ -34,9 +34,13 @@ export function qualificationGateItems(opp) {
 export function leadCompletenessItems(opp) {
   if (!opp) return [];
   const missing = [];
-  if (isBlank(opp.customerLegalName)) missing.push("Business name");
+  if (isBlank(opp.customerLegalName)) missing.push("Customer name");
   if (isBlank(opp.siteLine1) || isBlank(opp.siteSuburb)) missing.push("Site street and suburb");
+  if (isBlank(opp.propertyStoreys)) missing.push("House type (single or double storey)");
+  if (isBlank(opp.roofType)) missing.push("Roof type");
+  if (isBlank(opp.electricalPhase)) missing.push("Electrical phase");
   if (isBlank(opp.energyAnnualKwh) && !opp.energyHasBills) missing.push("Energy usage or bills");
+  if (isBlank(opp.preferredInstallTimeframe)) missing.push("Preferred installation timeframe");
   if (!opp.leadSource) missing.push("Lead source");
   if (opp.leadSource === "referrer" && !opp.referrerId) missing.push("Referrer");
   return missing;

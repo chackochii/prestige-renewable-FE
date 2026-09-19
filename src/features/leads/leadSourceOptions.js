@@ -7,6 +7,18 @@ export const LEAD_TYPES = [
   { key: "commercial", label: "Commercial" },
 ];
 
+/**
+ * Commercial leads are businesses: they trade under a business name and an
+ * ABN. Residential leads are people, so neither field is asked for.
+ */
+export function isBusinessLead(leadType) {
+  return leadType === "commercial";
+}
+
+export function leadTypeLabel(key) {
+  return LEAD_TYPES.find((t) => t.key === key)?.label || key || "—";
+}
+
 export const MANUAL_LEAD_SOURCES = [
   { key: "internal", label: "Internal outreach" },
   { key: "inbound", label: "Inbound enquiry" },

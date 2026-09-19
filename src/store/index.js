@@ -11,6 +11,7 @@ import rolesReducer from "@/slices/rolesSlice";
 import leadsReducer from "@/slices/leadsSlice";
 import estimationReducer from "@/slices/estimationSlice";
 import catalogReducer from "@/slices/catalogSlice";
+import collaborationReducer from "@/slices/collaborationSlice";
 import approvalsReducer from "@/slices/approvalsSlice";
 import procurementReducer from "@/slices/procurementSlice";
 import constructionReducer from "@/slices/constructionSlice";
@@ -30,6 +31,7 @@ export const store = configureStore({
     leads: leadsReducer,
     estimation: estimationReducer,
     catalog: catalogReducer,
+    collaboration: collaborationReducer,
     approvals: approvalsReducer,
     procurement: procurementReducer,
     construction: constructionReducer,

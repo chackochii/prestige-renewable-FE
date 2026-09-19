@@ -8,18 +8,25 @@
 // unchanged.
 
 import { isBlank, isEmail } from "@/utils/validators";
-import { MANUAL_LEAD_SOURCES } from "./leadSourceOptions";
+import { isBusinessLead, MANUAL_LEAD_SOURCES } from "./leadSourceOptions";
 
 const MANUAL_SOURCE_KEYS = MANUAL_LEAD_SOURCES.map((s) => s.key);
 
 export function emptyLeadForm() {
   return {
+    leadType: "",
     customerLegalName: "",
     customerTradingName: "",
     customerAbn: "",
+    customerFirstName: "",
+    customerLastName: "",
     customerEmail: "",
     customerPhone: "",
+    // Asked in the checklist only when billing differs from the site address.
+    billingSameAsSite: "",
     customerBillingAddress: "",
+    // Blank means English; anything else is what the customer prefers.
+    preferredLanguage: "",
     siteLine1: "",
     siteSuburb: "",
     siteState: "NSW",
@@ -29,11 +36,24 @@ export function emptyLeadForm() {
     siteAccessNotes: "",
     siteMapUrl: "",
     qualification: "nurture",
-    leadType: "",
     needsClientContact: false,
     contactAttempts: [],
+    serviceRequirement: "",
+    propertyStoreys: "",
+    roofType: "",
+    electricalPhase: "",
     energyAnnualKwh: "",
     energyHasBills: false,
+    financeAssistance: "",
+    financeNotes: "",
+    siteRequirementsNone: false,
+    siteSpecificRequirements: "",
+    preferredInstallTimeframe: "",
+    preferredInstallLocation: "",
+    customerIntentConfirmed: false,
+    customerComments: "",
+    businessOffers: "",
+    customerBudget: "",
     leadSource: "internal",
     leadSourceDetails: "",
     referrerId: "",
@@ -52,17 +72,40 @@ export function emptyLeadForm() {
 
 const str = (v) => (v === null || v === undefined ? "" : String(v));
 
+/**
+ * First and last name are captured separately. Records taken before they were
+ * split keep the whole name in customerLegalName — for a person that is
+ * "Jane Marie Smith", so everything but the final word is the first name. A
+ * business name is never split.
+ */
+function personName(opp) {
+  if (opp.customerFirstName || opp.customerLastName)
+    return { first: str(opp.customerFirstName), last: str(opp.customerLastName) };
+  if (isBusinessLead(opp.leadType)) return { first: "", last: "" };
+  const parts = str(opp.customerLegalName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return { first: parts[0] || "", last: "" };
+  return { first: parts.slice(0, -1).join(" "), last: parts[parts.length - 1] };
+}
+
 export function leadToForm(opp) {
   const base = emptyLeadForm();
   if (!opp) return base;
+  const name = personName(opp);
   return {
     ...base,
+    leadType: str(opp.leadType),
     customerLegalName: str(opp.customerLegalName),
     customerTradingName: str(opp.customerTradingName),
     customerAbn: str(opp.customerAbn),
+    customerFirstName: name.first,
+    customerLastName: name.last,
     customerEmail: str(opp.customerEmail),
     customerPhone: str(opp.customerPhone),
+    // Older records predate the question: a billing address already on file
+    // means it was captured separately from the site.
+    billingSameAsSite: str(opp.billingSameAsSite) || (opp.customerBillingAddress ? "no" : ""),
     customerBillingAddress: str(opp.customerBillingAddress),
+    preferredLanguage: str(opp.preferredLanguage),
     siteLine1: str(opp.siteLine1),
     siteSuburb: str(opp.siteSuburb),
     siteState: str(opp.siteState) || "NSW",
@@ -72,7 +115,6 @@ export function leadToForm(opp) {
     siteAccessNotes: str(opp.siteAccessNotes),
     siteMapUrl: str(opp.siteMapUrl),
     qualification: str(opp.qualification) || "nurture",
-    leadType: str(opp.leadType),
     needsClientContact: Boolean(opp.needsClientContact),
     contactAttempts: Array.isArray(opp.contactAttempts)
       ? opp.contactAttempts.map((a) => ({
@@ -80,10 +122,25 @@ export function leadToForm(opp) {
           contactedAt: str(a?.contactedAt),
           reached: a?.reached !== false,
           reason: str(a?.reason),
+          notes: str(a?.notes),
         }))
       : [],
+    serviceRequirement: str(opp.serviceRequirement),
+    propertyStoreys: str(opp.propertyStoreys),
+    roofType: str(opp.roofType),
+    electricalPhase: str(opp.electricalPhase),
     energyAnnualKwh: str(opp.energyAnnualKwh),
     energyHasBills: Boolean(opp.energyHasBills),
+    financeAssistance: str(opp.financeAssistance),
+    financeNotes: str(opp.financeNotes),
+    siteRequirementsNone: Boolean(opp.siteRequirementsNone),
+    siteSpecificRequirements: str(opp.siteSpecificRequirements),
+    preferredInstallTimeframe: str(opp.preferredInstallTimeframe),
+    preferredInstallLocation: str(opp.preferredInstallLocation),
+    customerIntentConfirmed: Boolean(opp.customerIntentConfirmed),
+    customerComments: str(opp.customerComments),
+    businessOffers: str(opp.businessOffers),
+    customerBudget: str(opp.customerBudget),
     leadSource: str(opp.leadSource) || "internal",
     leadSourceDetails: str(opp.leadSourceDetails),
     referrerId: str(opp.referrerId),
@@ -103,6 +160,13 @@ export function leadToForm(opp) {
 }
 
 const trim = (v) => String(v ?? "").trim();
+/** The customer's name as one string, for records that display a single name. */
+/** The site address as one line — what billing uses when it is the same. */
+const siteAddress = (form) =>
+  [trim(form.siteLine1), trim(form.siteSuburb), `${form.siteState || ""} ${trim(form.sitePostcode)}`.trim()]
+    .filter(Boolean)
+    .join(", ");
+const fullName = (form) => [trim(form.customerFirstName), trim(form.customerLastName)].filter(Boolean).join(" ");
 export const idOrNull = (v) => (isBlank(v) ? null : Number(v));
 const numberOrNull = (v) => (isBlank(v) ? null : Number(v));
 
@@ -118,13 +182,22 @@ export function isAutomatedSource(source) {
  * leadsApi.js), called separately by LeadPackPanel/NewLeadPage.
  */
 export function formToPayload(form) {
+  const business = isBusinessLead(form.leadType);
   const payload = {
-    customerLegalName: trim(form.customerLegalName),
+    leadType: form.leadType,
+    // customerLegalName stays the record's display name everywhere else in
+    // the app: the business name for a commercial lead, the person's full
+    // name for a residential one.
+    customerLegalName: business ? trim(form.customerLegalName) : fullName(form),
     customerTradingName: trim(form.customerTradingName),
-    customerAbn: trim(form.customerAbn),
+    customerAbn: business ? trim(form.customerAbn) : "",
+    customerFirstName: trim(form.customerFirstName),
+    customerLastName: trim(form.customerLastName),
     customerEmail: trim(form.customerEmail),
     customerPhone: trim(form.customerPhone),
-    customerBillingAddress: trim(form.customerBillingAddress),
+    billingSameAsSite: trim(form.billingSameAsSite),
+    customerBillingAddress: form.billingSameAsSite === "yes" ? siteAddress(form) : trim(form.customerBillingAddress),
+    preferredLanguage: trim(form.preferredLanguage),
     siteLine1: trim(form.siteLine1),
     siteSuburb: trim(form.siteSuburb),
     siteState: form.siteState,
@@ -134,7 +207,6 @@ export function formToPayload(form) {
     siteAccessNotes: trim(form.siteAccessNotes),
     siteMapUrl: trim(form.siteMapUrl),
     qualification: form.potential === "yes" ? "qualified" : form.potential === "no" ? "disqualified" : "nurture",
-    leadType: form.leadType,
     needsClientContact: Boolean(form.needsClientContact),
     contactAttempts: form.needsClientContact
       ? (form.contactAttempts || []).map((a) => ({
@@ -142,11 +214,28 @@ export function formToPayload(form) {
           contactedAt: a.contactedAt || null,
           reached: a.reached !== false,
           reason: a.reached === false ? trim(a.reason) : "",
+          notes: trim(a.notes),
         }))
       : [],
+    serviceRequirement: trim(form.serviceRequirement),
+    propertyStoreys: trim(form.propertyStoreys),
+    roofType: trim(form.roofType),
+    electricalPhase: trim(form.electricalPhase),
     energyAnnualKwh: numberOrNull(form.energyAnnualKwh),
     energyHasBills: Boolean(form.energyHasBills),
+    financeAssistance: trim(form.financeAssistance),
+    financeNotes: form.financeAssistance === "yes" ? trim(form.financeNotes) : "",
+    siteRequirementsNone: Boolean(form.siteRequirementsNone),
+    siteSpecificRequirements: form.siteRequirementsNone ? "" : trim(form.siteSpecificRequirements),
+    preferredInstallTimeframe: form.preferredInstallTimeframe,
+    preferredInstallLocation: trim(form.preferredInstallLocation),
+    customerIntentConfirmed: Boolean(form.customerIntentConfirmed),
+    customerComments: trim(form.customerComments),
+    businessOffers: trim(form.businessOffers),
+    customerBudget: numberOrNull(form.customerBudget),
     leadSourceDetails: trim(form.leadSourceDetails),
+    // Owner discounts moved out of lead capture — passed back untouched so
+    // anything already recorded against the job survives a save here.
     hasOwnerDiscount: Boolean(form.hasOwnerDiscount),
     ownerDiscountName: form.hasOwnerDiscount ? trim(form.ownerDiscountName) : "",
     ownerDiscountAmount: form.hasOwnerDiscount ? numberOrNull(form.ownerDiscountAmount) : null,
@@ -167,7 +256,13 @@ export function formToPayload(form) {
 
 export function validateLeadForm(form) {
   const errors = {};
-  if (isBlank(form.customerLegalName)) errors.customerLegalName = "Enter the customer name.";
+  // Type comes first on the form: it decides whether the customer is a
+  // business (name + ABN) or a person.
+  if (isBlank(form.leadType)) errors.leadType = "Select the type of lead.";
+  if (isBusinessLead(form.leadType) && isBlank(form.customerLegalName))
+    errors.customerLegalName = "Enter the business name.";
+  if (isBlank(form.customerFirstName)) errors.customerFirstName = "Enter the first name.";
+  if (isBlank(form.customerLastName)) errors.customerLastName = "Enter the last name.";
   if (!isBlank(form.customerEmail) && !isEmail(form.customerEmail)) errors.customerEmail = "Enter a valid customer email.";
   if (isBlank(form.customerPhone) && isBlank(form.customerEmail)) {
     errors.customerPhone = "Enter a phone number or email.";
@@ -182,23 +277,42 @@ export function validateLeadForm(form) {
   if (isBlank(form.salespersonId)) return errors;
 
   if (!isBlank(form.energyAnnualKwh) && Number(form.energyAnnualKwh) < 0) errors.energyAnnualKwh = "Usage cannot be negative.";
+  if (form.billingSameAsSite === "no" && isBlank(form.customerBillingAddress))
+    errors.customerBillingAddress = "Enter the billing address.";
+  if (form.financeAssistance === "yes" && isBlank(form.financeNotes))
+    errors.financeNotes = "Record what finance assistance the customer needs.";
   if (!form.leadSource) errors.leadSource = "Select a lead source.";
   if (form.leadSource === "referrer" && isBlank(form.referrerId))
     errors.referrerId = "Select the referrer who introduced this lead.";
-  if (isBlank(form.leadType)) errors.leadType = "Select a type.";
   if (form.needsClientContact && !(form.contactAttempts || []).length)
     errors.contactAttempts = "Log at least one contact attempt.";
   if ((form.contactAttempts || []).some((a) => a.reached === false && isBlank(a.reason)))
     errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
-  if (form.hasOwnerDiscount) {
-    if (isBlank(form.ownerDiscountName)) errors.ownerDiscountName = "Enter the owner's name.";
-    if (isBlank(form.ownerDiscountAmount)) errors.ownerDiscountAmount = "Enter the discount amount.";
-    if (!isBlank(form.ownerDiscountAmount) && Number(form.ownerDiscountAmount) < 0)
-      errors.ownerDiscountAmount = "Discount cannot be negative.";
-  }
+  if (!isBlank(form.customerBudget) && Number(form.customerBudget) < 0)
+    errors.customerBudget = "A budget cannot be negative.";
   if (form.potential === "no" && isBlank(form.notPotentialReason))
     errors.notPotentialReason = "Enter the reason this isn't a potential client.";
-  if (form.potential === "yes" && isBlank(form.estimatorId))
-    errors.estimatorId = "Assign an estimator for this potential client.";
+  // A lead is only "Potential" once Estimation has everything it needs — the
+  // checklist above gates the decision, and these back it up on save.
+  if (form.potential === "yes") {
+    if (isBlank(form.estimatorId)) errors.estimatorId = "Assign an estimator for this potential client.";
+    if (isBlank(form.serviceRequirement)) errors.serviceRequirement = "Record whether they want solar, battery or both.";
+    if (isBlank(form.billingSameAsSite))
+      errors.billingSameAsSite = "Confirm whether the site address is the billing address.";
+    if (isBlank(form.customerComments)) errors.customerComments = "Record the initial customer requirements and comments.";
+    if (isBlank(form.propertyStoreys)) errors.propertyStoreys = "Confirm whether the house is single or double storey.";
+    if (isBlank(form.roofType)) errors.roofType = "Confirm the roof type.";
+    if (isBlank(form.electricalPhase)) errors.electricalPhase = "Confirm the electrical phase.";
+    if (isBlank(form.financeAssistance))
+      errors.financeAssistance = "Record whether the customer needs finance assistance.";
+    if (!form.siteRequirementsNone && isBlank(form.siteSpecificRequirements))
+      errors.siteSpecificRequirements = "Record any site-specific requirements, or tick that there are none.";
+    if (isBlank(form.preferredInstallTimeframe))
+      errors.preferredInstallTimeframe = "Confirm the preferred installation timeframe.";
+    if (isBlank(form.preferredInstallLocation))
+      errors.preferredInstallLocation = "Confirm the preferred installation location.";
+    if (!form.customerIntentConfirmed)
+      errors.customerIntentConfirmed = "Confirm the customer is genuinely interested in proceeding.";
+  }
   return errors;
 }

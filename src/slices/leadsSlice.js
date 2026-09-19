@@ -27,6 +27,9 @@ const initialState = {
   quote: null,
   quoteStatus: "idle",
   quoteError: null,
+  versions: [],
+  versionsStatus: "idle",
+  versionsError: null,
 };
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
@@ -210,11 +213,45 @@ export const submitEstimationClientInfo = createAsyncThunk(
   },
 );
 
+export const submitEstimationInput = createAsyncThunk(
+  "leads/estimation/input",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.submitEstimationInput(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
 export const submitEstimatorChecklist = createAsyncThunk(
   "leads/estimation/checklist",
   async ({ id, body }, { rejectWithValue }) => {
     try {
       return await api.submitEstimatorChecklist(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+/** Fire-and-forget — no opportunity fields change, so nothing to store here. */
+export const notifyEstimator = createAsyncThunk(
+  "leads/notifyEstimator",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.notifyEstimator(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const acknowledgeLeadChange = createAsyncThunk(
+  "leads/acknowledgeLeadChange",
+  async (id, { rejectWithValue }) => {
+    try {
+      return await api.acknowledgeLeadChange(id);
     } catch (err) {
       return reject(err, rejectWithValue);
     }
@@ -336,6 +373,27 @@ export const deleteQuoteCost = createAsyncThunk(
   },
 );
 
+// ---- Quote versions -----------------------------------------------------
+
+export const fetchQuoteVersions = createAsyncThunk("leads/quote/versions/fetch", async (id, { rejectWithValue }) => {
+  try {
+    return await api.listQuoteVersions(id);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+export const saveQuoteVersion = createAsyncThunk(
+  "leads/quote/versions/save",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.createQuoteVersion(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
 const upsert = (state, opp) => {
   if (!opp) return;
   const idx = state.items.findIndex((o) => o.id === opp.id);
@@ -364,6 +422,9 @@ const leadsSlice = createSlice({
       state.quote = null;
       state.quoteStatus = "idle";
       state.quoteError = null;
+      state.versions = [];
+      state.versionsStatus = "idle";
+      state.versionsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -453,6 +514,8 @@ const leadsSlice = createSlice({
       .addCase(assignCoordinator.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimationRequirements.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimationClientInfo.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(acknowledgeLeadChange.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(submitEstimationInput.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimatorChecklist.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(fetchOpportunityQuote.pending, (state) => {
         state.quoteStatus = "loading";
@@ -491,6 +554,21 @@ const leadsSlice = createSlice({
       })
       .addCase(deleteQuoteCost.fulfilled, (state, action) => {
         if (state.quote) state.quote.additionalCosts = state.quote.additionalCosts.filter((c) => c.id !== action.payload);
+      })
+      .addCase(fetchQuoteVersions.pending, (state) => {
+        state.versionsStatus = "loading";
+        state.versionsError = null;
+      })
+      .addCase(fetchQuoteVersions.fulfilled, (state, action) => {
+        state.versionsStatus = "succeeded";
+        state.versions = action.payload || [];
+      })
+      .addCase(fetchQuoteVersions.rejected, (state, action) => {
+        state.versionsStatus = "failed";
+        state.versionsError = action.payload;
+      })
+      .addCase(saveQuoteVersion.fulfilled, (state, action) => {
+        if (action.payload) state.versions.unshift(action.payload);
       })
       .addCase(logout, () => initialState);
   },
