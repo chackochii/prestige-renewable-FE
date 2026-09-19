@@ -125,6 +125,15 @@ export async function submitEstimatorChecklist(id, body) {
 }
 
 /**
+ * Estimation collecting an optional lead input the client had to supply.
+ * body: { input } — a partial estimationInput, merged server-side. Guarded by
+ * estimation.update: it is the estimator's work, not the lead pack.
+ */
+export async function collectEstimationInputs(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/collected-inputs`, body));
+}
+
+/**
  * The estimation-side gate: the estimator has reviewed what sales supplied and
  * confirms BOQ preparation can start. Returning it to sales instead goes
  * through submitEstimationRequirements({ received: false, reason }).

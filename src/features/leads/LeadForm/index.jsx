@@ -30,6 +30,7 @@ import {
   ROOF_TYPES,
   SERVICE_REQUIREMENTS,
   STOREY_OPTIONS,
+  electricalPhaseLabel,
 } from "@/features/leads/propertyOptions";
 import { COMMON_LANGUAGES, DEFAULT_LANGUAGE } from "@/constants/languages";
 import {
@@ -42,9 +43,19 @@ import {
   inspectionStatusLabel,
   systemSizeKw,
 } from "@/constants/estimationInput";
+import { TECHNICAL_GROUP } from "@/helpers/leadChecklist";
 import { isAutomatedSource } from "@/features/leads/leadFormModel";
 import { isBlank } from "@/utils/validators";
 import ChecklistRow from "./ChecklistRow";
+
+/** Heading above a run of estimation-input rows — the same titles estimation shows. */
+function GroupHead({ title }) {
+  return (
+    <div className="input-group-head">
+      <h4>{title}</h4>
+    </div>
+  );
+}
 
 const BILLING_OPTIONS = [
   { key: "yes", label: "Yes — bill to the site address" },
@@ -234,6 +245,7 @@ export default function LeadForm({
       : !isBlank(form.billingSameAsSite);
   const doneEmail = !isBlank(form.customerEmail);
   const donePhone = !isBlank(form.customerPhone);
+  const doneMeasurements = !isBlank(form.roofMeasurements);
   const doneStoreys = !isBlank(form.propertyStoreys);
   const doneRoof = !isBlank(form.roofType);
   const donePhase = !isBlank(form.electricalPhase);
@@ -273,6 +285,7 @@ export default function LeadForm({
     { label: "Customer details", done: doneCustomer, missing: customerMissing },
     { label: "Service requirement", done: doneService },
     { label: "Billing address", done: doneBilling },
+    { label: "Roof / site measurements", done: doneMeasurements },
     { label: "House type", done: doneStoreys },
     { label: "Roof type", done: doneRoof },
     { label: "Electrical phase", done: donePhase },
@@ -625,7 +638,13 @@ export default function LeadForm({
                 </div>
               </ChecklistRow>
 
-              <ChecklistRow done={doneStoreys} label="House type">
+              <ChecklistRow done={doneMeasurements} label="Roof / site measurements">
+              <Field hint="dimensions, usable area, tilt — what estimation sizes the system from">
+                {textarea("roofMeasurements")}
+              </Field>
+            </ChecklistRow>
+
+            <ChecklistRow done={doneStoreys} label="House type">
                 <ChoiceGroup
                   name="lf-storeys"
                   otherLabel="house type"
@@ -854,11 +873,9 @@ export default function LeadForm({
             <div className="checklist" style={{ marginBottom: 20 }}>
               {/* ---- What estimation needs before BOQ preparation ---- */}
 
-              <ChecklistRow done={!isBlank(form.siteType)} label="Site type">
-                <Field>{selectField("siteType", SITE_TYPES, "Residential, commercial or industrial")}</Field>
-              </ChecklistRow>
+              <GroupHead title="Site & Inspection" />
 
-              <ChecklistRow done={!isBlank(form.preSiteInspectionRequired)} label="Pre-site inspection">
+                <ChecklistRow done={!isBlank(form.preSiteInspectionRequired)} label="Pre-site inspection">
                 <Field label="Inspection required">{yesNo("preSiteInspectionRequired")}</Field>
                 {inspectionNeeded ? (
                   <div style={{ marginTop: 10 }}>
@@ -903,15 +920,21 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={!isBlank(form.roofMeasurements)} label="Roof / site measurements">
-                <Field hint="dimensions, usable area, tilt">{textarea("roofMeasurements")}</Field>
-              </ChecklistRow>
+              <GroupHead title={TECHNICAL_GROUP} />
 
               <ChecklistRow
                 done={!isBlank(form.existingElectrical) || !isBlank(form.switchboardCondition)}
                 label="Existing electrical system"
               >
                 <div className="form-grid">
+                  <Field label="Electrical phase" hint="confirmed during lead qualification">
+                    <input
+                      type="text"
+                      value={electricalPhaseLabel(form.electricalPhase) || "Not confirmed yet"}
+                      disabled
+                      readOnly
+                    />
+                  </Field>
                   <Field label="Main switchboard / DB">
                     {selectField("switchboardCondition", SWITCHBOARD_CONDITIONS, "Select condition")}
                   </Field>
@@ -987,7 +1010,7 @@ export default function LeadForm({
 
               <ChecklistRow
                 done={!isBlank(form.mountingRequirements) || !isBlank(form.siteConstraints)}
-                label="Mounting, shading & installation"
+                label="Mounting, shading & site constraints"
               >
                 <div className="form-grid">
                   <Field label="Mounting / roof structure" className="span-2" hint="tilt frames, rail type, structural notes">
@@ -995,10 +1018,18 @@ export default function LeadForm({
                   </Field>
                   <Field label="Cable, conduit & trunking" className="span-2">{textarea("cableRequirements")}</Field>
                   <Field label="Shading, orientation & constraints" className="span-2">{textarea("siteConstraints")}</Field>
-                  <Field label="Special installation requirements" className="span-2" hint="crane, scaffold, after-hours">
-                    {textarea("specialRequirements")}
-                  </Field>
                 </div>
+              </ChecklistRow>
+
+              <GroupHead title="Installation, Permits & Utility" />
+
+              <ChecklistRow
+                done={!isBlank(form.specialRequirements)}
+                label="Special installation requirements"
+              >
+                <Field label="Special requirements" hint="crane, scaffold, after-hours">
+                  {textarea("specialRequirements")}
+                </Field>
               </ChecklistRow>
 
               <ChecklistRow
@@ -1051,6 +1082,8 @@ export default function LeadForm({
                   )}
                 </div>
               </ChecklistRow>
+
+              <GroupHead title="Customer-Specific Notes" />
 
               <ChecklistRow
                 done={!isBlank(form.inclusions) || !isBlank(form.exclusions)}

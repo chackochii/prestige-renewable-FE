@@ -1,9 +1,9 @@
 // Lead → Estimation Input Checklist.
 //
-// This belongs to the LEAD module, not to estimation: it is the last gate
-// before a lead is handed over, filled in by the sales representative. The
-// estimator does not re-enter any of it — they review what arrived and either
-// accept it or send it back (see features/estimation/InputReview).
+// These belong to the LEAD module: optional rows on the lead checklist that
+// travel to estimation with the lead. Estimation does not re-enter them — it
+// reads what arrived and collects whatever sales left blank, straight from
+// the client (see features/estimation/LeadInputs).
 //
 // Anything already captured during lead qualification is inherited, never
 // asked for twice: customer contact, installation address, enquiry scope and
