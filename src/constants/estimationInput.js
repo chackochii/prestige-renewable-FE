@@ -1,22 +1,24 @@
-// Estimation Input — what has to be gathered before a BOQ can be prepared.
+// Lead → Estimation Input Checklist.
 //
-// Each item names its owner: most are the estimator's, but the customer scope
-// is written by the sales representative who spoke to the customer. Owners are
-// shown on the form as a label, not enforced — anyone with estimation.update
-// can fill the section in (a salesperson dictating scope to the estimator is
-// normal), and the record shows who saved it.
+// This belongs to the LEAD module, not to estimation: it is the last gate
+// before a lead is handed over, filled in by the sales representative. The
+// estimator does not re-enter any of it — they review what arrived and either
+// accept it or send it back (see features/estimation/InputReview).
+//
+// Anything already captured during lead qualification is inherited, never
+// asked for twice: customer contact, installation address, enquiry scope and
+// electrical phase all come straight off the lead record.
 
 export const OWNERS = {
-  estimator: "Estimator",
   sales: "Sales Representative",
+  estimator: "Estimator",
+  siteCrew: "Site crew",
 };
 
 export const SITE_TYPES = [
   { key: "residential", label: "Residential" },
   { key: "commercial", label: "Commercial" },
   { key: "industrial", label: "Industrial" },
-  { key: "rural", label: "Rural / farm" },
-  { key: "strata", label: "Strata / multi-dwelling" },
 ];
 
 export const SWITCHBOARD_CONDITIONS = [
@@ -32,6 +34,31 @@ export const BACKUP_OPTIONS = [
   { key: "whole_home", label: "Whole home / whole site" },
   { key: "undecided", label: "Not decided yet" },
 ];
+
+/**
+ * Item 4: the inspection's progress, shown to sales rather than entered by
+ * them. It is derived from the operations assignment raised by "Request
+ * pre-site inspection" — see inspectionStatusFrom below.
+ */
+export const INSPECTION_STATUSES = [
+  { key: "requested", label: "Requested" },
+  { key: "scheduled", label: "Scheduled" },
+  { key: "completed", label: "Completed" },
+];
+
+/** The operations assignment's own status, collapsed to the three the checklist shows. */
+export function inspectionStatusFrom(assignment) {
+  const status = assignment?.status;
+  if (!status) return null;
+  if (["completed", "report_submitted"].includes(status)) return "completed";
+  if (["scheduled", "rescheduled", "in_progress"].includes(status)) return "scheduled";
+  if (["cancelled"].includes(status)) return null;
+  return "requested";
+}
+
+export function inspectionStatusLabel(key) {
+  return INSPECTION_STATUSES.find((s) => s.key === key)?.label || "Not requested yet";
+}
 
 /** Permits and approvals this job may need, ticked as they are identified. */
 export const PERMIT_OPTIONS = [
@@ -50,64 +77,65 @@ export const VPP_OPTIONS = [
   { key: "to_confirm", label: "To be confirmed" },
 ];
 
-/**
- * Category used for drawings and layouts uploaded against the job.
- *
- * prestige-be validates this against a fixed list (photo, sketch, bill,
- * document, client_document) and maps "sketch" to the document type
- * "drawing", so that is the category to send — anything else is a 400. It is
- * shared with the pre-site visit's sketches, so both lists show the same
- * files; a dedicated category would need the backend's map extended.
- */
+/** Category used for drawings, layouts and SLDs uploaded against the job. */
 export const DRAWING_CATEGORY = "sketch";
+/** Category used for site photos taken on the pre-site inspection. */
+export const SITE_PHOTO_CATEGORY = "photo";
 
 export function emptyEstimationInput() {
   return {
-    // 1 — lead & qualification review (Estimator)
-    leadReviewConfirmed: false,
-    leadReviewNotes: "",
-    // 2 — customer scope (Sales Representative)
-    customerScope: "",
-    // 3 — site & existing electrical (Estimator)
+    // Project & site
     siteType: "",
+    preSiteInspectionRequired: "",
+    siteCrewAssigneeId: "",
+    inspectionStatus: "",
+    siteVisitCompleted: false,
+    roofMeasurements: "",
+    // Existing electrical
+    existingElectrical: "",
     switchboardLocation: "",
     switchboardCondition: "",
-    existingElectrical: "",
-    // 4 — existing system, retrofit only (Estimator)
+    switchboardUpgrade: "",
+    loadRequirements: "",
+    // Existing system (retrofit only)
     isRetrofit: "",
     existingSolarKw: "",
     existingInverter: "",
     existingBattery: "",
     existingSystemNotes: "",
-    // 5 — new system specification (Estimator)
+    // New system specification
     panelQty: "",
     panelCapacityW: "",
-    panelBrandModel: "",
+    preferredBrands: "",
     inverterBrandModel: "",
     batteryBrandModel: "",
     batteryCapacityKwh: "",
     backupRequirement: "",
-    backupNotes: "",
-    // 6 — site constraints & install requirements (Estimator)
+    backupDuration: "",
+    // Installation requirements
+    mountingRequirements: "",
+    cableRequirements: "",
     siteConstraints: "",
-    // 7 — permits, approvals & VPP (Estimator)
+    specialRequirements: "",
+    // Compliance
     permits: [],
+    vppDiscussed: false,
     vppEligibility: "",
+    vppNotes: "",
     permitNotes: "",
-    // 8 — utility / meter requirements and drawings (Estimator)
     meterRequirements: "",
     drawingsNotes: "",
-    // 9 — inclusions & exclusions (Estimator)
+    // Customer
     inclusions: "",
     exclusions: "",
-    // 10 — ready for BOQ (Estimator)
-    readyForBoq: false,
+    // Anything sales wants the estimator to know before they pick it up
+    noteForEstimator: "",
   };
 }
 
 const str = (v) => (v === null || v === undefined ? "" : String(v));
 
-/** Reads the saved input off the opportunity, filling in anything not set yet. */
+/** Reads the saved checklist off the opportunity, filling in anything not set yet. */
 export function estimationInputFromOpp(opp) {
   const saved = opp?.estimationInput && typeof opp.estimationInput === "object" ? opp.estimationInput : {};
   const base = emptyEstimationInput();
@@ -130,25 +158,48 @@ export function systemSizeKw(input) {
   return (qty * watts) / 1000;
 }
 
+const blank = (v) => !String(v ?? "").trim();
+
 /**
- * The items that must be filled in before the estimator can confirm the
- * section is ready for BOQ preparation (item 10). Returns their labels.
+ * What sales still has to supply before they can sign the checklist off. Items
+ * that only apply in some cases (retrofit details, inspection findings, VPP)
+ * are only required once that case applies.
  */
-export function estimationInputMissing(input, { drawingsCount = 0 } = {}) {
-  const blank = (v) => !String(v ?? "").trim();
+export function estimationInputMissing(input, { drawingsCount = 0, sitePhotoCount = 0 } = {}) {
   const missing = [];
-  if (!input.leadReviewConfirmed) missing.push("lead & qualification review");
-  if (blank(input.customerScope)) missing.push("customer scope and requirements");
-  if (blank(input.siteType) || blank(input.switchboardCondition)) missing.push("site type and switchboard");
+  if (blank(input.siteType)) missing.push("site type");
+  if (blank(input.preSiteInspectionRequired)) missing.push("whether a pre-site inspection is required");
+  if (input.preSiteInspectionRequired === "yes") {
+    if (!input.siteVisitCompleted) missing.push("site visit completed and findings reviewed");
+    if (!sitePhotoCount) missing.push("site photos");
+  }
+  if (blank(input.roofMeasurements)) missing.push("roof / site measurements");
+  if (blank(input.existingElectrical)) missing.push("existing electrical system");
+  if (blank(input.switchboardCondition)) missing.push("main switchboard / DB details");
+  if (blank(input.switchboardUpgrade)) missing.push("switchboard upgrade requirement");
+  if (blank(input.loadRequirements)) missing.push("electrical load requirements");
   if (blank(input.isRetrofit)) missing.push("whether this is a retrofit");
-  if (input.isRetrofit === "yes" && blank(input.existingSolarKw) && blank(input.existingInverter) && blank(input.existingBattery))
-    missing.push("existing system details");
-  if (blank(input.panelQty) || blank(input.panelCapacityW) || blank(input.inverterBrandModel))
-    missing.push("new system specification");
+  if (
+    input.isRetrofit === "yes" &&
+    blank(input.existingSolarKw) &&
+    blank(input.existingInverter) &&
+    blank(input.existingBattery)
+  )
+    missing.push("existing solar / inverter / battery details");
+  if (blank(input.panelQty) || blank(input.panelCapacityW)) missing.push("panel quantity and system capacity");
+  if (blank(input.inverterBrandModel)) missing.push("inverter brand / model");
   if (blank(input.backupRequirement)) missing.push("backup requirement");
-  if (blank(input.siteConstraints)) missing.push("site constraints and install requirements");
-  if (blank(input.vppEligibility)) missing.push("VPP eligibility");
+  if (["essential", "whole_home"].includes(input.backupRequirement)) {
+    if (blank(input.batteryCapacityKwh)) missing.push("battery capacity");
+    if (blank(input.backupDuration)) missing.push("backup duration");
+  }
+  if (blank(input.mountingRequirements)) missing.push("mounting / roof structure requirements");
+  if (blank(input.cableRequirements)) missing.push("cable / conduit / trunking requirements");
+  if (blank(input.siteConstraints)) missing.push("shading, orientation and site constraints");
   if (blank(input.meterRequirements) && !drawingsCount) missing.push("utility / meter requirements or a drawing");
   if (blank(input.inclusions) && blank(input.exclusions)) missing.push("inclusions and exclusions");
   return missing;
 }
+
+export const ESTIMATOR_ACCEPTANCE =
+  "Estimator has reviewed and accepted the inputs, and confirms all required information is available to commence BOQ preparation.";

@@ -8,12 +8,22 @@
 // unchanged.
 
 import { isBlank, isEmail } from "@/utils/validators";
+import { emptyEstimationInput, estimationInputFromOpp } from "@/constants/estimationInput";
 import { isBusinessLead, MANUAL_LEAD_SOURCES } from "./leadSourceOptions";
+
+// The estimation-input rows (pre-site inspection through customer-specific
+// notes) are optional parts of the lead checklist. They are held flat on the
+// form and nested back under `estimationInput` when the lead is saved, so the
+// estimator's review screen keeps reading one object.
+const ESTIMATION_INPUT_KEYS = Object.keys(emptyEstimationInput());
+const pickEstimationInput = (form) =>
+  Object.fromEntries(ESTIMATION_INPUT_KEYS.map((key) => [key, form[key]]));
 
 const MANUAL_SOURCE_KEYS = MANUAL_LEAD_SOURCES.map((s) => s.key);
 
 export function emptyLeadForm() {
   return {
+    ...emptyEstimationInput(),
     leadType: "",
     customerLegalName: "",
     customerTradingName: "",
@@ -93,6 +103,7 @@ export function leadToForm(opp) {
   const name = personName(opp);
   return {
     ...base,
+    ...estimationInputFromOpp(opp),
     leadType: str(opp.leadType),
     customerLegalName: str(opp.customerLegalName),
     customerTradingName: str(opp.customerTradingName),
@@ -244,6 +255,7 @@ export function formToPayload(form) {
       .filter((f) => f.label || f.value),
     potential: form.potential || null,
     notPotentialReason: form.potential === "no" ? trim(form.notPotentialReason) : "",
+    estimationInput: pickEstimationInput(form),
   };
   // Automated sources are owned by the integration that set them.
   if (!isAutomatedSource(form.leadSource)) {

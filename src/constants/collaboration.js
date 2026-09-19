@@ -214,6 +214,43 @@ export const INFORMATION_TEMPLATES = [
   { key: "custom", label: "Something else", title: "", fields: [] },
 ];
 
+/**
+ * What kind of file an upload slot expects. The requester names the item
+ * themselves ("sketch of the switchboard run"), picks one of these, and can
+ * add a comment saying what it has to show.
+ */
+export const DOCUMENT_TYPES = [
+  { key: "image", label: "Image / photo" },
+  { key: "document", label: "Document" },
+];
+
+export function documentTypeLabel(key) {
+  return DOCUMENT_TYPES.find((t) => t.key === key)?.label || "File";
+}
+
+/**
+ * Where a supplied file can be filed on the job itself. The keys are the
+ * attachment categories prestige-be already accepts (see leadsApi) — the
+ * requester picks one and the file lands in that part of the record.
+ */
+export const FILING_CATEGORIES = [
+  { key: "photo", label: "Site photos" },
+  { key: "sketch", label: "Sketches & drawings" },
+  { key: "bill", label: "Electricity bills" },
+  { key: "client_document", label: "Client documents" },
+];
+
+/** The documents a request asked for, normalised. */
+export function requestedDocuments(request) {
+  return Array.isArray(request?.requestedDocuments) ? request.requestedDocuments : [];
+}
+
+/** Files supplied against one requested document. */
+export function documentUploads(request, documentKey) {
+  const files = request?.response?.attachments || [];
+  return files.filter((file) => file.documentKey === documentKey);
+}
+
 /** Ready-made assignments for operations. */
 export const ASSIGNMENT_TEMPLATES = [
   {

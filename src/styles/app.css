@@ -537,6 +537,26 @@
   .activity-text { font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
   .activity-text b { color: var(--ink); font-weight: 700; }
   .activity-time { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .rr-list { display: flex; flex-direction: column; gap: 14px; }
+  .rr-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface); }
+  .rr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .rr-description { margin: 10px 0 0; font-size: 13.5px; }
+  .rr-block { margin-top: 14px; }
+  .rr-block h4 { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .rr-row { display: grid; grid-template-columns: minmax(140px, 240px) minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .rr-row:last-child { border-bottom: 0; }
+  .rr-label { font-size: 13px; color: var(--ink-soft); font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
+  .rr-label small { font-weight: 500; }
+  .rr-value { font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
+  .rr-value.is-missing { color: var(--muted); font-style: italic; }
+  .rr-file { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; color: var(--brand); font-weight: 600; }
+  .rr-file:hover { text-decoration: underline; }
+  .rr-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .document-slot { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .document-slot:last-child { border-bottom: 0; }
+  .document-slot-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .document-file { flex-wrap: wrap; gap: 8px; }
+  .document-file .select { padding: 6px 10px; font-size: 13px; }
   .request-detail-head { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .request-detail .section h3 { margin-bottom: 10px; }
   .waiting-group { border-top: 1px solid var(--line); }

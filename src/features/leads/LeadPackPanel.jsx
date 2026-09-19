@@ -5,7 +5,10 @@ import { ClipboardCheck, Pencil } from "lucide-react";
 import Alert from "@/components/Alert";
 import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
+import RequestDetail from "@/features/collaboration/RequestDetail";
+import RequestFormModal from "@/features/collaboration/RequestFormModal";
 import { formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
+import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -19,14 +22,16 @@ import {
   uploadOpportunityAttachment,
 } from "@/slices/leadsSlice";
 import { fetchReferrers } from "@/slices/referralsSlice";
+import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationSlice";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
-  const { estimators, sales, userName } = useUnitUsers();
+  const { estimators, sales, siteOps, userName } = useUnitUsers();
   const referrers = useAppSelector((s) => s.referrals.items);
+  const { oppId: collabOppId, byOpp: requests } = useAppSelector((s) => s.collaboration);
   const referrersStatus = useAppSelector((s) => s.referrals.status);
   const attachments = useAppSelector((s) => s.leads.attachments);
   const { notify, error: notifyError } = useNotifications();
@@ -35,6 +40,9 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingBills, setUploadingBills] = useState(false);
+  const [uploadingCategory, setUploadingCategory] = useState(null);
+  const [requestingInspection, setRequestingInspection] = useState(false);
+  const [viewingInspection, setViewingInspection] = useState(null);
   // A saved lead opens read-only; the pencil unlocks it. Once it is with an
   // estimator, unlocking asks first — editing under them is a real event.
   const [editing, setEditing] = useState(false);
@@ -55,7 +63,38 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     if (opp?.id) dispatch(fetchOpportunityAttachments(opp.id));
   }, [opp?.id, dispatch]);
 
+  useEffect(() => {
+    if (opp?.id) dispatch(fetchOpportunityRequests(opp.id));
+  }, [opp?.id, dispatch]);
+
+  // The pre-site inspection row tracks the operations assignment raised for it.
+  const inspection =
+    collabOppId === Number(opp?.id)
+      ? requests.find((r) => r.kind === "assignment" && r.department === "operations" && r.status !== "cancelled")
+      : null;
+
+  /** Opens the existing inspection, or starts a new request when there is none. */
+  const handleInspection = (existing) => {
+    if (existing) setViewingInspection(existing);
+    else setRequestingInspection(true);
+  };
+
   const billFiles = attachments.filter((a) => a.category === "bill");
+  const drawings = attachments.filter((a) => a.category === DRAWING_CATEGORY);
+  const sitePhotos = attachments.filter((a) => a.category === SITE_PHOTO_CATEGORY);
+
+  const uploadCategory = (category) => async (files) => {
+    setUploadingCategory(category);
+    try {
+      for (const file of files) {
+        await dispatch(uploadOpportunityAttachment({ id: opp.id, category, file })).unwrap();
+      }
+    } catch (err) {
+      notifyError(typeof err === "string" ? err : err?.message || "Could not upload the file.");
+    } finally {
+      setUploadingCategory(null);
+    }
+  };
 
   const uploadBills = async (files) => {
     setUploadingBills(true);
@@ -191,8 +230,9 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const errorList = [...new Set(Object.values(errors))];
 
   return (
-    <div className="card card-pad">
-      <div className="card-head" style={{ justifyContent: "space-between" }}>
+    <>
+      <div className="card card-pad">
+        <div className="card-head" style={{ justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <span className="card-icon">
             <ClipboardCheck size={16} />
@@ -223,6 +263,13 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         billFiles={billFiles}
         onUploadBills={canEdit && editing ? uploadBills : undefined}
         uploadingBills={uploadingBills}
+        drawings={drawings}
+        sitePhotos={sitePhotos}
+        onUploadDrawings={canEdit && editing ? uploadCategory(DRAWING_CATEGORY) : undefined}
+        onUploadSitePhotos={canEdit && editing ? uploadCategory(SITE_PHOTO_CATEGORY) : undefined}
+        uploadingCategory={uploadingCategory}
+        inspection={inspection}
+        onRequestInspection={canEdit ? handleInspection : undefined}
       />
 
       {errorList.length ? (
@@ -300,6 +347,28 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           }
         />
       ) : null}
-    </div>
+      </div>
+
+      {requestingInspection ? (
+        <RequestFormModal
+          opportunity={opp}
+          stage={Number(opp.stage) || 1}
+          kind="assignment"
+          department="operations"
+          people={siteOps.length ? siteOps : sales}
+          onClose={() => setRequestingInspection(false)}
+          onSubmit={async (body) => {
+            await dispatch(
+              createRequest({ opportunityId: opp.id, body: { ...body, title: body.title || "Pre-site inspection" } }),
+            ).unwrap();
+            notify("Pre-site inspection requested — the operations coordinator is notified");
+          }}
+        />
+      ) : null}
+
+      {viewingInspection ? (
+        <RequestDetail request={viewingInspection} onClose={() => setViewingInspection(null)} />
+      ) : null}
+    </>
   );
 }

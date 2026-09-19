@@ -213,11 +213,11 @@ export const submitEstimationClientInfo = createAsyncThunk(
   },
 );
 
-export const submitEstimationInput = createAsyncThunk(
-  "leads/estimation/input",
-  async ({ id, body }, { rejectWithValue }) => {
+export const acceptEstimationInputs = createAsyncThunk(
+  "leads/estimation/acceptInputs",
+  async (id, { rejectWithValue }) => {
     try {
-      return await api.submitEstimationInput(id, body);
+      return await api.acceptEstimationInputs(id);
     } catch (err) {
       return reject(err, rejectWithValue);
     }
@@ -515,7 +515,7 @@ const leadsSlice = createSlice({
       .addCase(submitEstimationRequirements.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimationClientInfo.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(acknowledgeLeadChange.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(submitEstimationInput.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(acceptEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimatorChecklist.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(fetchOpportunityQuote.pending, (state) => {
         state.quoteStatus = "loading";

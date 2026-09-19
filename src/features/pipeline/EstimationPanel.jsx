@@ -41,12 +41,12 @@ import FileDropzone from "@/components/FileDropzone";
 import SectionHead from "@/components/SectionHead";
 import Tabs from "@/components/Tabs";
 import ChecklistRow from "@/features/leads/LeadForm/ChecklistRow";
-import EstimationInput from "@/features/estimation/EstimationInput";
+import InputReview from "@/features/estimation/InputReview";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
 import VariationCheck from "@/features/pipeline/VariationCheck";
 import { REQUIREMENTS_CHECKLIST, ESTIMATOR_CHECKLIST } from "@/constants/checklists";
-import { DRAWING_CATEGORY, estimationInputFromOpp, estimationInputMissing } from "@/constants/estimationInput";
+import { DRAWING_CATEGORY } from "@/constants/estimationInput";
 import { estimationState } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -156,7 +156,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadingSketches, setUploadingSketches] = useState(false);
-  const [uploadingDrawings, setUploadingDrawings] = useState(false);
   // Sales edited the lead pack after this reached estimation. Dismissing
   // clears it on the record; the local flag hides it straight away.
   const [leadChangeSeen, setLeadChangeSeen] = useState(false);
@@ -227,7 +226,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const uploadClientDocuments = uploadCategory(CLIENT_DOCUMENT_CATEGORY, setUploadingDocs);
   const uploadSitePhotos = uploadCategory("photo", setUploadingPhotos);
   const uploadSiteSketches = uploadCategory("sketch", setUploadingSketches);
-  const uploadDrawings = uploadCategory(DRAWING_CATEGORY, setUploadingDrawings);
 
   const run = async (action) => {
     setSaving(true);
@@ -330,9 +328,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const checklistDone = showEstimatorChecklist && estimatorChecklistDone === ESTIMATOR_CHECKLIST.length;
   const siteVisitDone = showEstimatorChecklist && preSiteResolved;
   const quoteDone = Boolean(quote?.items?.length);
-  const savedInput = estimationInputFromOpp(opp);
-  const inputDone =
-    savedInput.readyForBoq && estimationInputMissing(savedInput, { drawingsCount: drawings.length }).length === 0;
+  // Done when the estimator has accepted what sales supplied.
+  const inputDone = Boolean(opp.estimationInputsAcceptedAt);
 
   // Open on the first step that still needs work.
   const [tab, setTab] = useState(() => {
@@ -346,11 +343,11 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const tabIcon = (done, icon) => (done ? <Check size={14} /> : icon);
   const tabs = [
     { key: "requirements", label: "Requirements", icon: tabIcon(requirementsDone, <ClipboardList size={14} />) },
-    { key: "input", label: "Estimation input", icon: tabIcon(inputDone, <ClipboardCheck size={14} />) },
-    { key: "checklist", label: "Estimator checklist", icon: tabIcon(checklistDone, <ListChecks size={14} />) },
+    { key: "input", label: "Input review", icon: tabIcon(inputDone, <ClipboardCheck size={14} />) },
+    { key: "checklist", label: "Optional checklist", icon: tabIcon(checklistDone, <ListChecks size={14} />) },
     { key: "site-visit", label: "Pre-site visit", icon: tabIcon(siteVisitDone, <HardHat size={14} />) },
     { key: "quote", label: "Quote", icon: tabIcon(quoteDone, <Receipt size={14} />) },
-    { key: "requests", label: "Requests", icon: <HandHelping size={14} /> },
+    { key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> },
     { key: "variations", label: "Variations", icon: <BadgeDollarSign size={14} /> },
   ];
 
@@ -492,12 +489,12 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
       ) : null}
 
       {tab === "input" ? (
-        <EstimationInput
+        <InputReview
           opp={opp}
           canEdit={canEdit}
           drawings={drawings}
-          onUploadDrawings={canEdit ? uploadDrawings : undefined}
-          uploadingDrawings={uploadingDrawings}
+          sitePhotos={sitePhotos}
+          onViewLead={onViewLead}
         />
       ) : null}
 
@@ -507,7 +504,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
           stage={2}
           unit={unit}
           canEdit={canEdit}
-          title="Requests raised from estimation"
+          title="Request / Response"
         />
       ) : null}
 
@@ -523,7 +520,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
             </div>
 
             <div className="section" style={{ marginTop: 24 }}>
-              <SectionHead icon={<ListChecks size={13} />} title="Estimator checklist" />
+              <SectionHead icon={<ListChecks size={13} />} title="Optional checklist" />
               <p className="lede" style={{ marginBottom: 16 }}>
                 Work through this while the client's input is pending, or to record the site assessment.
               </p>

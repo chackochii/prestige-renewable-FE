@@ -125,12 +125,12 @@ export async function submitEstimatorChecklist(id, body) {
 }
 
 /**
- * Estimation Input — the pack an estimator gathers before BOQ preparation
- * (see constants/estimationInput.js). body: { input } — the whole section is
- * saved at once, the same way the estimator checklist is.
+ * The estimation-side gate: the estimator has reviewed what sales supplied and
+ * confirms BOQ preparation can start. Returning it to sales instead goes
+ * through submitEstimationRequirements({ received: false, reason }).
  */
-export async function submitEstimationInput(id, body) {
-  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/input`, body));
+export async function acceptEstimationInputs(id) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/accept-inputs`));
 }
 
 /**
