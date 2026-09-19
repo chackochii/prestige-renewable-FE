@@ -250,6 +250,7 @@ const collaborationSlice = createSlice({
       .addCase(addProgress.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(cancelRequest.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(uploadRequestAttachment.fulfilled, (state, action) => upsert(state, action.payload?.request))
+      .addCase(fileAttachmentOnOpportunity.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(fetchRequestHistory.pending, (state) => {
         state.historyStatus = "loading";
       })

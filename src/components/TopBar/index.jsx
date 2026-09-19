@@ -18,6 +18,7 @@ export default function TopBar({ onMenu }) {
   const { unit } = useBusinessUnit();
   const { isDark, toggle: toggleTheme } = useTheme();
   const pages = useAppSelector((s) => s.pages.items);
+  const unread = useAppSelector((s) => s.inbox.unread);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -58,11 +59,13 @@ export default function TopBar({ onMenu }) {
         </button>
         <button
           type="button"
-          className="icon-btn"
+          className="icon-btn bell"
           onClick={() => navigate("/notifications")}
-          aria-label="Notifications"
+          aria-label={unread ? `Notifications (${unread} unread)` : "Notifications"}
+          title={unread ? `${unread} unread` : "Notifications"}
         >
           <Bell size={18} />
+          {unread ? <span className="bell-count">{unread > 99 ? "99+" : unread}</span> : null}
         </button>
         <div className="menu" ref={menuRef}>
           <button type="button" className="who" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu">

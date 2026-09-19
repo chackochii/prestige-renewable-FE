@@ -1,109 +1,142 @@
-// Inbox: what other teams have sent you, and what has come back on the
-// requests you raised.
-//
-// Derived from the requests this person can see (see
-// helpers/collaborationEvents.js) until prestige-be has a notification feed —
-// the event names there are the catalog it should emit.
+// Inbox: the notifications the API raised for you — assignments, requests and
+// responses from other teams, stage changes, won/lost and overdue items.
+// Stored server-side, marked read, and pushed live while the app is open (see
+// hooks/useNotificationFeed).
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Bell, BellOff } from "lucide-react";
-import Alert from "@/components/Alert";
+import { Link, useNavigate } from "react-router-dom";
+import { BellOff, CheckCheck } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
-import PageHeader from "@/components/PageHeader";
-import RequestDetail from "@/features/collaboration/RequestDetail";
-import { collaborationNotifications } from "@/helpers/collaborationEvents";
-import { formatDate, timeAgo } from "@/helpers/dateTimeHelpers";
-import { useAuth } from "@/hooks/useAuth";
-import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import Alert from "@/components/Alert";
+import { eventLabel, priorityMeta, PRIORITIES } from "@/constants/notifications";
+import { timeAgo } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { fetchAssignedRequests, fetchRaisedRequests } from "@/slices/collaborationSlice";
+import {
+  fetchNotificationEvents,
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "@/slices/inboxSlice";
+import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export default function NotificationsPage() {
   const dispatch = useAppDispatch();
-  const { user } = useAuth();
-  const { unit, unitId } = useBusinessUnit();
-  const { assigned, raised, assignedStatus, assignedError } = useAppSelector((s) => s.collaboration);
-  const [onlyHigh, setOnlyHigh] = useState(false);
-  const [open, setOpen] = useState(null);
+  const navigate = useNavigate();
+  const { unit } = useBusinessUnit();
+  const { error: notifyError } = useNotifications();
+  const { items, unread, status, error, events } = useAppSelector((s) => s.inbox);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [priority, setPriority] = useState("");
+
+  const query = useMemo(
+    () => ({ ...(unreadOnly ? { unread: 1 } : {}), ...(priority ? { priority } : {}) }),
+    [unreadOnly, priority],
+  );
 
   useEffect(() => {
-    if (!unitId) return;
-    dispatch(fetchAssignedRequests({ businessUnitId: unitId }));
-    dispatch(fetchRaisedRequests({ businessUnitId: unitId }));
-  }, [unitId, dispatch]);
+    dispatch(fetchNotifications(query));
+  }, [query, dispatch]);
 
-  const events = useMemo(
-    () => collaborationNotifications({ assigned, raised, user }),
-    [assigned, raised, user],
-  );
-  const rows = onlyHigh ? events.filter((e) => e.priority.key === "high") : events;
-  const highCount = events.filter((e) => e.priority.key === "high").length;
+  useEffect(() => {
+    if (!events.length) dispatch(fetchNotificationEvents());
+  }, [events.length, dispatch]);
+
+  const open = (notification) => {
+    if (!notification.read) dispatch(markNotificationRead(notification.id));
+    if (notification.opportunityId) navigate(`/opportunities/${notification.opportunityId}`);
+  };
+
+  const readAll = async () => {
+    try {
+      await dispatch(markAllNotificationsRead()).unwrap();
+    } catch (err) {
+      notifyError(typeof err === "string" ? err : err?.message || "Could not mark them read.");
+    }
+  };
 
   return (
     <>
       <PageHeader
         title="Inbox"
-        description={`Requests, responses and activity updates for you in ${unit?.name || "this unit"}.`}
+        description={`Notices for you in ${unit?.name || "this unit"}: requests from other teams, assignments, stage changes and overdue items. High-priority notices also appear as a message when they arrive.`}
         actions={
-          <Link to="/requests" className="btn btn-ghost">
-            Requests & assignments
-          </Link>
+          <>
+            <Link to="/requests" className="btn btn-ghost">
+              Requests &amp; assignments
+            </Link>
+            {unread ? (
+              <button type="button" className="btn btn-ghost" onClick={readAll}>
+                <CheckCheck size={16} /> Mark all read
+              </button>
+            ) : null}
+          </>
         }
       />
 
-      {assignedError ? (
-        <Alert tone="warning">
-          Notices could not be loaded ({assignedError}). The collaboration endpoints are not available yet.
-        </Alert>
-      ) : null}
-
       <div className="toolbar">
         <label className="check" style={{ margin: 0 }}>
-          <input type="checkbox" checked={onlyHigh} onChange={(e) => setOnlyHigh(e.target.checked)} />
-          Needs attention only{highCount ? ` (${highCount})` : ""}
+          <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} /> Unread only
+          {unread ? ` (${unread})` : ""}
         </label>
+        <select className="select" value={priority} onChange={(e) => setPriority(e.target.value)} aria-label="Priority filter">
+          <option value="">All priorities</option>
+          {PRIORITIES.map((key) => (
+            <option key={key} value={key}>
+              {priorityMeta(key).label}
+            </option>
+          ))}
+        </select>
       </div>
 
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
       <div className="card card-pad">
-        {assignedStatus === "loading" && !events.length ? (
+        {status === "loading" && !items.length ? (
           <LoadingState label="Loading your inbox…" />
-        ) : !rows.length ? (
+        ) : items.length === 0 ? (
           <EmptyState
             icon={<BellOff size={28} strokeWidth={1.5} />}
             title="Nothing here"
-            body="You're all caught up. New requests, responses and activity updates land here."
+            body={
+              unreadOnly || priority
+                ? "Nothing matches this filter."
+                : "You're all caught up. Requests, assignments and overdue records will land here."
+            }
           />
         ) : (
-          <div className="activity-feed">
-            {rows.map((entry) => (
+          items.map((n) => {
+            const meta = priorityMeta(n.priority);
+            return (
               <button
+                key={n.id}
                 type="button"
-                key={entry.id}
-                className="attn-row"
-                onClick={() => setOpen(entry.request)}
-                title={formatDate(entry.at, { withTime: true, timeZone: unit?.timezone })}
+                className={`list-row notice${n.read ? "" : " unread"}`}
+                onClick={() => open(n)}
+                style={{ width: "100%", textAlign: "left" }}
               >
-                <div className="attn-row-top">
-                  <span className="attn-title">
-                    <Bell size={14} /> {entry.title}
-                  </span>
-                  <Badge tone={entry.priority.tone}>{entry.priority.label}</Badge>
+                <div style={{ minWidth: 0 }}>
+                  <div className="row-title">
+                    {n.read ? null : <span className="notice-dot" aria-label="Unread" />}
+                    {n.title}
+                  </div>
+                  <div className="row-meta">
+                    {n.body || eventLabel(n.event, events)}
+                    {n.opportunityNumber ? ` · ${n.opportunityNumber}` : ""}
+                  </div>
                 </div>
-                <div className="attn-meta">{entry.detail}</div>
-                <div className="attn-meta">
-                  {entry.reference}
-                  {entry.project ? ` · ${entry.project}` : ""} · {timeAgo(entry.at)}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+                  <Badge tone={meta.tone}>{meta.label}</Badge>
+                  <span className="row-meta">{timeAgo(n.createdAt)}</span>
                 </div>
               </button>
-            ))}
-          </div>
+            );
+          })
         )}
       </div>
-
-      {open ? <RequestDetail request={open} timeZone={unit?.timezone} onClose={() => setOpen(null)} /> : null}
     </>
   );
 }

@@ -21,6 +21,7 @@ import referralsReducer from "@/slices/referralsSlice";
 import dlpOmReducer from "@/slices/dlpOmSlice";
 import employeeReducer from "@/slices/employeeSlice";
 import notificationsReducer from "@/slices/notificationsSlice";
+import inboxReducer from "@/slices/inboxSlice";
 
 export const store = configureStore({
   reducer: {
@@ -41,6 +42,7 @@ export const store = configureStore({
     dlpOm: dlpOmReducer,
     employee: employeeReducer,
     notifications: notificationsReducer,
+    inbox: inboxReducer,
   },
 });
 

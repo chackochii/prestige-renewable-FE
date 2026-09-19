@@ -15,6 +15,7 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { fetchBusinessUnits } from "@/slices/businessUnitsSlice";
 import { fetchPages } from "@/slices/pagesSlice";
 import { fetchRoles } from "@/slices/rolesSlice";
+import { useNotificationFeed } from "@/hooks/useNotificationFeed";
 
 export default function AdminLayout() {
   const dispatch = useAppDispatch();
@@ -24,6 +25,9 @@ export default function AdminLayout() {
   const rolesStatus = useAppSelector((s) => s.roles.status);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Live notifications for as long as the workspace is open.
+  useNotificationFeed();
 
   useEffect(() => {
     if (unitsStatus === "idle") dispatch(fetchBusinessUnits());

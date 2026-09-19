@@ -14,9 +14,11 @@ import NumberInput from "@/components/NumberInput";
 import EnquiryLinkCard from "@/features/leads/EnquiryLinkCard";
 import { STAGES } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
+import { PRIORITIES, priorityMeta } from "@/constants/notifications";
 import { getBusinessUnitConfig } from "@/services/api/businessUnitsApi";
-import { useAppDispatch } from "@/store";
+import { useAppDispatch, useAppSelector } from "@/store";
 import { updateBusinessUnitConfig } from "@/slices/businessUnitsSlice";
+import { fetchNotificationEvents } from "@/slices/inboxSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -32,6 +34,7 @@ function toForm(config) {
     commissionTiers: (config.commissionTiers || []).map((t) => ({ ...t, ratePercent: Math.round(Number(t.rate) * 10000) / 100 })),
     approvalTypes: (config.approvalTypes || []).map((a) => ({ ...a })),
     siteWorkSubstages: (config.siteWorkSubstages || []).map((s) => ({ ...s })),
+    notificationPriorities: { ...(config.notificationPriorities || {}) },
   };
 }
 
@@ -74,6 +77,12 @@ export default function UnitSettingsPage() {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const canEdit = hasPermission(PERMISSIONS.ADMIN_UPDATE);
+  // The notification events the priority table below is built from.
+  const events = useAppSelector((s) => s.inbox.events);
+
+  useEffect(() => {
+    if (!events.length) dispatch(fetchNotificationEvents());
+  }, [events.length, dispatch]);
 
   useEffect(() => {
     if (!unit?.id) return;
@@ -115,6 +124,7 @@ export default function UnitSettingsPage() {
             commissionTiers: form.commissionTiers.map((t) => ({ key: t.key, label: t.label, rate: (Number(t.ratePercent) || 0) / 100 })),
             approvalTypes: form.approvalTypes.filter((a) => a.key.trim()).map((a) => ({ key: a.key.trim(), label: a.label || a.key })),
             siteWorkSubstages: form.siteWorkSubstages.filter((s) => s.key.trim()).map((s) => ({ key: s.key.trim(), label: s.label || s.key })),
+            notificationPriorities: form.notificationPriorities,
           },
         }),
       ).unwrap();
@@ -261,6 +271,40 @@ export default function UnitSettingsPage() {
 
           <Card title="Site-works sub-stages" sub="Checklist blocks signed off on site. Keys are short codes such as 7a." style={{ marginBottom: 20 }}>
             <KeyLabelRows rows={form.siteWorkSubstages} keyMax={5} disabled={!canEdit} keyHint="up to 5 chars" onChange={(rows) => set("siteWorkSubstages", rows)} />
+          </Card>
+
+          <Card
+            title="Notification priority"
+            sub="How loud each notice is for this unit. High-priority notices also pop up as a message the moment they arrive."
+            style={{ marginBottom: 20 }}
+          >
+            {events.length === 0 ? (
+              <p className="lede">Loading the notification list…</p>
+            ) : (
+              <div className="form-grid auto">
+                {events.map((event) => (
+                  <Field key={event.key} label={event.label} hint={`default ${priorityMeta(event.defaultPriority).label.toLowerCase()}`}>
+                    <select
+                      value={form.notificationPriorities[event.key] || ""}
+                      disabled={!canEdit}
+                      onChange={(e) => {
+                        const next = { ...form.notificationPriorities };
+                        if (e.target.value) next[event.key] = e.target.value;
+                        else delete next[event.key];
+                        set("notificationPriorities", next);
+                      }}
+                    >
+                      <option value="">Default ({priorityMeta(event.defaultPriority).label})</option>
+                      {PRIORITIES.map((key) => (
+                        <option key={key} value={key}>
+                          {priorityMeta(key).label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ))}
+              </div>
+            )}
           </Card>
 
           {canEdit ? (

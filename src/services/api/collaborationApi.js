@@ -1,20 +1,15 @@
-// Cross-department requests and assignments.
+// Cross-department requests and assignments, served by prestige-be's
+// collaboration module.
 //
-// NOT YET IMPLEMENTED IN prestige-be — this is the contract the frontend is
-// written against, so the module can be wired up now and the routes added
-// later. Until then every call 404s and the screens show their "couldn't
-// load" state rather than breaking.
-//
-// Authorisation is the API's job, not the caller's. Every endpoint must scope
-// what it returns to the signed-in user: a person may read a request only if
-// they raised it, are assigned it, or hold the department's manager
-// permission; they may respond only if assigned, and decide only if they
-// raised it.
-// The frontend hides controls to match (see constants/collaboration.js), but
-// that is a convenience, never the enforcement.
+// Authorisation is the API's job, not the caller's: reading a request needs
+// leads.read (or estimation.read) in the record's business unit, only the
+// assignee may respond or add progress, and only the requester may decide,
+// edit or cancel. Internal progress notes and unsubmitted drafts never leave
+// the server for anyone else. The frontend hides controls to match (see
+// constants/collaboration.js), but that is a convenience, never the
+// enforcement.
 
 import { apiClient, unwrap, unwrapList } from "./client";
-import { MOCK_ENABLED, mock } from "./collaborationMock";
 
 /**
  * params: { businessUnitId (required), scope: "assigned" | "raised" | "all",
@@ -24,19 +19,16 @@ import { MOCK_ENABLED, mock } from "./collaborationMock";
  * list. "all" must still be scoped server-side to what the caller may see.
  */
 export async function listRequests(params) {
-  if (MOCK_ENABLED) return mock.listRequests(params);
   return unwrapList(await apiClient.get("/collaboration/requests", { params }));
 }
 
 /** One request with its response, progress entries, attachments and history. */
 export async function getRequest(id) {
-  if (MOCK_ENABLED) return mock.getRequest(id);
   return unwrap(await apiClient.get(`/collaboration/requests/${id}`));
 }
 
 /** Everything raised against one job, for the read-only panels on its stages. */
 export async function listOpportunityRequests(opportunityId) {
-  if (MOCK_ENABLED) return mock.listOpportunityRequests(opportunityId);
   return unwrap(await apiClient.get(`/opportunities/${opportunityId}/collaboration/requests`));
 }
 
@@ -46,13 +38,11 @@ export async function listOpportunityRequests(opportunityId) {
  *         dueAt, requestedFields?: [{ key, label, type }], scheduledFor? }
  */
 export async function createRequest(opportunityId, body) {
-  if (MOCK_ENABLED) return mock.createRequest(opportunityId, body);
   return unwrap(await apiClient.post(`/opportunities/${opportunityId}/collaboration/requests`, body));
 }
 
 /** Requester edits: { title?, description?, priority?, dueAt?, assigneeId? } */
 export async function updateRequest(id, body) {
-  if (MOCK_ENABLED) return mock.updateRequest(id, body);
   return unwrap(await apiClient.patch(`/collaboration/requests/${id}`, body));
 }
 
@@ -63,7 +53,6 @@ export async function updateRequest(id, body) {
  * and moves the request to "responded".
  */
 export async function submitResponse(id, body) {
-  if (MOCK_ENABLED) return mock.submitResponse(id, body);
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/response`, body));
 }
 
@@ -72,7 +61,6 @@ export async function submitResponse(id, body) {
  * body: { outcome: "accepted" | "clarification_required" | "returned", note? }
  */
 export async function decideResponse(id, body) {
-  if (MOCK_ENABLED) return mock.decideResponse(id, body);
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/decision`, body));
 }
 
@@ -83,7 +71,6 @@ export async function decideResponse(id, body) {
  * never be returned to the requester.
  */
 export async function addProgress(id, body) {
-  if (MOCK_ENABLED) return mock.addProgress(id, body);
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/progress`, body));
 }
 
@@ -93,7 +80,6 @@ export async function addProgress(id, body) {
  * for, so the response comes back labelled.
  */
 export async function uploadRequestAttachment(id, category, file, documentKey) {
-  if (MOCK_ENABLED) return mock.uploadRequestAttachment(id, category, file, documentKey);
   const formData = new FormData();
   formData.append("file", file);
   formData.append("category", category);
@@ -113,18 +99,15 @@ export async function uploadRequestAttachment(id, category, file, documentKey) {
  * stored file rather than asking the browser to re-upload it.
  */
 export async function fileAttachmentOnOpportunity(id, body) {
-  if (MOCK_ENABLED) return mock.fileAttachmentOnOpportunity(id, body);
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/attachments/file-on-job`, body));
 }
 
 /** body: { reason } — requester only, while the request is still open. */
 export async function cancelRequest(id, body) {
-  if (MOCK_ENABLED) return mock.cancelRequest(id, body);
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/cancel`, body));
 }
 
 /** Action, actor, timestamp and status change for everything that happened. */
 export async function listRequestHistory(id) {
-  if (MOCK_ENABLED) return mock.listRequestHistory(id);
   return unwrap(await apiClient.get(`/collaboration/requests/${id}/history`));
 }

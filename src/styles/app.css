@@ -95,6 +95,12 @@
   }
   .icon-btn:hover { border-color: var(--accent); color: var(--brand); }
   .dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; }
+  /* Unread count on the notification bell. */
+  .bell-count {
+    position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px;
+    background: var(--danger); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700;
+    display: grid; place-items: center; line-height: 1;
+  }
   .who {
     display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 4px; border-radius: 999px;
     border: 1px solid var(--line); background: var(--surface); cursor: pointer; text-align: left; font-size: 13px; font-weight: 600;
@@ -412,6 +418,12 @@
   button.list-row { width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; font: inherit; color: inherit; }
   button.list-row:last-child { border-bottom: 0; }
   button.list-row:hover { background: var(--surface-2); padding-left: 14px; }
+  /* Inbox rows: unread carries a marker and slightly stronger text. */
+  .notice.unread .row-title { font-weight: 700; }
+  .notice-dot {
+    display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: middle;
+    background: var(--brand); border-radius: 50%;
+  }
   .menu { position: relative; }
   .menu-pop {
     position: absolute; right: 0; top: 46px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 200px;
