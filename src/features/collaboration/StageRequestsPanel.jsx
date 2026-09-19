@@ -7,15 +7,14 @@
 import { useEffect, useState } from "react";
 import { HandHelping, Plus, UserPlus } from "lucide-react";
 import Alert from "@/components/Alert";
-import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
 import SectionHead from "@/components/SectionHead";
 import RequestDetail from "./RequestDetail";
 import RequestFormModal from "./RequestFormModal";
-import RequestStatusBadge from "./RequestStatusBadge";
-import { departmentLabel, priorityMeta, requestCode, statusMeta } from "@/constants/collaboration";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import RequestResponseCard from "./RequestResponseCard";
+import { statusMeta } from "@/constants/collaboration";
+import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -23,8 +22,9 @@ import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationS
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
-export default function StageRequestsPanel({ opp, stage, unit, canEdit = false, title = "Waiting on other teams" }) {
+export default function StageRequestsPanel({ opp, stage, unit, canEdit = false, title = "Request / Response" }) {
   const dispatch = useAppDispatch();
+  const { user } = useAuth();
   const { notify, error: notifyError } = useNotifications();
   const { active, sales, siteOps } = useUnitUsers();
   const { oppId, byOpp, byOppStatus, byOppError } = useAppSelector((s) => s.collaboration);
@@ -91,26 +91,15 @@ export default function StageRequestsPanel({ opp, stage, unit, canEdit = false, 
             }
           />
         ) : (
-          <div className="list-stack">
+          <div className="rr-list">
             {items.map((request) => (
-              <button type="button" key={request.id} className="waiting-row" onClick={() => setOpen(request)}>
-                <span className="waiting-row-number">{requestCode(request)}</span>
-                <span className="waiting-row-body">
-                  <span className="row-title">{request.title}</span>
-                  <span className="row-meta">
-                    {departmentLabel(request.department)}
-                    {request.assigneeName ? ` · ${request.assigneeName}` : ""}
-                    {request.dueAt ? ` · due ${formatDate(request.dueAt, { timeZone: unit?.timezone })}` : ""}
-                  </span>
-                  {request.latestUpdate?.note ? (
-                    <span className="row-meta">Latest: {request.latestUpdate.note}</span>
-                  ) : null}
-                </span>
-                <span className="waiting-row-end">
-                  <Badge tone={priorityMeta(request.priority).tone}>{priorityMeta(request.priority).label}</Badge>
-                  <RequestStatusBadge request={request} />
-                </span>
-              </button>
+              <RequestResponseCard
+                key={request.id}
+                request={request}
+                user={user}
+                timeZone={unit?.timezone}
+                onOpen={setOpen}
+              />
             ))}
           </div>
         )}

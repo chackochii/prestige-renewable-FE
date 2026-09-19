@@ -121,9 +121,20 @@ export const addProgress = createAsyncThunk("collaboration/progress", async ({ i
 
 export const uploadRequestAttachment = createAsyncThunk(
   "collaboration/uploadAttachment",
-  async ({ id, category, file }, { rejectWithValue }) => {
+  async ({ id, category, file, documentKey }, { rejectWithValue }) => {
     try {
-      return await api.uploadRequestAttachment(id, category, file);
+      return await api.uploadRequestAttachment(id, category, file, documentKey);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const fileAttachmentOnOpportunity = createAsyncThunk(
+  "collaboration/fileOnJob",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.fileAttachmentOnOpportunity(id, body);
     } catch (err) {
       return reject(err, rejectWithValue);
     }

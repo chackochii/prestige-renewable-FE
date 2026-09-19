@@ -9,7 +9,7 @@
 // It never sends anyone into another department's module.
 
 import { useEffect, useState } from "react";
-import { Check, Clock, MessageCircleQuestion, Paperclip, X } from "lucide-react";
+import { Check, Clock, Download, FolderInput, MessageCircleQuestion, Paperclip, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -24,9 +24,13 @@ import {
   canProgress,
   canRespond,
   departmentLabel,
+  documentUploads,
+  FILING_CATEGORIES,
+  isRequester,
   priorityMeta,
   REQUEST_KINDS,
   requestCode,
+  requestedDocuments,
   statusMeta,
   visibleProgress,
 } from "@/constants/collaboration";
@@ -40,11 +44,59 @@ import {
   cancelRequest,
   decideResponse,
   fetchRequestHistory,
+  fileAttachmentOnOpportunity,
   submitResponse,
   uploadRequestAttachment,
 } from "@/slices/collaborationSlice";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
+
+/**
+ * One supplied file: open or download it, and — for the person who asked for
+ * it — file a copy into the job's own attachments so they can work with it.
+ */
+function FileRow({ file, canFile, filing, onFile }) {
+  const [category, setCategory] = useState(FILING_CATEGORIES[0].key);
+  return (
+    <div className="list-row document-file">
+      <span style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+        <Paperclip size={14} />
+        <a href={file.url} target="_blank" rel="noreferrer" className="row-title">
+          {file.filename}
+        </a>
+      </span>
+      <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <a href={file.url} download className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">
+          <Download size={14} /> Download
+        </a>
+        {canFile ? (
+          <>
+            <select
+              className="select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              aria-label={`Where to file ${file.filename}`}
+            >
+              {FILING_CATEGORIES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={filing}
+              onClick={() => onFile(file, category)}
+            >
+              <FolderInput size={14} /> {filing ? "Filing…" : "File on job"}
+            </button>
+          </>
+        ) : null}
+      </span>
+    </div>
+  );
+}
 
 function Fact({ label, value }) {
   return (
@@ -62,7 +114,8 @@ export default function RequestDetail({ request, onClose, timeZone }) {
   const { user } = useAuth();
   const { notify, error: notifyError } = useNotifications();
   const { history, historyStatus } = useAppSelector((s) => s.collaboration);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(null);
+  const [filing, setFiling] = useState(null);
   const [clarifying, setClarifying] = useState(false);
   const [clarification, setClarification] = useState("");
   const [busy, setBusy] = useState(false);
@@ -78,16 +131,32 @@ export default function RequestDetail({ request, onClose, timeZone }) {
   const progress = visibleProgress(request, user);
   const fields = Array.isArray(request.requestedFields) ? request.requestedFields : [];
 
-  const upload = (category) => async (files) => {
-    setUploading(true);
+  const upload = (category) => async (files, documentKey) => {
+    setUploading(documentKey || (category === "report" ? "report" : "other"));
     try {
       for (const file of files) {
-        await dispatch(uploadRequestAttachment({ id: request.id, category, file })).unwrap();
+        await dispatch(uploadRequestAttachment({ id: request.id, category, file, documentKey })).unwrap();
       }
     } catch (err) {
       notifyError(errText(err, "Could not upload the file."));
     } finally {
-      setUploading(false);
+      setUploading(null);
+    }
+  };
+
+  /** Copies a supplied file into the job itself, so it lands in the estimator's own fields. */
+  const fileOnJob = async (attachment, category) => {
+    if (!category) return;
+    setFiling(attachment.id);
+    try {
+      await dispatch(
+        fileAttachmentOnOpportunity({ id: request.id, body: { attachmentId: attachment.id, category } }),
+      ).unwrap();
+      notify(`${attachment.filename} filed on the job`);
+    } catch (err) {
+      notifyError(errText(err, "Could not file the document on the job."));
+    } finally {
+      setFiling(null);
     }
   };
 
@@ -210,15 +279,52 @@ export default function RequestDetail({ request, onClose, timeZone }) {
               ))}
               {response.note ? <Fact label="Note" value={response.note} /> : null}
             </div>
-            {response.attachments?.length ? (
-              <div className="list-stack" style={{ marginTop: 10 }}>
-                {response.attachments.map((file) => (
-                  <a key={file.id} className="list-row" href={file.url} target="_blank" rel="noreferrer">
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <Paperclip size={14} /> <span className="row-title">{file.filename}</span>
-                    </span>
-                  </a>
-                ))}
+          </div>
+        ) : null}
+
+        {/* ---- Photos and documents that were asked for ---- */}
+        {requestedDocuments(request).length || response?.attachments?.length ? (
+          <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
+            <h3>Photos &amp; documents</h3>
+            {requestedDocuments(request).map((doc) => {
+              const files = documentUploads(request, doc.key);
+              return (
+                <div key={doc.key} className="document-slot">
+                  <div className="document-slot-head">
+                    <span className="row-title">{doc.label}</span>
+                    <Badge tone={files.length ? "success" : "warning"}>
+                      {files.length ? `${files.length} supplied` : "Not supplied yet"}
+                    </Badge>
+                  </div>
+                  {files.map((file) => (
+                    <FileRow
+                      key={file.id}
+                      file={file}
+                      canFile={isRequester(request, user)}
+                      filing={filing === file.id}
+                      onFile={fileOnJob}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+
+            {(response?.attachments || []).filter((f) => !f.documentKey).length ? (
+              <div className="document-slot">
+                <div className="document-slot-head">
+                  <span className="row-title">Other files</span>
+                </div>
+                {(response?.attachments || [])
+                  .filter((f) => !f.documentKey)
+                  .map((file) => (
+                    <FileRow
+                      key={file.id}
+                      file={file}
+                      canFile={isRequester(request, user)}
+                      filing={filing === file.id}
+                      onFile={fileOnJob}
+                    />
+                  ))}
               </div>
             ) : null}
           </div>

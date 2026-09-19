@@ -12,6 +12,7 @@ import Modal from "@/components/Modal";
 import {
   ASSIGNMENT_TEMPLATES,
   DEPARTMENTS,
+  DOCUMENT_TYPES,
   FIELD_TYPES,
   INFORMATION_TEMPLATES,
   PRIORITIES,
@@ -47,8 +48,8 @@ export default function RequestFormModal({
     description: templates[0].description || "",
     priority: "medium",
     dueAt: "",
-    scheduledFor: "",
     fields: (templates[0].fields || []).map((f) => ({ ...f })),
+    documents: [],
   }));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -65,6 +66,14 @@ export default function RequestFormModal({
       fields: (template.fields || []).map((x) => ({ ...x })),
     }));
   };
+
+  const setDocument = (index, key, value) =>
+    set(
+      "documents",
+      form.documents.map((d, i) => (i === index ? { ...d, [key]: value } : d)),
+    );
+  const addDocument = () => set("documents", [...form.documents, { label: "", type: "image", comment: "" }]);
+  const removeDocument = (index) => set("documents", form.documents.filter((_, i) => i !== index));
 
   const setField = (index, key, value) =>
     set(
@@ -88,13 +97,20 @@ export default function RequestFormModal({
       await onSubmit({
         kind,
         stage,
+        requestedDocuments: form.documents
+          .filter((d) => !isBlank(d.label))
+          .map((d, i) => ({
+            key: d.key || slug(d.label, i),
+            label: d.label.trim(),
+            type: d.type || "image",
+            comment: (d.comment || "").trim(),
+          })),
         department: form.department,
         assigneeId: Number(form.assigneeId),
         title: form.title.trim(),
         description: form.description.trim(),
         priority: form.priority,
         dueAt: form.dueAt || null,
-        scheduledFor: isAssignment ? form.scheduledFor || null : null,
         requestedFields: isAssignment
           ? null
           : form.fields.map((f, i) => ({
@@ -184,11 +200,6 @@ export default function RequestFormModal({
         <Field label="Needed by">
           <input type="date" value={form.dueAt} onChange={(e) => set("dueAt", e.target.value)} />
         </Field>
-        {isAssignment ? (
-          <Field label="Suggested date" className="span-2" hint="the coordinator can reschedule">
-            <input type="date" value={form.scheduledFor} onChange={(e) => set("scheduledFor", e.target.value)} />
-          </Field>
-        ) : null}
       </div>
 
       {!isAssignment ? (
@@ -227,6 +238,49 @@ export default function RequestFormModal({
           </button>
         </div>
       ) : null}
+
+      <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
+        <h3>Photos &amp; documents needed</h3>
+        <p className="lede" style={{ marginBottom: 12 }}>
+          Name each one — &ldquo;sketch of the switchboard run&rdquo; — and it becomes its own upload slot on their
+          response, with your comment as the instruction.
+        </p>
+        {form.documents.map((doc, i) => (
+          <div key={i} className="row-grid" style={{ "--row-cols": "1fr 150px 1fr auto" }}>
+            <Field label="What is needed">
+              <input
+                value={doc.label}
+                placeholder="e.g. Sketch of the switchboard run"
+                onChange={(e) => setDocument(i, "label", e.target.value)}
+              />
+            </Field>
+            <Field label="Type">
+              <select value={doc.type} onChange={(e) => setDocument(i, "type", e.target.value)}>
+                {DOCUMENT_TYPES.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Comment" hint="what it has to show">
+              <input
+                value={doc.comment}
+                placeholder="e.g. include the meter number"
+                onChange={(e) => setDocument(i, "comment", e.target.value)}
+              />
+            </Field>
+            <div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeDocument(i)} aria-label="Remove">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={addDocument}>
+          <Plus size={14} /> Add a photo or document
+        </button>
+      </div>
 
       {error ? (
         <Alert tone="danger" style={{ marginTop: 16, marginBottom: 0 }}>

@@ -5,15 +5,18 @@
 import { useState } from "react";
 import { Send, Save } from "lucide-react";
 import Alert from "@/components/Alert";
+import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
 import NumberInput from "@/components/NumberInput";
+import { documentTypeLabel, documentUploads, requestedDocuments } from "@/constants/collaboration";
 import { isBlank } from "@/utils/validators";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
-export default function ResponseForm({ request, onSubmit, onUpload, uploading = false }) {
+export default function ResponseForm({ request, onSubmit, onUpload, uploading = null }) {
   const fields = Array.isArray(request.requestedFields) ? request.requestedFields : [];
+  const documents = requestedDocuments(request);
   const [values, setValues] = useState(() => ({ ...(request.response?.fields || {}) }));
   const [note, setNote] = useState(request.response?.note || "");
   const [error, setError] = useState("");
@@ -79,10 +82,47 @@ export default function ResponseForm({ request, onSubmit, onUpload, uploading = 
         <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
       </Field>
 
+      {documents.length ? (
+        <div style={{ marginTop: 14 }}>
+          <h3>Photos &amp; documents asked for</h3>
+          {documents.map((doc) => {
+            const files = documentUploads(request, doc.key);
+            return (
+              <div key={doc.key} className="document-slot">
+                <div className="document-slot-head">
+                  <span className="row-title">
+                    {doc.label} <Badge tone="neutral">{documentTypeLabel(doc.type)}</Badge>
+                  </span>
+                  <Badge tone={files.length ? "success" : "warning"}>
+                    {files.length ? `${files.length} uploaded` : "Not supplied"}
+                  </Badge>
+                </div>
+                {doc.comment ? (
+                  <p className="lede" style={{ margin: "0 0 8px" }}>
+                    {doc.comment}
+                  </p>
+                ) : null}
+                {onUpload ? (
+                  <FileDropzone
+                    files={files}
+                    onSelect={(selected) => onUpload(selected, doc.key)}
+                    uploading={uploading === doc.key}
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       {onUpload ? (
         <div style={{ marginTop: 14 }}>
-          <h3>Attachments</h3>
-          <FileDropzone files={request.response?.attachments || []} onSelect={onUpload} uploading={uploading} />
+          <h3>Anything else</h3>
+          <FileDropzone
+            files={(request.response?.attachments || []).filter((f) => !f.documentKey)}
+            onSelect={(selected) => onUpload(selected, null)}
+            uploading={uploading === "other"}
+          />
         </div>
       ) : null}
 
