@@ -105,23 +105,6 @@ function itemsForOpportunity(opp, { userName, timeZone }) {
   };
   const items = [];
 
-  if (stage === 2 && opp.estimationRequirementsReceived === false) {
-    items.push({
-      ...base,
-      id: `req-${opp.id}`,
-      team: "sales",
-      title: "Lead details requested",
-      detail: opp.estimationOnHoldReason || "Sent back to sales — estimation on hold",
-      owner: opp.salespersonId ? userName?.(opp.salespersonId) : null,
-      facts: [
-        ...commonFacts,
-        fact("Salesperson", opp.salespersonId ? userName?.(opp.salespersonId) : "Not assigned"),
-        fact("What estimation asked for", opp.estimationOnHoldReason),
-        fact("Estimation status", "On hold until sales sends the missing details"),
-      ],
-    });
-  }
-
   if (stage === 2 && opp.estimationClientInfoNeeded === true) {
     items.push({
       ...base,

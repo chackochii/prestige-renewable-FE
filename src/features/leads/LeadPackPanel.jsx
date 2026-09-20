@@ -1,12 +1,13 @@
 // Stage-1 work: the lead pack, editable while the record lives.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Pencil } from "lucide-react";
 import Alert from "@/components/Alert";
 import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
 import RequestDetail from "@/features/collaboration/RequestDetail";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
+import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import { formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
 import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
@@ -27,6 +28,9 @@ import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
 
+/** Everything raised from the lead pack is filed against stage 1. */
+const LEAD_STAGE = 1;
+
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
   const { estimators, sales, siteOps, userName } = useUnitUsers();
@@ -43,16 +47,24 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [uploadingCategory, setUploadingCategory] = useState(null);
   const [requestingInspection, setRequestingInspection] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(null);
-  // A saved lead opens read-only; the pencil unlocks it. Once it is with an
-  // estimator, unlocking asks first — editing under them is a real event.
-  const [editing, setEditing] = useState(false);
+  // Open ready to edit. The checklist runs across several tabs and people
+  // fill it in over more than one sitting, so locking it behind a pencil only
+  // got in the way. Read-only is for people without the permission, and for
+  // anyone who has pressed Cancel.
+  const [editing, setEditing] = useState(true);
   const [confirmEdit, setConfirmEdit] = useState(false);
 
-  // A fresh record (after fetch or save) replaces any unsaved edits.
+  // A fresh record (after fetch or save) replaces any unsaved edits. Opening a
+  // different record starts read-only again, but saving the one you are on
+  // leaves the form unlocked so you can carry straight on to the next tab.
+  const openedId = useRef(opp?.id);
   useEffect(() => {
     setForm(leadToForm(opp));
     setErrors({});
-    setEditing(false);
+    if (openedId.current !== opp?.id) {
+      openedId.current = opp?.id;
+      setEditing(true);
+    }
   }, [opp]);
 
   useEffect(() => {
@@ -206,7 +218,8 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         }
       }
 
-      setEditing(false);
+      // Deliberately stays in edit mode: the checklist spans several tabs and
+      // people save as they go.
       notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
     } catch (err) {
       setSaveError(typeof err === "string" ? err : err?.message || "Could not save the lead pack.");
@@ -215,7 +228,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     }
   };
 
-  const atLeadStage = Number(opp.stage) === 1;
+  const atLeadStage = Number(opp.stage) === LEAD_STAGE;
   // "Handed over" means an estimator owns it now, whether or not the stage moved.
   const estimatorName = opp.estimator?.name || userName(opp.estimatorId);
   const handedOver = Boolean(opp.estimatorId);
@@ -251,6 +264,14 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           : "This lead has already moved on. You can still review and update the details."}
       </p>
 
+      {canEdit && editing && handedOver ? (
+        <Alert tone="warning" style={{ marginBottom: 12 }}>
+          {estimatorName || "An estimator"} is pricing this lead
+          {opp.estimatorAssignedAt ? ` (assigned ${formatWhen(opp.estimatorAssignedAt)})` : ""}. Changes here change
+          what they are working from, and they are notified when you save.
+        </Alert>
+      ) : null}
+
       <LeadForm
         form={form}
         set={set}
@@ -260,6 +281,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         referrers={referrers}
         unit={unit}
         disabled={!canEdit || !editing}
+        onUnlock={canEdit && !editing ? startEditing : undefined}
         billFiles={billFiles}
         onUploadBills={canEdit && editing ? uploadBills : undefined}
         uploadingBills={uploadingBills}
@@ -270,6 +292,17 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         uploadingCategory={uploadingCategory}
         inspection={inspection}
         onRequestInspection={canEdit ? handleInspection : undefined}
+        requestsPanel={
+          <StageRequestsPanel
+            opp={opp}
+            stage={LEAD_STAGE}
+            unit={unit}
+            canEdit={canEdit}
+            informationDepartment="operations"
+            assignmentDepartment="operations"
+            emptyBody="Raise a request when you need something from another team to qualify this lead, or assign a site activity to operations."
+          />
+        }
       />
 
       {errorList.length ? (
@@ -352,7 +385,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
       {requestingInspection ? (
         <RequestFormModal
           opportunity={opp}
-          stage={Number(opp.stage) || 1}
+          stage={LEAD_STAGE}
           kind="assignment"
           department="operations"
           people={siteOps.length ? siteOps : sales}

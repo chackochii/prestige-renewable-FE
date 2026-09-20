@@ -37,7 +37,6 @@ import {
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
-import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
 import SectionHead from "@/components/SectionHead";
 import Tabs from "@/components/Tabs";
@@ -59,9 +58,7 @@ import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationS
 import {
   acknowledgeLeadChange,
   fetchOpportunityAttachments,
-  notifySalesManager,
   submitEstimationClientInfo,
-  submitEstimationRequirements,
   submitEstimatorChecklist,
   uploadOpportunityAttachment,
 } from "@/slices/leadsSlice";
@@ -69,8 +66,6 @@ import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
 
 const STATUS_META = {
-  awaiting_requirements: { label: "Awaiting requirements from sales", tone: "neutral" },
-  on_hold: { label: "On hold — sent back to sales", tone: "danger" },
   evaluating: { label: "Evaluating", tone: "warning" },
   awaiting_client_info: { label: "Awaiting client input", tone: "warning" },
   ready: { label: "Ready to proceed", tone: "success" },
@@ -141,7 +136,6 @@ function LockedStep({ title, body }) {
 }
 
 const formFromOpp = (opp) => ({
-  holdReason: opp.estimationOnHoldReason || "",
   checklistValues: opp.estimationChecklistValues || {},
   preSiteInspectionRequired: opp.estimationPreSiteInspectionRequired ?? null,
 });
@@ -161,10 +155,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const [leadChangeSeen, setLeadChangeSeen] = useState(false);
   const [requestingInspection, setRequestingInspection] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(false);
-  const [askingReceived, setAskingReceived] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [holdReason, setHoldReason] = useState(() => formFromOpp(opp).holdReason);
   const [checklistValues, setChecklistValues] = useState(() => formFromOpp(opp).checklistValues);
   const [preSiteInspectionRequired, setPreSiteInspectionRequired] = useState(
     () => formFromOpp(opp).preSiteInspectionRequired,
@@ -172,10 +164,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
 
   useEffect(() => {
     const fresh = formFromOpp(opp);
-    setHoldReason(fresh.holdReason);
     setChecklistValues(fresh.checklistValues);
     setPreSiteInspectionRequired(fresh.preSiteInspectionRequired);
-    setAskingReceived(false);
     setError("");
   }, [opp]);
 
@@ -235,30 +225,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
     }
   };
 
-  const answerReceived = (received) => {
-    if (received === false) {
-      setAskingReceived(true);
-      return;
-    }
-    setAskingReceived(false);
-    run(() => dispatch(submitEstimationRequirements({ id: opp.id, body: { received: true } })).unwrap());
-  };
-
-  const confirmNotReceived = () => {
-    if (!holdReason.trim()) {
-      setError("Say what's missing before sending it back to sales.");
-      return;
-    }
-    run(async () => {
-      await dispatch(
-        submitEstimationRequirements({ id: opp.id, body: { received: false, reason: holdReason.trim() } }),
-      ).unwrap();
-      await dispatch(notifySalesManager(opp.id)).unwrap();
-      setAskingReceived(false);
-      notify("Sent back to sales — sales manager notified");
-    });
-  };
-
   const answerClientInfo = (needed) => {
     run(() => dispatch(submitEstimationClientInfo({ id: opp.id, body: { needed } })).unwrap());
   };
@@ -277,13 +243,11 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
 
   const state = estimationState(opp);
   const status = STATUS_META[state];
-  const onHold = opp.estimationRequirementsReceived === false;
 
   const leadRows = leadMandatoryItems(opp, { billCount: billFiles.length });
   const requirementsChecklistComplete = leadRows.every((row) => row.done);
 
-  const showRequirementsChecklist = opp.estimationRequirementsReceived === true;
-  const showClientInfoGate = showRequirementsChecklist && requirementsChecklistComplete;
+  const showClientInfoGate = requirementsChecklistComplete;
   const showEstimatorChecklist = opp.estimationClientInfoNeeded === true;
 
   // Resolved when no inspection is needed, or when operations has completed
@@ -296,10 +260,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const showQuoteBuilder = state === "ready" || (showEstimatorChecklist && preSiteResolved);
 
   // One flag per tab, for the tick on the tab and for choosing where to open.
-  const requirementsDone =
-    opp.estimationRequirementsReceived === true &&
-    requirementsChecklistComplete &&
-    opp.estimationClientInfoNeeded != null;
+  const requirementsDone = requirementsChecklistComplete && opp.estimationClientInfoNeeded != null;
   const siteVisitDone = showEstimatorChecklist && preSiteResolved;
   const quoteDone = Boolean(quote?.items?.length);
 
@@ -330,7 +291,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
     ) : (
       <LockedStep
         title="Finish the requirements first"
-        body="This opens once sales has provided the requirements, the requirements checklist is complete and the client input question is answered."
+        body="This opens once the requirements checklist is complete and the client input question is answered."
       />
     );
 
@@ -375,53 +336,25 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
         </Alert>
       ) : null}
 
-      {onHold ? (
-        <Alert tone="warning" style={{ marginBottom: 12 }}>
-          Estimation is on hold and sales has been notified. {opp.estimationOnHoldReason}
-        </Alert>
-      ) : null}
-
       <Tabs items={tabs} value={tab} onChange={setTab} />
 
       {tab === "requirements" ? (
         <>
           <div className="section">
-            <SectionHead icon={<ClipboardList size={13} />} title="Requirements from sales" />
-            <QuestionBlock title="Did sales provide the minimum required information for this lead?">
-              <YesNo value={opp.estimationRequirementsReceived} onChange={answerReceived} disabled={!canEdit || saving} />
-              {askingReceived ? (
-                <div style={{ marginTop: 14 }}>
-                  <Field label="What's missing?" hint="sent to sales with the notification">
-                    <textarea rows={2} value={holdReason} disabled={!canEdit} onChange={(e) => setHoldReason(e.target.value)} />
-                  </Field>
-                  {canEdit ? (
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      style={{ marginTop: 12 }}
-                      disabled={saving || !holdReason.trim()}
-                      onClick={confirmNotReceived}
-                    >
-                      Send back to sales
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </QuestionBlock>
+            <SectionHead icon={<ListChecks size={13} />} title="Requirements checklist" />
+            <LeadInputs
+              opp={opp}
+              canEdit={canEdit}
+              stage={2}
+              billFiles={billFiles}
+              drawings={drawings}
+              sitePhotos={sitePhotos}
+              onUploadSitePhotos={canEdit ? uploadSitePhotos : undefined}
+              uploadingSitePhotos={uploadingPhotos}
+              onUploadDrawings={canEdit ? uploadSiteSketches : undefined}
+              uploadingDrawings={uploadingSketches}
+            />
           </div>
-
-          {showRequirementsChecklist ? (
-            <div className="section" style={{ marginTop: 24 }}>
-              <SectionHead icon={<ListChecks size={13} />} title="Requirements checklist" />
-              <LeadInputs
-                opp={opp}
-                canEdit={canEdit}
-                billFiles={billFiles}
-                drawings={drawings}
-                sitePhotos={sitePhotos}
-              />
-            </div>
-          ) : null}
 
           {showClientInfoGate ? (
             <div className="section" style={{ marginTop: 24 }}>

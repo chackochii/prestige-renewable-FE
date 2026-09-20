@@ -22,7 +22,19 @@ import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationS
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
-export default function StageRequestsPanel({ opp, stage, unit, canEdit = false, title = "Request / Response" }) {
+export default function StageRequestsPanel({
+  opp,
+  stage,
+  unit,
+  canEdit = false,
+  title = "Request / Response",
+  // Which department each button starts on. Estimation asks sales for
+  // information; the lead stage asks operations. Either way the requester can
+  // change it in the form — this only decides what is pre-selected.
+  informationDepartment = "sales",
+  assignmentDepartment = "operations",
+  emptyBody,
+}) {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { notify, error: notifyError } = useNotifications();
@@ -59,14 +71,14 @@ export default function StageRequestsPanel({ opp, stage, unit, canEdit = false, 
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => setRaising({ kind: "information", department: "sales" })}
+                onClick={() => setRaising({ kind: "information", department: informationDepartment })}
               >
                 <Plus size={14} /> Request information
               </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => setRaising({ kind: "assignment", department: "operations" })}
+                onClick={() => setRaising({ kind: "assignment", department: assignmentDepartment })}
               >
                 <UserPlus size={14} /> Assign an activity
               </button>
@@ -86,7 +98,8 @@ export default function StageRequestsPanel({ opp, stage, unit, canEdit = false, 
             title="Nothing with another team"
             body={
               canEdit
-                ? "Raise a request when you need information from sales, or assign an activity to operations."
+                ? emptyBody ||
+                  "Raise a request when you need information from sales, or assign an activity to operations."
                 : "No requests have been raised from this stage."
             }
           />

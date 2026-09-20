@@ -90,6 +90,9 @@ export function emptyEstimationInput() {
     siteCrewAssigneeId: "",
     inspectionStatus: "",
     siteVisitCompleted: false,
+    // One per upload row, the way energyHasBills works on the lead: the row is
+    // satisfied by a tick or by an attachment.
+    sitePhotosOnFile: false,
     roofMeasurements: "",
     // Existing electrical
     existingElectrical: "",
@@ -124,6 +127,7 @@ export function emptyEstimationInput() {
     vppNotes: "",
     permitNotes: "",
     meterRequirements: "",
+    drawingsOnFile: false,
     drawingsNotes: "",
     // Customer
     inclusions: "",
@@ -171,7 +175,7 @@ export function estimationInputMissing(input, { drawingsCount = 0, sitePhotoCoun
   if (blank(input.preSiteInspectionRequired)) missing.push("whether a pre-site inspection is required");
   if (input.preSiteInspectionRequired === "yes") {
     if (!input.siteVisitCompleted) missing.push("site visit completed and findings reviewed");
-    if (!sitePhotoCount) missing.push("site photos");
+    if (!sitePhotoCount && !input.sitePhotosOnFile) missing.push("site photos");
   }
   if (blank(input.roofMeasurements)) missing.push("roof / site measurements");
   if (blank(input.existingElectrical)) missing.push("existing electrical system");
@@ -196,7 +200,8 @@ export function estimationInputMissing(input, { drawingsCount = 0, sitePhotoCoun
   if (blank(input.mountingRequirements)) missing.push("mounting / roof structure requirements");
   if (blank(input.cableRequirements)) missing.push("cable / conduit / trunking requirements");
   if (blank(input.siteConstraints)) missing.push("shading, orientation and site constraints");
-  if (blank(input.meterRequirements) && !drawingsCount) missing.push("utility / meter requirements or a drawing");
+  if (blank(input.meterRequirements) && !drawingsCount && !input.drawingsOnFile)
+    missing.push("utility / meter requirements or a drawing");
   if (blank(input.inclusions) && blank(input.exclusions)) missing.push("inclusions and exclusions");
   return missing;
 }

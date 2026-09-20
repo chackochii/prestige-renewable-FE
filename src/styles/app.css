@@ -559,9 +559,18 @@
   .lead-input-row { display: grid; grid-template-columns: 24px minmax(140px, 260px) minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--line); }
   .lead-input-row:last-child { border-bottom: 0; }
   .lead-input-row.is-editing { background: var(--surface-2); border-radius: 10px; padding: 12px 10px; }
+  .lead-input-row.is-files { align-items: start; padding: 12px 0; }
+  .lead-input-row.is-files .dropzone { padding: 14px; }
   .lead-input-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
   .lead-input-value { font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
   .lead-input-value.is-missing { color: var(--muted); font-style: italic; }
+  .lead-input-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .lead-input-row.is-picking { cursor: pointer; border-radius: 8px; margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+  .lead-input-row.is-picking:hover { background: var(--surface-2); }
+  .lead-input-row.is-locked { cursor: default; opacity: 0.55; }
+  .status-icon.pick { display: grid; place-items: center; }
+  .status-icon.pick input { margin: 0; cursor: pointer; }
+  .lead-input-row.is-locked .status-icon.pick input { cursor: default; }
   .rr-list { display: flex; flex-direction: column; gap: 14px; }
   .rr-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface); }
   .rr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
