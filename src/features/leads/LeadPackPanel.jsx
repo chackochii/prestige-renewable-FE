@@ -1,6 +1,6 @@
 // Stage-1 work: the lead pack, editable while the record lives.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Pencil } from "lucide-react";
 import Alert from "@/components/Alert";
 import Modal from "@/components/Modal";
@@ -47,16 +47,24 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [uploadingCategory, setUploadingCategory] = useState(null);
   const [requestingInspection, setRequestingInspection] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(null);
-  // A saved lead opens read-only; the pencil unlocks it. Once it is with an
-  // estimator, unlocking asks first — editing under them is a real event.
-  const [editing, setEditing] = useState(false);
+  // Open ready to edit. The checklist runs across several tabs and people
+  // fill it in over more than one sitting, so locking it behind a pencil only
+  // got in the way. Read-only is for people without the permission, and for
+  // anyone who has pressed Cancel.
+  const [editing, setEditing] = useState(true);
   const [confirmEdit, setConfirmEdit] = useState(false);
 
-  // A fresh record (after fetch or save) replaces any unsaved edits.
+  // A fresh record (after fetch or save) replaces any unsaved edits. Opening a
+  // different record starts read-only again, but saving the one you are on
+  // leaves the form unlocked so you can carry straight on to the next tab.
+  const openedId = useRef(opp?.id);
   useEffect(() => {
     setForm(leadToForm(opp));
     setErrors({});
-    setEditing(false);
+    if (openedId.current !== opp?.id) {
+      openedId.current = opp?.id;
+      setEditing(true);
+    }
   }, [opp]);
 
   useEffect(() => {
@@ -210,7 +218,8 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         }
       }
 
-      setEditing(false);
+      // Deliberately stays in edit mode: the checklist spans several tabs and
+      // people save as they go.
       notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
     } catch (err) {
       setSaveError(typeof err === "string" ? err : err?.message || "Could not save the lead pack.");
@@ -254,6 +263,14 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           ? "A lead becomes an opportunity once it's marked Potential with an estimator assigned."
           : "This lead has already moved on. You can still review and update the details."}
       </p>
+
+      {canEdit && editing && handedOver ? (
+        <Alert tone="warning" style={{ marginBottom: 12 }}>
+          {estimatorName || "An estimator"} is pricing this lead
+          {opp.estimatorAssignedAt ? ` (assigned ${formatWhen(opp.estimatorAssignedAt)})` : ""}. Changes here change
+          what they are working from, and they are notified when you save.
+        </Alert>
+      ) : null}
 
       <LeadForm
         form={form}

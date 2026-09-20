@@ -9,9 +9,10 @@ import { useState } from "react";
 import { Check, Circle, Pencil, Send, UserPlus, X } from "lucide-react";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
+import FileDropzone from "@/components/FileDropzone";
 import NumberInput from "@/components/NumberInput";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
-import { PERMIT_OPTIONS } from "@/constants/estimationInput";
+import { DRAWING_CATEGORY, PERMIT_OPTIONS, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { countDone, groupOptionalItems, leadMandatoryItems, leadOptionalItems } from "@/helpers/leadChecklist";
 import { oppTitle } from "@/helpers/opportunity";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -22,8 +23,12 @@ import { collectEstimationInputs } from "@/slices/leadsSlice";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
-/** A row estimation can ask sales about — the read-only ones are not questions. */
-const askable = (row) => row.type !== "readonly";
+/**
+ * A row estimation can ask sales about. Rows read off the record are not
+ * questions, and files are asked for through the request's own document
+ * slots rather than as an answer field.
+ */
+const askable = (row) => !["readonly", "files"].includes(row.type);
 
 /** The answer type sales gets on the response form, from the row's own control. */
 const ANSWER_TYPES = { textarea: "textarea", number: "number" };
@@ -57,7 +62,7 @@ function Tick({ done, label, value }) {
 }
 
 /** One optional row: read-only when sales supplied it, editable when they didn't. */
-function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected = false, onSelect }) {
+function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected = false, onSelect, upload }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(row.value ?? "");
 
@@ -139,6 +144,40 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
     );
   }
 
+  // Files live on the job, not in the estimation-input object — the row is an
+  // upload slot with whatever is already attached listed under it.
+  if (row.type === "files") {
+    const count = Number(row.value) || 0;
+    return (
+      <div className="lead-input-row is-files">
+        <span className={`status-icon ${row.done ? "done" : "pending"}`}>
+          {row.done ? <Check size={15} /> : <Circle size={15} />}
+        </span>
+        <span className="lead-input-label">{row.label}</span>
+        <span className="lead-input-value">
+          {canEdit ? (
+            <label className="check" style={{ margin: "0 0 10px" }}>
+              <input
+                type="checkbox"
+                checked={Boolean(row.confirmed)}
+                disabled={saving}
+                onChange={(e) => onSave(row.confirmField, e.target.checked)}
+              />
+              {row.confirmLabel}
+            </label>
+          ) : (
+            <span className={row.done ? "" : "is-missing"} style={{ display: "block", marginBottom: 8 }}>
+              {count ? `${count} attached` : row.confirmed ? "On file" : "Nothing attached"}
+            </span>
+          )}
+          {canEdit && upload?.onSelect ? (
+            <FileDropzone files={upload.files || []} onSelect={upload.onSelect} uploading={Boolean(upload.uploading)} />
+          ) : null}
+        </span>
+      </div>
+    );
+  }
+
   if (editing) {
     return (
       <div className="lead-input-row is-editing">
@@ -194,6 +233,11 @@ export default function LeadInputs({
   billFiles = [],
   drawings = [],
   sitePhotos = [],
+  // Estimation can attach site photos and drawings straight from the rows.
+  onUploadSitePhotos,
+  uploadingSitePhotos = false,
+  onUploadDrawings,
+  uploadingDrawings = false,
 }) {
   const dispatch = useAppDispatch();
   const { notify, error: notifyError } = useNotifications();
@@ -211,7 +255,11 @@ export default function LeadInputs({
   const optionalGroups = groupOptionalItems(optional);
   const mandatoryDone = countDone(mandatory);
   const optionalDone = countDone(optional);
-  const outstanding = optional.filter((row) => !row.done && row.type !== "readonly");
+  const outstanding = optional.filter((row) => !row.done && askable(row));
+  const uploads = {
+    [SITE_PHOTO_CATEGORY]: { files: sitePhotos, onSelect: onUploadSitePhotos, uploading: uploadingSitePhotos },
+    [DRAWING_CATEGORY]: { files: drawings, onSelect: onUploadDrawings, uploading: uploadingDrawings },
+  };
   const pickedRows = optional.filter((row) => picked.includes(row.field));
 
   const startPicking = () => {
@@ -319,6 +367,7 @@ export default function LeadInputs({
                   selecting={selecting}
                   selected={picked.includes(row.field)}
                   onSelect={togglePick}
+                  upload={row.category ? uploads[row.category] : undefined}
                 />
               ))}
             </div>

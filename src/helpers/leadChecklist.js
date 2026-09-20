@@ -10,7 +10,9 @@
 
 import {
   BACKUP_OPTIONS,
+  DRAWING_CATEGORY,
   PERMIT_OPTIONS,
+  SITE_PHOTO_CATEGORY,
   SWITCHBOARD_CONDITIONS,
   VPP_OPTIONS,
   estimationInputFromOpp,
@@ -176,16 +178,21 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       type: "checkbox",
       value: input.siteVisitCompleted,
       display: input.siteVisitCompleted ? "Yes" : "",
-      onlyWhen: input.preSiteInspectionRequired === "yes",
     },
     {
       group: "Site & Inspection",
       field: "__sitePhotos",
       label: "Site photos",
-      type: "readonly",
+      // Estimation can add these itself, so the row carries an upload slot
+      // rather than just a count.
+      type: "files",
+      category: SITE_PHOTO_CATEGORY,
+      confirmField: "sitePhotosOnFile",
+      confirmLabel: "Site photos available on file",
+      confirmed: input.sitePhotosOnFile,
       value: sitePhotoCount ? String(sitePhotoCount) : "",
-      display: sitePhotoCount ? `${sitePhotoCount} attached` : "",
-      onlyWhen: input.preSiteInspectionRequired === "yes",
+      display: sitePhotoCount ? `${sitePhotoCount} attached` : "On file",
+      done: Boolean(input.sitePhotosOnFile) || sitePhotoCount > 0,
     },
 
     // ---- Technical & Electrical Specification ----
@@ -371,9 +378,14 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       group: "Installation, Permits & Utility",
       field: "__drawings",
       label: "Drawings, layouts & SLD",
-      type: "readonly",
+      type: "files",
+      category: DRAWING_CATEGORY,
+      confirmField: "drawingsOnFile",
+      confirmLabel: "Drawings available on file",
+      confirmed: input.drawingsOnFile,
       value: drawingCount ? String(drawingCount) : "",
-      display: drawingCount ? `${drawingCount} attached` : "",
+      display: drawingCount ? `${drawingCount} attached` : "On file",
+      done: Boolean(input.drawingsOnFile) || drawingCount > 0,
     },
 
     // ---- Customer-Specific Notes ----
@@ -397,7 +409,9 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
     .filter((row) => row.onlyWhen === undefined || row.onlyWhen)
     .map((row) => ({
       ...row,
-      done: row.type === "checkbox" ? Boolean(row.value) : filled(row.value),
+      // A row may settle its own done rule (the document rows do); otherwise
+      // it is done once it holds something.
+      done: row.done ?? (row.type === "checkbox" ? Boolean(row.value) : filled(row.value)),
       display: row.display ?? String(row.value ?? ""),
     }));
 }

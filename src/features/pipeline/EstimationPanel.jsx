@@ -349,6 +349,10 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
               billFiles={billFiles}
               drawings={drawings}
               sitePhotos={sitePhotos}
+              onUploadSitePhotos={canEdit ? uploadSitePhotos : undefined}
+              uploadingSitePhotos={uploadingPhotos}
+              onUploadDrawings={canEdit ? uploadSiteSketches : undefined}
+              uploadingDrawings={uploadingSketches}
             />
           </div>
 

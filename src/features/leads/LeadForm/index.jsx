@@ -968,23 +968,31 @@ export default function LeadForm({
                     <div style={{ marginTop: 10 }}>
                       {checkbox("siteVisitCompleted", "Site visit completed and findings reviewed")}
                     </div>
-                    <div style={{ marginTop: 10 }}>
-                      <h3>Site photos</h3>
-                      {onUploadSitePhotos ? (
-                        <FileDropzone
-                          files={sitePhotos}
-                          onSelect={onUploadSitePhotos}
-                          disabled={disabled}
-                          uploading={uploadingCategory === "photo"}
-                        />
-                      ) : (
-                        <p className="dropzone-empty" style={{ margin: 0 }}>
-                          Uploads are available once the lead is saved.
-                        </p>
-                      )}
-                    </div>
                   </div>
                 ) : null}
+              </ChecklistRow>
+
+              {/* Optional, like every other estimation-input row: tick it when the
+                  photos are already on file, or attach them here. */}
+              <ChecklistRow
+                done={sitePhotos.length > 0 || Boolean(form.sitePhotosOnFile)}
+                label="Site photos"
+              >
+                <div style={{ marginBottom: 10 }}>
+                  {checkbox("sitePhotosOnFile", "Site photos available on file")}
+                </div>
+                {onUploadSitePhotos ? (
+                  <FileDropzone
+                    files={sitePhotos}
+                    onSelect={onUploadSitePhotos}
+                    disabled={disabled}
+                    uploading={uploadingCategory === "photo"}
+                  />
+                ) : (
+                  <p className="dropzone-empty" style={{ margin: 0 }}>
+                    Uploads are available once the lead is saved.
+                  </p>
+                )}
               </ChecklistRow>
 
               <GroupHead title={TECHNICAL_GROUP} />
@@ -1126,28 +1134,31 @@ export default function LeadForm({
                 </div>
               </ChecklistRow>
 
-              <ChecklistRow
-                done={!isBlank(form.meterRequirements) || drawings.length > 0}
-                label="Utility, meter & drawings"
-              >
+              <ChecklistRow done={!isBlank(form.meterRequirements)} label="Utility & meter">
                 <Field label="Utility or meter requirements" hint="NMI, meter change, network limits">
                   {input("meterRequirements")}
                 </Field>
-                <div style={{ marginTop: 10 }}>
-                  <h3>Drawings, layouts & SLD</h3>
-                  {onUploadDrawings ? (
-                    <FileDropzone
-                      files={drawings}
-                      onSelect={onUploadDrawings}
-                      disabled={disabled}
-                      uploading={uploadingCategory === "sketch"}
-                    />
-                  ) : (
-                    <p className="dropzone-empty" style={{ margin: 0 }}>
-                      Uploads are available once the lead is saved.
-                    </p>
-                  )}
+              </ChecklistRow>
+
+              <ChecklistRow
+                done={drawings.length > 0 || Boolean(form.drawingsOnFile)}
+                label="Drawings, layouts & SLD"
+              >
+                <div style={{ marginBottom: 10 }}>
+                  {checkbox("drawingsOnFile", "Drawings available on file")}
                 </div>
+                {onUploadDrawings ? (
+                  <FileDropzone
+                    files={drawings}
+                    onSelect={onUploadDrawings}
+                    disabled={disabled}
+                    uploading={uploadingCategory === "sketch"}
+                  />
+                ) : (
+                  <p className="dropzone-empty" style={{ margin: 0 }}>
+                    Uploads are available once the lead is saved.
+                  </p>
+                )}
               </ChecklistRow>
 
               <GroupHead title="Customer-Specific Notes" />

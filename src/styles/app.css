@@ -559,6 +559,8 @@
   .lead-input-row { display: grid; grid-template-columns: 24px minmax(140px, 260px) minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--line); }
   .lead-input-row:last-child { border-bottom: 0; }
   .lead-input-row.is-editing { background: var(--surface-2); border-radius: 10px; padding: 12px 10px; }
+  .lead-input-row.is-files { align-items: start; padding: 12px 0; }
+  .lead-input-row.is-files .dropzone { padding: 14px; }
   .lead-input-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
   .lead-input-value { font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
   .lead-input-value.is-missing { color: var(--muted); font-style: italic; }
