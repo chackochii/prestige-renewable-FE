@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
 import RequestDetail from "@/features/collaboration/RequestDetail";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
+import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import { formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
 import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
@@ -26,6 +27,9 @@ import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationS
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
+
+/** Everything raised from the lead pack is filed against stage 1. */
+const LEAD_STAGE = 1;
 
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
@@ -215,7 +219,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     }
   };
 
-  const atLeadStage = Number(opp.stage) === 1;
+  const atLeadStage = Number(opp.stage) === LEAD_STAGE;
   // "Handed over" means an estimator owns it now, whether or not the stage moved.
   const estimatorName = opp.estimator?.name || userName(opp.estimatorId);
   const handedOver = Boolean(opp.estimatorId);
@@ -260,6 +264,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         referrers={referrers}
         unit={unit}
         disabled={!canEdit || !editing}
+        onUnlock={canEdit && !editing ? startEditing : undefined}
         billFiles={billFiles}
         onUploadBills={canEdit && editing ? uploadBills : undefined}
         uploadingBills={uploadingBills}
@@ -270,6 +275,17 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         uploadingCategory={uploadingCategory}
         inspection={inspection}
         onRequestInspection={canEdit ? handleInspection : undefined}
+        requestsPanel={
+          <StageRequestsPanel
+            opp={opp}
+            stage={LEAD_STAGE}
+            unit={unit}
+            canEdit={canEdit}
+            informationDepartment="operations"
+            assignmentDepartment="operations"
+            emptyBody="Raise a request when you need something from another team to qualify this lead, or assign a site activity to operations."
+          />
+        }
       />
 
       {errorList.length ? (
@@ -352,7 +368,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
       {requestingInspection ? (
         <RequestFormModal
           opportunity={opp}
-          stage={Number(opp.stage) || 1}
+          stage={LEAD_STAGE}
           kind="assignment"
           department="operations"
           people={siteOps.length ? siteOps : sales}

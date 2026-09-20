@@ -8,8 +8,9 @@
 // customer before the lead can be marked Potential.
 
 import { useState } from "react";
-import { Building2, Check, ClipboardCheck, ExternalLink, PhoneCall, Plus, Send, X } from "lucide-react";
+import { Building2, Check, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, X } from "lucide-react";
 import { formatDate } from "@/helpers/dateTimeHelpers";
+import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
 import Tabs from "@/components/Tabs";
@@ -60,6 +61,16 @@ function GroupHead({ title }) {
 const BILLING_OPTIONS = [
   { key: "yes", label: "Yes — bill to the site address" },
   { key: "no", label: "No — different billing address" },
+];
+
+/**
+ * The client-contact question. It starts unanswered on purpose: the row only
+ * ticks once someone says what happened, and a "yes" needs a logged attempt
+ * behind it.
+ */
+const CONTACT_OPTIONS = [
+  { key: "yes", label: "Yes — log every attempt below" },
+  { key: "no", label: "No — we already had everything" },
 ];
 
 /**
@@ -144,11 +155,19 @@ export default function LeadForm({
   uploadingCategory = null,
   inspection = null,
   onRequestInspection,
+  // Rendered under its own tab when the panel passes one in.
+  requestsPanel = null,
+  // Unlocks a saved lead for editing. Passed only when the person may edit;
+  // without it a locked form just says why it is locked.
+  onUnlock,
 }) {
   const err = (field) => errors[field];
   const hasSalesperson = !isBlank(form.salespersonId) && showChecklist;
   const [tab, setTab] = useState("customer");
-  const activeTab = hasSalesperson ? tab : "customer";
+  // The checklist and the decision need an owner before they mean anything;
+  // requests do not, so they stay reachable on an unassigned lead.
+  const needsSalesperson = ["checklist", "decision"].includes(tab);
+  const activeTab = hasSalesperson || !needsSalesperson ? tab : "customer";
   const automated = isAutomatedSource(form.leadSource);
   const tiers = commissionTiersFor(unit);
   const business = isBusinessLead(form.leadType);
@@ -221,18 +240,32 @@ export default function LeadForm({
   const contactAttempts = form.contactAttempts || [];
   const emptyAttemptDraft = { method: "", contactedAt: "", reached: true, reason: "", notes: "" };
   const [attemptDraft, setAttemptDraft] = useState(emptyAttemptDraft);
-  const attemptDraftValid =
-    attemptDraft.method.trim() && attemptDraft.contactedAt && (attemptDraft.reached || attemptDraft.reason.trim());
+  const attemptDraftMissing = [
+    isBlank(attemptDraft.method) ? "how you tried" : null,
+    attemptDraft.contactedAt ? null : "the date",
+    !attemptDraft.reached && isBlank(attemptDraft.reason) ? "a reason they weren't reached" : null,
+  ].filter(Boolean);
+  const attemptDraftValid = attemptDraftMissing.length === 0;
   const addContactAttempt = () => {
     if (!attemptDraftValid) return;
     set("contactAttempts", [...contactAttempts, attemptDraft]);
     setAttemptDraft(emptyAttemptDraft);
   };
+  // This form can sit inside a <form> (the new-lead page), where Enter in a
+  // text box would submit the lead instead of logging the attempt.
+  const attemptKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    addContactAttempt();
+  };
   const removeContactAttempt = (i) => set("contactAttempts", contactAttempts.filter((_, idx) => idx !== i));
 
   // One boolean per mandatory row — the single source of truth for both the
   // row ticks and the "Potential" gate/progress bar below.
-  const doneContact = !form.needsClientContact || contactAttempts.length > 0;
+  // Answered "no", or answered "yes" and backed up with a logged attempt.
+  // An unanswered question is never complete.
+  const doneContact =
+    form.needsClientContact === "no" || (form.needsClientContact === "yes" && contactAttempts.length > 0);
   const doneName = !isBlank(form.customerFirstName) && !isBlank(form.customerLastName);
   const doneAddress = !isBlank(form.siteLine1) && !isBlank(form.siteSuburb) && !isBlank(form.sitePostcode);
   const siteAddressLine = [form.siteLine1, form.siteSuburb, `${form.siteState || ""} ${form.sitePostcode || ""}`.trim()]
@@ -319,10 +352,32 @@ export default function LeadForm({
                 { key: "decision", label: "Notes & decision", icon: <Check size={14} /> },
               ]
             : []),
+          ...(requestsPanel
+            ? [{ key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> }]
+            : []),
         ]}
         value={activeTab}
         onChange={setTab}
       />
+
+      {/* The Edit button sits in the card head, above the tabs and often off
+          screen by the time you are deep in the checklist — so say here, on
+          whichever tab you are on, why nothing can be filled in. */}
+      {disabled ? (
+        <Alert tone="info" style={{ marginBottom: 16 }}>
+          <span style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <span>
+              This lead is read-only.{" "}
+              {onUnlock ? "Unlock it to fill in the checklist." : "Editing needs the \u201cUpdate Leads\u201d permission."}
+            </span>
+            {onUnlock ? (
+              <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: "auto" }} onClick={onUnlock}>
+                <Pencil size={14} /> Edit lead details
+              </button>
+            ) : null}
+          </span>
+        </Alert>
+      ) : null}
 
       {activeTab === "customer" ? (
         <div className="section" id="lf-customer">
@@ -407,6 +462,8 @@ export default function LeadForm({
         </div>
       ) : null}
 
+      {activeTab === "requests" ? requestsPanel : null}
+
       {activeTab === "checklist" ? (
         <div className="section" id="lf-checklist">
           <p className="lede" style={{ marginBottom: 16 }}>
@@ -424,16 +481,19 @@ export default function LeadForm({
 
               <div className="checklist" style={{ marginBottom: 20 }}>
               <ChecklistRow done={doneContact} label="Contact client?">
-                <label className="check" style={{ marginBottom: form.needsClientContact ? 10 : 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.needsClientContact}
-                    disabled={disabled}
-                    onChange={(e) => set("needsClientContact", e.target.checked)}
-                  />
-                  Need to contact client to collect mandatory details
-                </label>
-                {form.needsClientContact ? (
+                <p className="lede" style={{ margin: "0 0 10px" }}>
+                  Did you have to contact the client to collect the mandatory details?
+                </p>
+                <ChoiceGroup
+                  name="lf-contact"
+                  otherLabel="answer"
+                  options={CONTACT_OPTIONS}
+                  value={form.needsClientContact}
+                  disabled={disabled}
+                  error={err("needsClientContact")}
+                  onChange={(v) => set("needsClientContact", v)}
+                />
+                {form.needsClientContact === "yes" ? (
                   <div>
                     {contactAttempts.length ? (
                       <div className="list-stack" style={{ marginBottom: 10 }}>
@@ -476,20 +536,22 @@ export default function LeadForm({
                       No response yet? Log another attempt — every attempt is kept.
                     </p>
                     <div className="form-grid" style={{ marginBottom: 8 }}>
-                      <Field>
+                      <Field label="How you tried" hint="required">
                         <input
                           value={attemptDraft.method}
                           disabled={disabled}
                           onChange={(e) => setAttemptDraft((a) => ({ ...a, method: e.target.value }))}
+                          onKeyDown={attemptKeyDown}
                           placeholder="e.g. Phone call, email"
                         />
                       </Field>
-                      <Field>
+                      <Field label="When" hint="required">
                         <input
                           type="date"
                           value={attemptDraft.contactedAt}
                           disabled={disabled}
                           onChange={(e) => setAttemptDraft((a) => ({ ...a, contactedAt: e.target.value }))}
+                          onKeyDown={attemptKeyDown}
                         />
                       </Field>
                     </div>
@@ -509,6 +571,7 @@ export default function LeadForm({
                           value={attemptDraft.reason}
                           disabled={disabled}
                           onChange={(e) => setAttemptDraft((a) => ({ ...a, reason: e.target.value }))}
+                          placeholder="e.g. No answer, voicemail left"
                         />
                       </Field>
                     ) : null}
@@ -520,15 +583,19 @@ export default function LeadForm({
                         onChange={(e) => setAttemptDraft((a) => ({ ...a, notes: e.target.value }))}
                       />
                     </Field>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ marginTop: 10 }}
-                      disabled={disabled || !attemptDraftValid}
-                      onClick={addContactAttempt}
-                    >
-                      <Plus size={14} /> Add attempt
-                    </button>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={disabled || !attemptDraftValid}
+                        onClick={addContactAttempt}
+                      >
+                        <Plus size={14} /> Add attempt
+                      </button>
+                      {!disabled && !attemptDraftValid ? (
+                        <span className="row-meta">Still needed: {attemptDraftMissing.join(", ")}</span>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
               </ChecklistRow>

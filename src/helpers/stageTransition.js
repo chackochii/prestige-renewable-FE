@@ -51,9 +51,7 @@ export function leadCompletenessItems(opp) {
  * than a separate status flag — mirrors advanceState()/leadGateItems() below.
  */
 export function estimationState(opp) {
-  if (!opp) return "awaiting_requirements";
-  if (opp.estimationRequirementsReceived == null) return "awaiting_requirements";
-  if (opp.estimationRequirementsReceived === false) return "on_hold";
+  if (!opp) return "evaluating";
   if (opp.estimationClientInfoNeeded === false) return "ready";
   if (opp.estimationClientInfoNeeded === true) return "awaiting_client_info";
   return "evaluating";
@@ -62,7 +60,7 @@ export function estimationState(opp) {
 /** Items still missing before an opportunity can leave estimation (stage 2). */
 export function estimationGateItems(opp) {
   if (!opp) return [];
-  return estimationState(opp) === "ready" ? [] : ["Complete estimation (requirements, checklist, client input)"];
+  return estimationState(opp) === "ready" ? [] : ["Complete estimation (requirements checklist, client input)"];
 }
 
 /** Items still missing before an opportunity can leave estimation without a priced quote. */

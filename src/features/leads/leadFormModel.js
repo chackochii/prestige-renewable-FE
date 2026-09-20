@@ -46,7 +46,8 @@ export function emptyLeadForm() {
     siteAccessNotes: "",
     siteMapUrl: "",
     qualification: "nurture",
-    needsClientContact: false,
+    // "" until someone answers it — an unanswered question is not a "no".
+    needsClientContact: "",
     contactAttempts: [],
     serviceRequirement: "",
     propertyStoreys: "",
@@ -126,7 +127,7 @@ export function leadToForm(opp) {
     siteAccessNotes: str(opp.siteAccessNotes),
     siteMapUrl: str(opp.siteMapUrl),
     qualification: str(opp.qualification) || "nurture",
-    needsClientContact: Boolean(opp.needsClientContact),
+    needsClientContact: opp.needsClientContact == null ? "" : opp.needsClientContact ? "yes" : "no",
     contactAttempts: Array.isArray(opp.contactAttempts)
       ? opp.contactAttempts.map((a) => ({
           method: str(a?.method),
@@ -218,8 +219,9 @@ export function formToPayload(form) {
     siteAccessNotes: trim(form.siteAccessNotes),
     siteMapUrl: trim(form.siteMapUrl),
     qualification: form.potential === "yes" ? "qualified" : form.potential === "no" ? "disqualified" : "nurture",
-    needsClientContact: Boolean(form.needsClientContact),
-    contactAttempts: form.needsClientContact
+    // null keeps "not answered yet" on the record, so it comes back unanswered.
+    needsClientContact: isBlank(form.needsClientContact) ? null : form.needsClientContact === "yes",
+    contactAttempts: form.needsClientContact === "yes"
       ? (form.contactAttempts || []).map((a) => ({
           method: trim(a.method),
           contactedAt: a.contactedAt || null,
@@ -296,7 +298,7 @@ export function validateLeadForm(form) {
   if (!form.leadSource) errors.leadSource = "Select a lead source.";
   if (form.leadSource === "referrer" && isBlank(form.referrerId))
     errors.referrerId = "Select the referrer who introduced this lead.";
-  if (form.needsClientContact && !(form.contactAttempts || []).length)
+  if (form.needsClientContact === "yes" && !(form.contactAttempts || []).length)
     errors.contactAttempts = "Log at least one contact attempt.";
   if ((form.contactAttempts || []).some((a) => a.reached === false && isBlank(a.reason)))
     errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
@@ -308,6 +310,8 @@ export function validateLeadForm(form) {
   // checklist above gates the decision, and these back it up on save.
   if (form.potential === "yes") {
     if (isBlank(form.estimatorId)) errors.estimatorId = "Assign an estimator for this potential client.";
+    if (isBlank(form.needsClientContact))
+      errors.needsClientContact = "Confirm whether the client had to be contacted for the mandatory details.";
     if (isBlank(form.serviceRequirement)) errors.serviceRequirement = "Record whether they want solar, battery or both.";
     if (isBlank(form.billingSameAsSite))
       errors.billingSameAsSite = "Confirm whether the site address is the billing address.";

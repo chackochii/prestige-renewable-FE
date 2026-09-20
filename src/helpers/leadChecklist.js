@@ -37,10 +37,14 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     {
       key: "contact",
       label: "Client contacted",
-      value: opp.needsClientContact
-        ? `${contactAttempts.length} attempt${contactAttempts.length === 1 ? "" : "s"} logged`
-        : "Not needed",
-      done: !opp.needsClientContact || contactAttempts.length > 0,
+      // null means sales never answered it — that is not the same as "no".
+      value:
+        opp.needsClientContact == null
+          ? ""
+          : opp.needsClientContact
+            ? `${contactAttempts.length} attempt${contactAttempts.length === 1 ? "" : "s"} logged`
+            : "Not needed",
+      done: opp.needsClientContact === false || (Boolean(opp.needsClientContact) && contactAttempts.length > 0),
     },
     { key: "customer", label: "Customer details", value: name, done: filled(name) },
     {

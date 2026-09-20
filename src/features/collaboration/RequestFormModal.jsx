@@ -35,20 +35,25 @@ export default function RequestFormModal({
   kind = "information",
   department: initialDepartment,
   people = [],
+  // Prefilled by whoever raised it — the lead-input rows an estimator ticked,
+  // for instance. It opens on the custom template so nothing overwrites it,
+  // and every field stays editable.
+  initial = null,
   onClose,
   onSubmit,
 }) {
   const isAssignment = kind === "assignment";
   const templates = isAssignment ? ASSIGNMENT_TEMPLATES : INFORMATION_TEMPLATES;
-  const [templateKey, setTemplateKey] = useState(templates[0].key);
+  const start = initial ? templates.find((t) => t.key === "custom") || templates[0] : templates[0];
+  const [templateKey, setTemplateKey] = useState(start.key);
   const [form, setForm] = useState(() => ({
     department: initialDepartment || (isAssignment ? "operations" : "sales"),
     assigneeId: "",
-    title: templates[0].title || "",
-    description: templates[0].description || "",
+    title: initial?.title ?? start.title ?? "",
+    description: initial?.description ?? start.description ?? "",
     priority: "medium",
     dueAt: "",
-    fields: (templates[0].fields || []).map((f) => ({ ...f })),
+    fields: (initial?.fields ?? start.fields ?? []).map((f) => ({ ...f })),
     documents: [],
   }));
   const [error, setError] = useState("");
