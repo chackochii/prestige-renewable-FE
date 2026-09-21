@@ -1,14 +1,18 @@
 // Post-login gate: a person with several business units chooses one before
 // the workspace renders (the choice is remembered per user). A single unit is
-// selected automatically (see businessUnitsSlice); no units means no access.
+// selected automatically (see businessUnitsSlice); no units means no access —
+// except for the system administrator, who is the one who creates them and so
+// must be able to reach the business-units screen through this gate.
 
+import { Link, useLocation } from "react-router-dom";
 import LoadingState from "@/components/LoadingState";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 
 export default function UnitSelectGate({ children }) {
-  const { user, logout } = useAuth();
+  const { user, logout, isSuperAdmin } = useAuth();
   const { unit, units, status, error, switchUnit, reload } = useBusinessUnit();
+  const location = useLocation();
 
   if (status === "idle" || status === "loading") return <LoadingState screen label="Loading your workspace…" />;
 
@@ -34,6 +38,33 @@ export default function UnitSelectGate({ children }) {
   }
 
   if (units.length === 0) {
+    // The system administrator sees every unit, so an empty list means there
+    // are none at all — on a new deployment, or after the last one was
+    // removed. Let them through to the screen that creates one rather than
+    // telling them to ask themselves.
+    if (isSuperAdmin) {
+      if (location.pathname.startsWith("/superadmin")) return children;
+      return (
+        <div className="gate-wrap">
+          <div className="card card-pad gate-card">
+            <h2>No business units yet</h2>
+            <p className="lede" style={{ marginBottom: 16 }}>
+              {user?.name}, nothing can be captured until this platform has a business unit. Create the first one to
+              get started — everything else (people, pages, leads) hangs off it.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Link to="/superadmin" className="btn btn-primary">
+                Create a business unit
+              </Link>
+              <button type="button" className="btn btn-ghost" onClick={logout}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="gate-wrap">
         <div className="card card-pad gate-card">
