@@ -809,6 +809,11 @@
     .topbar-brand { display: flex; }
     .topbar { gap: 10px; }
     .top-actions { gap: 8px; }
+    /* The user menu drops its name and role and keeps just the avatar, sized
+       to land on the same 40px square as the theme and bell buttons beside it
+       (3px padding + 32px avatar + 1px border, each side). Hide the text span
+       specifically — a plain `.who span` would take the avatar with it and
+       collapse the button to a tap target nobody can hit. */
     .who { padding: 3px; }
     .who > span:not(.avatar) { display: none; }
     .who .avatar { width: 32px; height: 32px; }
@@ -831,7 +836,6 @@
     .checklist-row .cr-label { flex-basis: auto; padding-top: 0; }
     .modal.wide { width: min(520px, 100%); }
     .stats { grid-template-columns: 1fr; }
-    .who span { display: none; }
     .unit-switch > span { display: none; }
     .unit-switch { padding: 6px 8px; }
     .unit-switch select { max-width: 150px; }
