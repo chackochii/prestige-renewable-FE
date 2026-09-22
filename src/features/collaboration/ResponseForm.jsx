@@ -1,6 +1,6 @@
-// The response form Sales sees: exactly the fields the requester asked for,
-// nothing else. A draft is private to the responder; submitting sends it back
-// and notifies whoever raised the request.
+// The response form Sales sees: one input per thing the requester asked for,
+// and nothing else on the form that nobody asked for. A draft is private to
+// the responder; submitting sends it back and notifies whoever raised it.
 
 import { useState } from "react";
 import { Send, Save } from "lucide-react";
@@ -8,17 +8,20 @@ import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
-import NumberInput from "@/components/NumberInput";
 import { documentTypeLabel, documentUploads, requestedDocuments } from "@/constants/collaboration";
 import { isBlank } from "@/utils/validators";
+
+/** Where a free answer goes when the request named no individual items. */
+const FREE_ANSWER = [{ key: "response", label: "Your response" }];
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
 export default function ResponseForm({ request, onSubmit, onUpload, uploading = null }) {
-  const fields = Array.isArray(request.requestedFields) ? request.requestedFields : [];
+  const asked = Array.isArray(request.requestedFields) ? request.requestedFields : [];
+  // One input per item asked for; a single one when nothing specific was.
+  const fields = asked.length ? asked : FREE_ANSWER;
   const documents = requestedDocuments(request);
   const [values, setValues] = useState(() => ({ ...(request.response?.fields || {}) }));
-  const [note, setNote] = useState(request.response?.note || "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(null); // "draft" | "submit"
 
@@ -35,7 +38,7 @@ export default function ResponseForm({ request, onSubmit, onUpload, uploading = 
     setBusy(draft ? "draft" : "submit");
     setError("");
     try {
-      await onSubmit({ fields: values, note: note.trim(), draft });
+      await onSubmit({ fields: values, note: request.response?.note || "", draft });
     } catch (err) {
       setError(errText(err, "Could not send the response."));
     } finally {
@@ -43,15 +46,9 @@ export default function ResponseForm({ request, onSubmit, onUpload, uploading = 
     }
   };
 
-  const control = (field) => {
-    const value = values[field.key] ?? "";
-    if (field.type === "textarea")
-      return <textarea rows={3} value={value} onChange={(e) => set(field.key, e.target.value)} />;
-    if (field.type === "number") return <NumberInput value={value} onChange={(v) => set(field.key, v)} />;
-    if (field.type === "date")
-      return <input type="date" value={value} onChange={(e) => set(field.key, e.target.value)} />;
-    return <input type="text" value={value} onChange={(e) => set(field.key, e.target.value)} />;
-  };
+  const control = (field) => (
+    <input type="text" value={values[field.key] ?? ""} onChange={(e) => set(field.key, e.target.value)} />
+  );
 
   return (
     <div className="section" style={{ marginBottom: 0 }}>
@@ -62,25 +59,13 @@ export default function ResponseForm({ request, onSubmit, onUpload, uploading = 
         </Alert>
       ) : null}
 
-      {fields.length ? (
-        <div className="form-grid">
-          {fields.map((field) => (
-            <Field
-              key={field.key}
-              label={field.label}
-              className={field.type === "textarea" ? "span-2" : undefined}
-            >
-              {control(field)}
-            </Field>
-          ))}
-        </div>
-      ) : (
-        <p className="lede">No specific fields were asked for — answer in the note below.</p>
-      )}
-
-      <Field label="Note" hint="optional" className="span-2">
-        <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-      </Field>
+      <div className="form-grid">
+        {fields.map((field) => (
+          <Field key={field.key} label={field.label} className="span-2">
+            {control(field)}
+          </Field>
+        ))}
+      </div>
 
       {documents.length ? (
         <div style={{ marginTop: 14 }}>
@@ -112,17 +97,6 @@ export default function ResponseForm({ request, onSubmit, onUpload, uploading = 
               </div>
             );
           })}
-        </div>
-      ) : null}
-
-      {onUpload ? (
-        <div style={{ marginTop: 14 }}>
-          <h3>Anything else</h3>
-          <FileDropzone
-            files={(request.response?.attachments || []).filter((f) => !f.documentKey)}
-            onSelect={(selected) => onUpload(selected, null)}
-            uploading={uploading === "other"}
-          />
         </div>
       ) : null}
 

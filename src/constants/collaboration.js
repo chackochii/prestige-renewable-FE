@@ -158,6 +158,23 @@ export function contextualAction(request, user) {
   return { key: "view", label: "View details" };
 }
 
+/** Every live pre-site inspection on a job, newest first. */
+export function inspectionRequests(requests = []) {
+  return requests
+    .filter((r) => r.kind === "assignment" && r.department === "operations" && r.status !== "cancelled")
+    .slice()
+    .sort((a, b) => Number(b.id) - Number(a.id));
+}
+
+/**
+ * The one a job is currently running on: the most recent raised. A job may
+ * carry several — a first visit that found more than expected, a re-visit after
+ * a switchboard change — so raising another is always allowed.
+ */
+export function latestInspection(requests = []) {
+  return inspectionRequests(requests)[0] || null;
+}
+
 /** Reference shown to people: the API's own code, or one built from the id. */
 export function requestCode(request) {
   if (request?.code) return request.code;
@@ -166,52 +183,17 @@ export function requestCode(request) {
 }
 
 /**
- * The fields an information request asks for. Sales answers exactly these and
- * nothing else — the response form is built from this list.
+ * What an information request asks for is typed by the requester, one line per
+ * item, and the response form is built from that list — nothing is pre-filled
+ * on their behalf, so nobody is ever answering a question no one asked.
  */
-export const FIELD_TYPES = [
-  { key: "text", label: "Short text" },
-  { key: "textarea", label: "Long text" },
-  { key: "number", label: "Number" },
-  { key: "date", label: "Date" },
-];
 
-/** Ready-made field sets for the things estimation asks sales for most. */
+/** Subject presets. They name the request; the items asked for are typed. */
 export const INFORMATION_TEMPLATES = [
-  {
-    key: "client_usage",
-    label: "Client energy usage",
-    title: "Client energy usage and bills",
-    fields: [
-      { key: "annual_kwh", label: "Annual usage (kWh)", type: "number" },
-      { key: "tariff", label: "Current tariff / retailer", type: "text" },
-      { key: "bill_period", label: "Bill period covered", type: "text" },
-      { key: "notes", label: "Anything else the client said", type: "textarea" },
-    ],
-  },
-  {
-    key: "site_details",
-    label: "Site details",
-    title: "Site details confirmation",
-    fields: [
-      { key: "roof_type", label: "Roof type", type: "text" },
-      { key: "storeys", label: "Single or double storey", type: "text" },
-      { key: "phase", label: "Electrical phase", type: "text" },
-      { key: "access", label: "Access constraints", type: "textarea" },
-    ],
-  },
-  {
-    key: "client_decision",
-    label: "Client decision & finance",
-    title: "Client decision and finance requirements",
-    fields: [
-      { key: "timeframe", label: "Preferred installation timeframe", type: "text" },
-      { key: "finance", label: "Finance assistance needed", type: "text" },
-      { key: "budget", label: "Budget indication", type: "text" },
-      { key: "notes", label: "Client comments", type: "textarea" },
-    ],
-  },
-  { key: "custom", label: "Something else", title: "", fields: [] },
+  { key: "client_usage", label: "Client energy usage", title: "Client energy usage and bills" },
+  { key: "site_details", label: "Site details", title: "Site details confirmation" },
+  { key: "client_decision", label: "Client decision & finance", title: "Client decision and finance requirements" },
+  { key: "custom", label: "Something else", title: "" },
 ];
 
 /**

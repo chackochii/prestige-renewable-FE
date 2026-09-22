@@ -154,6 +154,7 @@ export default function LeadForm({
   onUploadSitePhotos,
   uploadingCategory = null,
   inspection = null,
+  inspectionCount = 0,
   onRequestInspection,
   // Rendered under its own tab when the panel passes one in.
   requestsPanel = null,
@@ -954,17 +955,30 @@ export default function LeadForm({
                         <input type="text" value={inspectionStatusLabel(inspectionStatus)} disabled readOnly />
                       </Field>
                     </div>
+                    {/* Raising another is always allowed: a visit can find more
+                        than it was sent for, or the site can change under it. */}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                       {inspection ? (
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRequestInspection?.(inspection)}>
                           <ExternalLink size={14} /> Open the pre-site inspection form
                         </button>
-                      ) : onRequestInspection ? (
-                        <button type="button" className="btn btn-primary btn-sm" disabled={disabled} onClick={() => onRequestInspection(null)}>
-                          <Send size={14} /> Request pre-site inspection
+                      ) : null}
+                      {onRequestInspection ? (
+                        <button
+                          type="button"
+                          className={inspection ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
+                          onClick={() => onRequestInspection(null)}
+                        >
+                          <Send size={14} /> {inspection ? "Request another inspection" : "Request pre-site inspection"}
                         </button>
                       ) : null}
                     </div>
+                    {inspectionCount > 1 ? (
+                      <p className="row-meta" style={{ marginTop: 8 }}>
+                        {inspectionCount} pre-site requests raised on this job — see the Request / Response tab for all
+                        of them.
+                      </p>
+                    ) : null}
                     <div style={{ marginTop: 10 }}>
                       {checkbox("siteVisitCompleted", "Site visit completed and findings reviewed")}
                     </div>

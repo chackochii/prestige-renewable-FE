@@ -13,7 +13,6 @@ import {
   ASSIGNMENT_TEMPLATES,
   DEPARTMENTS,
   DOCUMENT_TYPES,
-  FIELD_TYPES,
   INFORMATION_TEMPLATES,
   PRIORITIES,
   REQUEST_KINDS,
@@ -22,6 +21,9 @@ import { stageById } from "@/constants/stages";
 import { isBlank } from "@/utils/validators";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
+
+/** An information request starts with one empty line to name what is needed. */
+const blankField = () => ({ key: "", label: "", type: "text" });
 
 const slug = (label, index) =>
   String(label || `field_${index + 1}`)
@@ -53,7 +55,7 @@ export default function RequestFormModal({
     description: initial?.description ?? start.description ?? "",
     priority: "medium",
     dueAt: "",
-    fields: (initial?.fields ?? start.fields ?? []).map((f) => ({ ...f })),
+    fields: initial?.fields?.length ? initial.fields.map((f) => ({ ...f })) : isAssignment ? [] : [blankField()],
     documents: [],
   }));
   const [error, setError] = useState("");
@@ -64,11 +66,12 @@ export default function RequestFormModal({
   const applyTemplate = (key) => {
     const template = templates.find((t) => t.key === key) || templates[0];
     setTemplateKey(key);
+    // Only the subject changes — whatever the requester has typed as the
+            // items they need stays put.
     setForm((f) => ({
       ...f,
       title: template.title || "",
       description: template.description || f.description,
-      fields: (template.fields || []).map((x) => ({ ...x })),
     }));
   };
 
@@ -85,7 +88,7 @@ export default function RequestFormModal({
       "fields",
       form.fields.map((f, i) => (i === index ? { ...f, [key]: value } : f)),
     );
-  const addField = () => set("fields", [...form.fields, { key: "", label: "", type: "text" }]);
+  const addField = () => set("fields", [...form.fields, blankField()]);
   const removeField = (index) => set("fields", form.fields.filter((_, i) => i !== index));
 
   const submit = async () => {
@@ -94,7 +97,7 @@ export default function RequestFormModal({
     if (!isAssignment && !form.fields.length)
       return setError("Add at least one piece of information you need back.");
     if (!isAssignment && form.fields.some((f) => isBlank(f.label)))
-      return setError("Every field needs a label — that is what the other team sees.");
+      return setError("Name every item you need — that is what the other team sees.");
 
     setSaving(true);
     setError("");
@@ -121,7 +124,7 @@ export default function RequestFormModal({
           : form.fields.map((f, i) => ({
               key: f.key?.trim() || slug(f.label, i),
               label: f.label.trim(),
-              type: f.type || "text",
+              type: "text",
             })),
       });
       onClose();
@@ -211,35 +214,26 @@ export default function RequestFormModal({
         <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
           <h3>Information you need back</h3>
           <p className="lede" style={{ marginBottom: 12 }}>
-            The response form is built from this list — they answer these and nothing else.
+            One line per thing you need. They get an input for each, and answer those and nothing else.
           </p>
           {form.fields.map((field, i) => (
-            <div key={i} className="row-grid" style={{ "--row-cols": "1fr 160px auto" }}>
-              <Field label="Label">
+            <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
+              <Field label={`Item ${i + 1}`}>
                 <input
                   value={field.label}
                   placeholder="e.g. Annual usage (kWh)"
                   onChange={(e) => setField(i, "label", e.target.value)}
                 />
               </Field>
-              <Field label="Answer type">
-                <select value={field.type} onChange={(e) => setField(i, "type", e.target.value)}>
-                  {FIELD_TYPES.map((t) => (
-                    <option key={t.key} value={t.key}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
               <div>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeField(i)} aria-label="Remove field">
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeField(i)} aria-label="Remove item">
                   <X size={14} />
                 </button>
               </div>
             </div>
           ))}
           <button type="button" className="btn btn-ghost btn-sm" onClick={addField}>
-            <Plus size={14} /> Add a field
+            <Plus size={14} /> Add another item
           </button>
         </div>
       ) : null}

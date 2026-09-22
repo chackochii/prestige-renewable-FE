@@ -1,6 +1,6 @@
 // Stage-1 work: the lead pack, editable while the record lives.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardCheck, Pencil } from "lucide-react";
 import Alert from "@/components/Alert";
 import Modal from "@/components/Modal";
@@ -8,7 +8,7 @@ import LeadForm from "@/features/leads/LeadForm";
 import RequestDetail from "@/features/collaboration/RequestDetail";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
-import { formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
+import { autosavePayload, formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
 import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
@@ -24,6 +24,7 @@ import {
 } from "@/slices/leadsSlice";
 import { fetchReferrers } from "@/slices/referralsSlice";
 import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationSlice";
+import { inspectionRequests } from "@/constants/collaboration";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -53,17 +54,27 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   // anyone who has pressed Cancel.
   const [editing, setEditing] = useState(true);
   const [confirmEdit, setConfirmEdit] = useState(false);
+  // "", "saving", "saved" or "error" — what the autosave line shows.
+  const [autosaveState, setAutosaveState] = useState("");
 
   // A fresh record (after fetch or save) replaces any unsaved edits. Opening a
   // different record starts read-only again, but saving the one you are on
   // leaves the form unlocked so you can carry straight on to the next tab.
   const openedId = useRef(opp?.id);
+  // The latest dirty flag, readable from the effect below without making the
+  // effect re-run on every keystroke.
+  const dirtyRef = useRef(false);
   useEffect(() => {
-    setForm(leadToForm(opp));
-    setErrors({});
-    if (openedId.current !== opp?.id) {
+    const changedRecord = openedId.current !== opp?.id;
+    if (changedRecord) {
       openedId.current = opp?.id;
       setEditing(true);
+    }
+    // A refresh of the record already open must not overwrite unsaved typing
+    // — autosave's own response comes back through here too.
+    if (changedRecord || !dirtyRef.current) {
+      setForm(leadToForm(opp));
+      setErrors({});
     }
   }, [opp]);
 
@@ -79,16 +90,61 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     if (opp?.id) dispatch(fetchOpportunityRequests(opp.id));
   }, [opp?.id, dispatch]);
 
-  // The pre-site inspection row tracks the operations assignment raised for it.
-  const inspection =
-    collabOppId === Number(opp?.id)
-      ? requests.find((r) => r.kind === "assignment" && r.department === "operations" && r.status !== "cancelled")
-      : null;
+  // The checklist lives in local state until it is saved, so anything that
+  // takes the person off this screen has to know there is unsaved work.
+  const savedForm = useMemo(() => leadToForm(opp), [opp]);
+  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
+  dirtyRef.current = dirty;
+
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  // Autosave. The checklist runs over several tabs and more than one sitting,
+  // so every change goes to the record about a second after typing stops, and
+  // nothing is left living only in this browser tab. The decision fields are
+  // left out (see autosavePayload) and nothing is validated: a half-filled
+  // checklist is precisely what needs keeping.
+  useEffect(() => {
+    if (!canEdit || !editing || !dirty || saving) return undefined;
+    const timer = setTimeout(async () => {
+      const previousAttemptCount = (opp.contactAttempts || []).length;
+      setAutosaveState("saving");
+      try {
+        await dispatch(updateLead({ id: opp.id, body: autosavePayload(form) })).unwrap();
+        await logNewFailedAttempts(previousAttemptCount);
+        setAutosaveState("saved");
+      } catch {
+        // Kept quiet: the Save button is still there, and the line below says
+        // the change has not landed.
+        setAutosaveState("error");
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, canEdit, editing, dirty, saving]);
+
+  // The pre-site inspection row tracks the most recent assignment raised for
+  // it; a job may have more than one.
+  const inspections = collabOppId === Number(opp?.id) ? inspectionRequests(requests) : [];
+  const inspection = inspections[0] || null;
 
   /** Opens the existing inspection, or starts a new request when there is none. */
-  const handleInspection = (existing) => {
-    if (existing) setViewingInspection(existing);
-    else setRequestingInspection(true);
+  const handleInspection = async (existing) => {
+    if (existing) {
+      setViewingInspection(existing);
+      return;
+    }
+    // Save what is on screen before the request leaves. Without this the
+    // checklist stays in this browser tab only, and a logout loses it.
+    if (dirty && !(await save())) return;
+    setRequestingInspection(true);
   };
 
   const billFiles = attachments.filter((a) => a.category === "bill");
@@ -131,11 +187,30 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     });
   };
 
+  /** Returns true when the record was written, false when it was not. */
+  /**
+   * One job-history line per new attempt where the client wasn't reached.
+   * `previousCount` is how many attempts the record held before this write.
+   */
+  const logNewFailedAttempts = async (previousCount) => {
+    const added = (form.contactAttempts || []).slice(previousCount);
+    for (const attempt of added.filter((a) => a.reached === false)) {
+      await dispatch(
+        addOpportunityHistoryEntry({
+          id: opp.id,
+          body: {
+            note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) — ${attempt.reason}`,
+          },
+        }),
+      ).unwrap();
+    }
+  };
+
   const save = async () => {
     const found = validateLeadForm(form);
     if (Object.keys(found).length) {
       setErrors(found);
-      return;
+      return false;
     }
     // Baseline before this save — used to work out what's actually new,
     // so re-saving never re-writes the same job-history entry twice.
@@ -156,17 +231,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
 
       // Every attempt where the client wasn't reached must have its reason
       // recorded in Job History — write one entry per new attempt only.
-      const newAttempts = form.contactAttempts.slice(previousAttemptCount);
-      for (const attempt of newAttempts.filter((a) => a.reached === false)) {
-        await dispatch(
-          addOpportunityHistoryEntry({
-            id: opp.id,
-            body: {
-              note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) — ${attempt.reason}`,
-            },
-          }),
-        ).unwrap();
-      }
+      await logNewFailedAttempts(previousAttemptCount);
 
       // Assignment fields are their own audited actions, not part of the
       // generic PATCH — only call each endpoint when that assignment
@@ -221,8 +286,10 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
       // Deliberately stays in edit mode: the checklist spans several tabs and
       // people save as they go.
       notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
+      return true;
     } catch (err) {
       setSaveError(typeof err === "string" ? err : err?.message || "Could not save the lead pack.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -291,6 +358,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         onUploadSitePhotos={canEdit && editing ? uploadCategory(SITE_PHOTO_CATEGORY) : undefined}
         uploadingCategory={uploadingCategory}
         inspection={inspection}
+        inspectionCount={inspections.length}
         onRequestInspection={canEdit ? handleInspection : undefined}
         requestsPanel={
           <StageRequestsPanel
@@ -342,6 +410,15 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={saving}>
             Cancel
           </button>
+          <span className="row-meta" style={{ alignSelf: "center" }}>
+            {autosaveState === "error"
+              ? "Autosave failed — use Save lead details."
+              : dirty || autosaveState === "saving"
+                ? "Saving…"
+                : autosaveState === "saved"
+                  ? "All changes saved"
+                  : ""}
+          </span>
           {handedOver ? (
             <span className="row-meta" style={{ alignSelf: "center" }}>
               {estimatorName || "The estimator"} is notified when you save.
