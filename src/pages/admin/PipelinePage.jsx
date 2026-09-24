@@ -1,6 +1,6 @@
 // Pipeline board: one column per stage the business unit runs.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { X } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -11,6 +11,7 @@ import JobCard from "@/components/JobCard";
 import { oppTitle, oppValue } from "@/helpers/opportunity";
 import { enabledStagesFor, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
+import { advanceableStages, canAdvanceFrom, canViewStage, viewableStages } from "@/helpers/stageAccess";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
@@ -40,12 +41,22 @@ export default function PipelinePage() {
   const [ownerId, setOwnerId] = useState("");
   const [draggingId, setDraggingId] = useState(null);
 
-  const stageFilter = params.get("stage") || "";
+  // A ?stage= pointing at a stage this person cannot see is ignored rather than
+  // obeyed — a stale link or a bookmark should show their board, not nothing.
+  const requestedStage = params.get("stage") || "";
+  const stageFilter = requestedStage && canViewStage(user, requestedStage) ? requestedStage : "";
   const lifecycle = params.get("life") || "Active";
   const { items, status, error, ready, reload } = useOpportunities(lifecycle === "all" ? {} : { lifecycle });
 
-  const stages = useMemo(() => enabledStagesFor(unit), [unit]);
-  const canMove = hasPermission(PERMISSIONS.LEADS_UPDATE);
+  // Stages this unit runs, narrowed to the ones this person may see. A stage
+  // their role does not cover gets no column and no cards — the API filters the
+  // records out too, so an empty column would be misleading rather than honest.
+  const stages = useMemo(() => viewableStages(user, enabledStagesFor(unit)), [unit, user]);
+  // Moving a card is per stage, not one permission for the whole board: the
+  // stage being left decides (see helpers/stageAccess). Someone may own
+  // Estimation and nothing else, so only those cards are draggable for them.
+  const canMoveFrom = useCallback((stage) => canAdvanceFrom(user, stage), [user]);
+  const movableStages = useMemo(() => advanceableStages(user, stages), [user, stages]);
 
   const rows = useMemo(
     () =>
@@ -97,7 +108,11 @@ export default function PipelinePage() {
         title="Pipeline"
         description={
           ready
-            ? `${rows.length} opportunit${rows.length === 1 ? "y" : "ies"} weighted at ${formatCurrency(totalValue)}.${canMove ? " Drag a card to move it into the next stage." : ""}`
+            ? `${rows.length} opportunit${rows.length === 1 ? "y" : "ies"} weighted at ${formatCurrency(totalValue)}.${
+                movableStages.length
+                  ? ` Drag a card to move it into the next stage — you can move ${movableStages.map((s) => s.short).join(", ")}.`
+                  : ""
+              }`
             : "Loading the board…"
         }
         actions={
@@ -187,7 +202,7 @@ export default function PipelinePage() {
                         key={o.id}
                         opp={o}
                         owner={byId.get(o.salespersonId) || byId.get(o.leadOwnerId) || (o.leadOwnerId === user.id ? user : null)}
-                        draggable={canMove && o.lifecycle === "Active" && nextStageFor(o.stage, unit) !== null}
+                        draggable={canMoveFrom(o.stage) && o.lifecycle === "Active" && nextStageFor(o.stage, unit) !== null}
                         dragging={draggingId === o.id}
                         onDragStart={() => setDraggingId(o.id)}
                         onDragEnd={() => setDraggingId(null)}

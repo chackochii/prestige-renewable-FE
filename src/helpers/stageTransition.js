@@ -4,6 +4,7 @@
 // is still missing.
 
 import { CLOSED_LIFECYCLES, LAST_STAGE } from "@/constants/stages";
+import { advanceDeniedReason } from "@/helpers/stageAccess";
 import { isBlank } from "@/utils/validators";
 
 /** Items still missing before a lead can leave stage 1. Hard gates first. */
@@ -68,8 +69,12 @@ export function quoteGateItems(quote) {
   return quote?.items?.length ? [] : ["Add at least one item to the quote"];
 }
 
-/** Whether the "Advance" action makes sense for this record. */
-export function advanceState(opp, { quote } = {}) {
+/**
+ * Whether the "Advance" action makes sense for this record. Pass `user` and the
+ * stage's own permission is checked too — moving a record on belongs to the
+ * department that owns the stage being left (see helpers/stageAccess).
+ */
+export function advanceState(opp, { quote, user } = {}) {
   if (!opp) return { canAdvance: false, missing: ["No record"] };
   if (opp.lifecycle && CLOSED_LIFECYCLES.includes(opp.lifecycle))
     return { canAdvance: false, missing: [`Record is ${opp.lifecycle.toLowerCase()}`] };
@@ -77,5 +82,9 @@ export function advanceState(opp, { quote } = {}) {
   const stage = Number(opp.stage);
   const missing =
     stage === 1 ? leadGateItems(opp) : stage === 2 ? [...estimationGateItems(opp), ...quoteGateItems(quote)] : [];
+  // Listed last: the checklist tells them what the record still needs, this
+  // tells them it is not theirs to move even once it is complete.
+  const denied = user === undefined ? null : advanceDeniedReason(user, stage);
+  if (denied) missing.push(denied);
   return { canAdvance: missing.length === 0, missing };
 }

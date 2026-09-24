@@ -372,6 +372,10 @@
     background: var(--paper-2); color: var(--muted); position: relative; z-index: 1; border: 1px solid var(--line-strong);
     transition: background var(--fast), border-color var(--fast), color var(--fast), box-shadow var(--fast), transform var(--fast);
   }
+  /* A stage another team owns: readable as a step in the pipeline, clearly not
+     this person's to open. Dimmer than :disabled, which only means "not yet". */
+  .step.locked .step-dot { background: var(--neutral-bg); color: var(--muted); border-style: dashed; }
+  .step.locked .step-label { color: var(--muted); font-style: italic; }
   .step.done .step-dot { background: var(--brand); color: #fff; border-color: var(--brand); }
   .step.current .step-dot { background: var(--accent-soft); color: var(--brand-2); border-color: var(--accent); box-shadow: 0 0 0 4px #f2a93c33; }
   .step-label { font-size: 11px; color: var(--muted); transition: color var(--fast); }

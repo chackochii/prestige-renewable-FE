@@ -1,6 +1,6 @@
 // Opportunity detail: hero, stage stepper, stage work and history.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, Clock, FileStack } from "lucide-react";
 import Badge from "@/components/Badge";
@@ -16,8 +16,9 @@ import LeadPackPanel from "@/features/leads/LeadPackPanel";
 import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
 import LifecycleModal from "@/features/pipeline/LifecycleModal";
-import { lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
+import { enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
+import { stageHiddenReason, viewableStages } from "@/helpers/stageAccess";
 import { advanceState } from "@/helpers/stageTransition";
 import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
@@ -32,7 +33,7 @@ export default function OpportunityPage() {
   const { id } = useParams();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { unit, units, switchUnit } = useBusinessUnit();
   const { notify } = useNotifications();
   const { selected: opp, selectedStatus, selectedError, quote } = useAppSelector((s) => s.leads);
@@ -61,6 +62,14 @@ export default function OpportunityPage() {
       switchUnit(opp.businessUnitId);
   }, [opp, unit, units, switchUnit]);
 
+  // Depends only on the person and the unit, so it belongs with the other
+  // hooks — the early returns below mean anything after them runs on some
+  // renders and not others.
+  const viewableStageIds = useMemo(
+    () => viewableStages(user, enabledStagesFor(unit)).map((s) => s.id),
+    [user, unit],
+  );
+
   if (selectedStatus === "loading" || (selectedStatus === "idle" && !opp)) return <LoadingState label="Loading record…" />;
 
   if (!opp) {
@@ -86,7 +95,8 @@ export default function OpportunityPage() {
   const viewing = viewStage ?? current;
   const stage = stageById(current);
   const next = nextStageFor(current, unit);
-  const gate = advanceState(opp, { quote });
+  const gate = advanceState(opp, { quote, user });
+  const stageHidden = stageHiddenReason(user, viewing);
   const sla = slaStatus(opp.slaDueAt);
   const life = lifecycleMeta(opp.lifecycle);
   const value = Number(opp.acceptedValue) || Number(opp.estimatedValue) || 0;
@@ -170,6 +180,7 @@ export default function OpportunityPage() {
         stage={current}
         viewStage={viewing}
         enabledStageIds={unit?.enabledStages}
+        viewableStageIds={viewableStageIds}
         onSelect={(s) => {
           setTab("work");
           setViewStage(s);
@@ -205,7 +216,16 @@ export default function OpportunityPage() {
 
       {tab === "work" ? (
         <div className="panel">
-          {viewing === 1 ? (
+          {stageHidden ? (
+            // The record stays reachable — it may well be this person's deal —
+            // but the stage another team is working is not theirs to read.
+            <div className="card card-pad">
+              <EmptyState
+                title={`${stageById(viewing).label} is not visible to your role`}
+                body={stageHidden}
+              />
+            </div>
+          ) : viewing === 1 ? (
             <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : viewing === 2 ? (
             <EstimationPanel key={opp.id} opp={opp} unit={unit} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} />
