@@ -193,6 +193,21 @@ export function isAutomatedSource(source) {
  * own endpoints (assignSalesperson/assignEstimator/assignCoordinator in
  * leadsApi.js), called separately by LeadPackPanel/NewLeadPage.
  */
+/**
+ * The autosave body: everything the lead form collects except the decision.
+ *
+ * Marking a lead Potential (or not) is a deliberate act with stage
+ * consequences behind it, so it waits for the Save button — autosave only
+ * keeps the details from being lost.
+ */
+const DECISION_KEYS = ["qualification", "potential", "notPotentialReason"];
+
+export function autosavePayload(form) {
+  const payload = formToPayload(form);
+  for (const key of DECISION_KEYS) delete payload[key];
+  return payload;
+}
+
 export function formToPayload(form) {
   const business = isBusinessLead(form.leadType);
   const payload = {

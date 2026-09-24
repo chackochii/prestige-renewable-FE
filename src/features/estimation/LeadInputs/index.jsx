@@ -30,10 +30,6 @@ const errText = (err, fallback) => (typeof err === "string" ? err : err?.message
  */
 const askable = (row) => !["readonly", "files"].includes(row.type);
 
-/** The answer type sales gets on the response form, from the row's own control. */
-const ANSWER_TYPES = { textarea: "textarea", number: "number" };
-const answerType = (row) => ANSWER_TYPES[row.type] || "text";
-
 /**
  * The note sales reads on the request: the job, then exactly the rows that
  * were ticked, so the ask is legible before they open the response form.
@@ -385,7 +381,7 @@ export default function LeadInputs({
           initial={{
             title: `Lead information needed — ${pickedRows.length} item${pickedRows.length === 1 ? "" : "s"}`,
             description: noteFor(opp, pickedRows),
-            fields: pickedRows.map((row) => ({ key: row.field, label: row.label, type: answerType(row) })),
+            fields: pickedRows.map((row) => ({ key: row.field, label: row.label })),
           }}
           onClose={() => setRequesting(false)}
           onSubmit={async (body) => {

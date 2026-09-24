@@ -46,7 +46,7 @@ import RequestDetail from "@/features/collaboration/RequestDetail";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
 import RequestStatusBadge from "@/features/collaboration/RequestStatusBadge";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
-import { requestCode } from "@/constants/collaboration";
+import { inspectionRequests, requestCode } from "@/constants/collaboration";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
 import VariationCheck from "@/features/pipeline/VariationCheck";
 import { leadMandatoryItems } from "@/helpers/leadChecklist";
@@ -229,15 +229,16 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
     run(() => dispatch(submitEstimationClientInfo({ id: opp.id, body: { needed } })).unwrap());
   };
 
-  const saveEstimatorChecklist = () => {
+  const answerPreSite = (required) => {
+    setPreSiteInspectionRequired(required);
     run(async () => {
       await dispatch(
         submitEstimatorChecklist({
           id: opp.id,
-          body: { checklistValues, preSiteInspectionRequired },
+          body: { checklistValues, preSiteInspectionRequired: required },
         }),
       ).unwrap();
-      notify("Checklist saved");
+      notify(required ? "Pre-site inspection required" : "No pre-site inspection needed");
     });
   };
 
@@ -252,9 +253,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
 
   // Resolved when no inspection is needed, or when operations has completed
   // the one that was requested.
-  const inspection = requests.find(
-    (r) => r.kind === "assignment" && r.department === "operations" && r.status !== "cancelled",
-  );
+  const inspections = inspectionRequests(requests);
+  const inspection = inspections[0] || null;
   const inspectionComplete = ["completed", "report_submitted"].includes(inspection?.status);
   const preSiteResolved = preSiteInspectionRequired === false || inspectionComplete;
   const showQuoteBuilder = state === "ready" || (showEstimatorChecklist && preSiteResolved);
@@ -391,18 +391,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
         showEstimatorChecklist ? (
           <div className="section">
             <QuestionBlock title="Is a pre-site inspection required?">
-              <YesNo value={preSiteInspectionRequired} onChange={setPreSiteInspectionRequired} disabled={!canEdit} />
-              {canEdit && preSiteInspectionRequired !== formFromOpp(opp).preSiteInspectionRequired ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  style={{ marginTop: 12 }}
-                  disabled={saving}
-                  onClick={saveEstimatorChecklist}
-                >
-                  Save answer
-                </button>
-              ) : null}
+              <YesNo value={preSiteInspectionRequired} onChange={answerPreSite} disabled={!canEdit || saving} />
             </QuestionBlock>
 
             {preSiteInspectionRequired === true ? (
@@ -431,14 +420,26 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
                           <span className="row-meta">{inspection.latestUpdate.note}</span>
                         </div>
                       ) : null}
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        style={{ marginTop: 10 }}
-                        onClick={() => setViewingInspection(true)}
-                      >
-                        Open the request
-                      </button>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setViewingInspection(true)}>
+                          Open the request
+                        </button>
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setRequestingInspection(true)}
+                          >
+                            <Send size={14} /> Request another inspection
+                          </button>
+                        ) : null}
+                      </div>
+                      {inspections.length > 1 ? (
+                        <p className="row-meta" style={{ marginTop: 8 }}>
+                          {inspections.length} raised on this job — the latest is shown; the rest are on the Request /
+                          Response tab.
+                        </p>
+                      ) : null}
                     </div>
                   ) : (
                     <>
