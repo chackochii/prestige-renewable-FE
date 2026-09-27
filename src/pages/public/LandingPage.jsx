@@ -119,7 +119,7 @@ export default function LandingPage() {
       <nav className="landing-nav">
         <div className="landing-brand">
           <BrandMark size={32} />
-          Prestige Renewable
+          {/* Prestige Renewable */}
         </div>
         <div className="landing-nav-links">
           <a href="#process">Process</a>
@@ -229,7 +229,7 @@ export default function LandingPage() {
       <footer className="landing-footer">
         <div className="landing-brand" style={{ fontSize: 14 }}>
           <BrandMark size={26} />
-          Prestige Renewable
+          {/* Prestige Renewable */}
         </div>
         <span>© {new Date().getFullYear()} Prestige · Sales &amp; Delivery</span>
       </footer>
