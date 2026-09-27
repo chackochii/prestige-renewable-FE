@@ -8,6 +8,7 @@ import { logout } from "./authSlice";
 const initialState = {
   items: [],
   total: 0,
+  page: 1, // highest page loaded, for "load more"
   query: null,
   status: "idle",
   error: null,
@@ -34,10 +35,23 @@ const initialState = {
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
 
-export const fetchOpportunities = createAsyncThunk("leads/fetchAll", async (params, { rejectWithValue }) => {
+/**
+ * What identifies *which* list this is — the unit and the filters. Paging is
+ * deliberately excluded: asking for page 2 of the same list must not read as a
+ * different query, or the hook would throw the first page away and refetch.
+ */
+export const listIdentity = ({ page, pageSize, append, ...filters } = {}) => filters;
+
+/**
+ * params: the filters, plus { page, pageSize, append }. With append the rows
+ * are added to what is already held (infinite scroll); without it they replace
+ * it (first load, filter change, refresh).
+ */
+export const fetchOpportunities = createAsyncThunk("leads/fetchAll", async (params = {}, { rejectWithValue }) => {
   try {
-    const result = await api.listOpportunities({ pageSize: 200, ...params });
-    return { ...result, query: params };
+    const { page = 1, pageSize = 200, append = false } = params;
+    const result = await api.listOpportunities({ ...listIdentity(params), page, pageSize });
+    return { ...result, query: listIdentity(params), page, append };
   } catch (err) {
     return reject(err, rejectWithValue);
   }
@@ -443,13 +457,20 @@ const leadsSlice = createSlice({
       .addCase(fetchOpportunities.pending, (state, action) => {
         state.status = "loading";
         state.error = null;
-        state.query = action.meta.arg;
+        // Loading a further page keeps the current query and the rows already
+        // on screen; only a genuinely new list replaces them.
+        if (!action.meta.arg?.append) state.query = listIdentity(action.meta.arg);
       })
       .addCase(fetchOpportunities.fulfilled, (state, action) => {
+        const { items, total, page, append, query } = action.payload;
         state.status = "succeeded";
-        state.items = action.payload.items;
-        state.total = action.payload.total;
-        state.query = action.payload.query;
+        // The list is ordered by updatedAt, so a record edited between two
+        // requests can arrive on a second page as well — drop the duplicate
+        // rather than rendering it twice.
+        state.items = append ? [...state.items, ...items.filter((row) => !state.items.some((seen) => seen.id === row.id))] : items;
+        state.total = total;
+        state.page = page;
+        state.query = query;
       })
       .addCase(fetchOpportunities.rejected, (state, action) => {
         state.status = "failed";

@@ -7,12 +7,14 @@ import AdminNav from "@/components/AdminNav";
 import Badge from "@/components/Badge";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import LoadMore from "@/components/LoadMore";
 import Alert from "@/components/Alert";
 import BusinessUnitFormModal from "@/features/admin/BusinessUnitFormModal";
 import { formatPercent } from "@/utils/formatCurrency";
 import { useAppDispatch } from "@/store";
 import { createBusinessUnit, removeBusinessUnit, updateBusinessUnit } from "@/slices/businessUnitsSlice";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import { useIncrementalList } from "@/hooks/useIncrementalList";
 import { useNotifications } from "@/hooks/useNotifications";
 
 const TONE = { active: "success", configured: "info", inactive: "neutral" };
@@ -22,6 +24,10 @@ export default function BusinessUnitsPage() {
   const { units, unit: current, error } = useBusinessUnit();
   const { notify } = useNotifications();
   const [modal, setModal] = useState(null); // "new" | { edit } | { delete }
+  // Shown a slice at a time. Every unit is still fetched — the same list feeds
+  // the sidebar's unit switcher, so paging the request would leave units a
+  // person can work in unreachable.
+  const { shown, loaded, total, hasMore, showMore } = useIncrementalList(units, { step: 25 });
 
   const save = async (body) => {
     if (modal?.edit) {
@@ -76,7 +82,7 @@ export default function BusinessUnitsPage() {
                 </tr>
               </thead>
               <tbody>
-                {units.map((u) => (
+                {shown.map((u) => (
                   <tr key={u.id}>
                     <td data-label="Unit">
                       <div className="row-title">
@@ -106,6 +112,7 @@ export default function BusinessUnitsPage() {
                 ))}
               </tbody>
             </table>
+            <LoadMore loaded={loaded} total={total} hasMore={hasMore} onMore={showMore} noun="business units" />
           </div>
         )}
       </div>

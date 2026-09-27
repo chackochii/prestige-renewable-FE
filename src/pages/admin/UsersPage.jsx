@@ -8,6 +8,7 @@ import Badge from "@/components/Badge";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
+import LoadMore from "@/components/LoadMore";
 import Alert from "@/components/Alert";
 import UserFormModal from "@/features/admin/UserFormModal";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -16,6 +17,7 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { createUser, deleteUser, fetchUsers, updateUser } from "@/slices/employeeSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import { useIncrementalList } from "@/hooks/useIncrementalList";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export default function UsersPage() {
@@ -38,13 +40,20 @@ export default function UsersPage() {
     if (!loaded) dispatch(fetchUsers(wanted));
   }, [unitId, status, loaded, wanted, dispatch]);
 
-  const rows = useMemo(
+  const matching = useMemo(
     () =>
       (loaded ? items : []).filter((u) =>
         `${u.name} ${u.email} ${u.title || ""}`.toLowerCase().includes(search.toLowerCase()),
       ),
     [items, loaded, search],
   );
+  // Rendered a slice at a time. The whole list is still fetched, because both
+  // the search above and the last-administrator guard below have to see every
+  // account to be correct — a paged fetch would make them quietly wrong.
+  const { shown: rows, loaded: shownCount, total: matchCount, hasMore, showMore } = useIncrementalList(matching, {
+    step: 25,
+    resetKey: search,
+  });
 
   const canCreate = hasPermission(PERMISSIONS.ADMIN_CREATE);
   const canUpdate = hasPermission(PERMISSIONS.ADMIN_UPDATE);
@@ -151,6 +160,13 @@ export default function UsersPage() {
             );
           })
         )}
+        <LoadMore
+          loaded={shownCount}
+          total={matchCount}
+          hasMore={hasMore}
+          onMore={showMore}
+          noun={search ? "matching accounts" : "accounts"}
+        />
       </div>
 
       {editing ? (

@@ -7,6 +7,7 @@ import Badge from "@/components/Badge";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
+import LoadMore from "@/components/LoadMore";
 import Alert from "@/components/Alert";
 import OppCell from "@/components/OppCell";
 import { QUALIFICATIONS, qualificationMeta } from "@/constants/stages";
@@ -16,6 +17,7 @@ import { enquiryLink } from "@/features/leads/enquiryLink";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 
@@ -32,23 +34,26 @@ export default function LeadsPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { unit } = useBusinessUnit();
-  const { items, status, error, ready } = useOpportunities({ stage: 1 });
   const { userName } = useUnitUsers();
   const [search, setSearch] = useState("");
   const [qualification, setQualification] = useState("");
+  // Only part of the list is loaded now, so searching in the browser would miss
+  // anything further down. Both filters go to the API, which applies them
+  // across every lead and pages the result.
+  const settledSearch = useDebouncedValue(search.trim(), 300);
 
-  const rows = useMemo(
-    () =>
-      items
-        .filter((o) => (qualification ? o.qualification === qualification : true))
-        .filter((o) =>
-          `${o.number || ""} ${o.customerLegalName || ""} ${o.customerTradingName || ""} ${o.siteSuburb || ""}`
-            .toLowerCase()
-            .includes(search.toLowerCase()),
-        )
-        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
-    [items, search, qualification],
+  const { items, status, error, ready, total, loaded, hasMore, loadingMore, loadMore } = useOpportunities(
+    {
+      stage: 1,
+      ...(settledSearch ? { search: settledSearch } : {}),
+      ...(qualification ? { qualification } : {}),
+    },
+    { pageSize: 25 },
   );
+
+  // The API returns newest first; this only guards against a page arriving out
+  // of order after a "load more".
+  const rows = useMemo(() => [...items].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)), [items]);
 
   return (
     <>
@@ -150,6 +155,14 @@ export default function LeadsPage() {
                 })}
               </tbody>
             </table>
+            <LoadMore
+              loaded={loaded}
+              total={total}
+              hasMore={hasMore}
+              loading={loadingMore}
+              onMore={loadMore}
+              noun="leads"
+            />
           </div>
         )}
       </div>
