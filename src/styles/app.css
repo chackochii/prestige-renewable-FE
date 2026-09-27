@@ -188,6 +188,11 @@
   .table.clickable tbody tr:hover td { background: var(--surface-2); color: var(--brand); }
   .table.clickable tbody tr:hover td:first-child { border-radius: 10px 0 0 10px; }
   .table.clickable tbody tr:hover td:last-child { border-radius: 0 10px 10px 0; }
+  /* The row whose detail is open below the table — same surface as hover, so
+     the eye reads "this one" without a second colour. */
+  .table.clickable tbody tr.selected td { background: var(--surface-2); }
+  .table.clickable tbody tr.selected td:first-child { border-radius: 10px 0 0 10px; }
+  .table.clickable tbody tr.selected td:last-child { border-radius: 0 10px 10px 0; }
   .row-title { font-weight: 600; }
   .row-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .row-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; flex-shrink: 0; }
