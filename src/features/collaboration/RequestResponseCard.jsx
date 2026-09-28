@@ -14,13 +14,15 @@ import {
   documentTypeLabel,
   documentUploads,
   priorityMeta,
+  siteVisitStatusMeta,
+  siteVisitTask,
   REQUEST_KINDS,
   requestCode,
   requestedDocuments,
   statusMeta,
   visibleProgress,
 } from "@/constants/collaboration";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { formatDate, hasClockTime } from "@/helpers/dateTimeHelpers";
 
 const NOT_ANSWERED = "Not answered yet";
 
@@ -35,6 +37,7 @@ function AnswerRow({ label, value, answered }) {
 
 export default function RequestResponseCard({ request, user, timeZone, onOpen }) {
   const kind = REQUEST_KINDS[request.kind] || REQUEST_KINDS.information;
+  const visit = siteVisitTask(request);
   const fields = Array.isArray(request.requestedFields) ? request.requestedFields : [];
   const documents = requestedDocuments(request);
   const response = request.response;
@@ -52,11 +55,16 @@ export default function RequestResponseCard({ request, user, timeZone, onOpen })
           <div className="row-meta">
             {kind.label} · {departmentLabel(request.department)}
             {request.assigneeName ? ` · ${request.assigneeName}` : ""}
-            {request.dueAt ? ` · due ${formatDate(request.dueAt, { timeZone })}` : ""}
+            {request.dueAt
+              ? ` · due ${formatDate(request.dueAt, { withTime: hasClockTime(request.dueAt), timeZone })}`
+              : ""}
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <Badge tone={priorityMeta(request.priority).tone}>{priorityMeta(request.priority).label}</Badge>
+          {/* A visit handed out on a link is not done until that form comes
+              back, whatever the assignment's own status says. */}
+          {visit ? <Badge tone={siteVisitStatusMeta(visit).tone}>{siteVisitStatusMeta(visit).label}</Badge> : null}
           <RequestStatusBadge request={request} />
         </div>
       </div>

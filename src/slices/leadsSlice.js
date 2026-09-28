@@ -40,7 +40,13 @@ const reject = (err, rejectWithValue) => rejectWithValue(err.message);
  * deliberately excluded: asking for page 2 of the same list must not read as a
  * different query, or the hook would throw the first page away and refetch.
  */
-export const listIdentity = ({ page, pageSize, append, ...filters } = {}) => filters;
+const PAGING_KEYS = ["page", "pageSize", "append"];
+
+export const listIdentity = (params = {}) => {
+  const filters = { ...params };
+  for (const key of PAGING_KEYS) delete filters[key];
+  return filters;
+};
 
 /**
  * params: the filters, plus { page, pageSize, append }. With append the rows

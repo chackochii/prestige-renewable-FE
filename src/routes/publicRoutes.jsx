@@ -6,6 +6,7 @@ import PublicLayout from "@/layouts/publicLayout";
 import EnquiryPage from "@/pages/public/EnquiryPage";
 import LoginPage from "@/pages/public/LoginPage";
 import LogoutPage from "@/pages/public/LogoutPage";
+import SiteVisitPage from "@/pages/public/SiteVisitPage";
 import RouteErrorPage from "@/pages/public/RouteErrorPage";
 import { RedirectIfAuthenticated } from "./routeGuards";
 
@@ -25,6 +26,9 @@ export const publicRoutes = [
       { path: "/logout", element: <LogoutPage /> },
       // Anyone can reach this, signed in or not: it is a lead-capture form, not an app screen.
       { path: "/enquiry", element: <EnquiryPage /> },
+      // Same again for the site-visit report: the token in the link is the
+      // whole of the caller's authority, so no sign-in and no app shell.
+      { path: "/site-visit/:token", element: <SiteVisitPage /> },
     ],
   },
 ];

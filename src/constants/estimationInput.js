@@ -130,6 +130,7 @@ export function emptyEstimationInput() {
     drawingsOnFile: false,
     drawingsNotes: "",
     // Customer
+    clientSpecialRequirements: "",
     inclusions: "",
     exclusions: "",
     // Anything sales wants the estimator to know before they pick it up

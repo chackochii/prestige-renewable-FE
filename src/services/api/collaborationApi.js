@@ -102,6 +102,36 @@ export async function fileAttachmentOnOpportunity(id, body) {
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/attachments/file-on-job`, body));
 }
 
+/**
+ * Creates or replaces the site-visit form the coordinator hands to whoever is
+ * attending, and returns its token — the public link carries that and nothing
+ * else (see features/collaboration/siteVisitLink).
+ *
+ * The person may be someone in the directory (assigneeId) or a name typed in
+ * (assigneeName) — a contractor's electrician who has no account here.
+ *
+ * body: {
+ *   assigneeId?: number, assigneeName?: string,
+ *   assigneeEmail?: string, assigneePhone?: string,
+ *   requestedFields: [{ key, label }],
+ *   requestedDocuments: [{ key, label, type, comment }],
+ * }
+ * → { id, token, status: "pending" | "submitted", ... }
+ */
+export async function saveSiteVisitTask(id, body) {
+  return unwrap(await apiClient.post(`/collaboration/requests/${id}/site-visit`, body));
+}
+
+/**
+ * Removes one photo the site member uploaded. Only the coordinator does this,
+ * from the request itself — a duplicate, a blurred shot, a photo of the wrong
+ * board. The public form never deletes.
+ * → the updated request, with the file gone from `siteVisit.photos`.
+ */
+export async function deleteSiteVisitPhoto(id, photoId) {
+  return unwrap(await apiClient.delete(`/collaboration/requests/${id}/site-visit/photos/${photoId}`));
+}
+
 /** body: { reason } — requester only, while the request is still open. */
 export async function cancelRequest(id, body) {
   return unwrap(await apiClient.post(`/collaboration/requests/${id}/cancel`, body));

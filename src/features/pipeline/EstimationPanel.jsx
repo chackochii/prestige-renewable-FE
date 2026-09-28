@@ -33,9 +33,11 @@ import {
   MessageCircleQuestion,
   Receipt,
   Send,
+  Stamp,
 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
+import Field from "@/components/Field";
 import EmptyState from "@/components/EmptyState";
 import FileDropzone from "@/components/FileDropzone";
 import SectionHead from "@/components/SectionHead";
@@ -50,13 +52,15 @@ import { inspectionRequests, requestCode } from "@/constants/collaboration";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
 import VariationCheck from "@/features/pipeline/VariationCheck";
 import { leadMandatoryItems } from "@/helpers/leadChecklist";
-import { DRAWING_CATEGORY } from "@/constants/estimationInput";
+import { DRAWING_CATEGORY, PERMIT_OPTIONS } from "@/constants/estimationInput";
+import { estimationInputFromOpp } from "@/constants/estimationInput";
 import { estimationState } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationSlice";
 import {
   acknowledgeLeadChange,
+  collectEstimationInputs,
   fetchOpportunityAttachments,
   submitEstimationClientInfo,
   submitEstimatorChecklist,
@@ -158,6 +162,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [checklistValues, setChecklistValues] = useState(() => formFromOpp(opp).checklistValues);
+  // Permits are the estimator's own read of the job, kept outside the
+  // requirements checklist because sales is never asked for them.
+  const [permitNotes, setPermitNotes] = useState(() => estimationInputFromOpp(opp).permitNotes);
   const [preSiteInspectionRequired, setPreSiteInspectionRequired] = useState(
     () => formFromOpp(opp).preSiteInspectionRequired,
   );
@@ -166,6 +173,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
     const fresh = formFromOpp(opp);
     setChecklistValues(fresh.checklistValues);
     setPreSiteInspectionRequired(fresh.preSiteInspectionRequired);
+    setPermitNotes(estimationInputFromOpp(opp).permitNotes);
     setError("");
   }, [opp]);
 
@@ -224,6 +232,15 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
       setSaving(false);
     }
   };
+
+  const saveInput = (field, value) =>
+    run(async () => {
+      await dispatch(collectEstimationInputs({ id: opp.id, body: { input: { [field]: value } } })).unwrap();
+    });
+
+  const savedPermits = estimationInputFromOpp(opp).permits || [];
+  const togglePermit = (key) =>
+    saveInput("permits", savedPermits.includes(key) ? savedPermits.filter((k) => k !== key) : [...savedPermits, key]);
 
   const answerClientInfo = (needed) => {
     run(() => dispatch(submitEstimationClientInfo({ id: opp.id, body: { needed } })).unwrap());
@@ -356,6 +373,48 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
             />
           </div>
 
+          <div className="section" style={{ marginTop: 24 }}>
+            <SectionHead icon={<Stamp size={13} />} title="Permits & approvals" />
+            <p className="lede" style={{ marginBottom: 12 }}>
+              What this job has to clear before it can be built. Estimation identifies these — they are never
+              asked of sales.
+            </p>
+            <div className="choice-grid">
+              {PERMIT_OPTIONS.map((permit) => (
+                <label key={permit.key} className="choice">
+                  <input
+                    type="checkbox"
+                    checked={savedPermits.includes(permit.key)}
+                    disabled={!canEdit || saving}
+                    onChange={() => togglePermit(permit.key)}
+                  />
+                  <span>{permit.label}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <Field label="Permit / approval notes" hint="reference numbers, who is lodging, what is outstanding">
+                <textarea
+                  rows={2}
+                  value={permitNotes}
+                  disabled={!canEdit || saving}
+                  onChange={(e) => setPermitNotes(e.target.value)}
+                />
+              </Field>
+              {canEdit && permitNotes !== estimationInputFromOpp(opp).permitNotes ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginTop: 8 }}
+                  disabled={saving}
+                  onClick={() => saveInput("permitNotes", permitNotes)}
+                >
+                  {saving ? "Saving…" : "Save notes"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           {showClientInfoGate ? (
             <div className="section" style={{ marginTop: 24 }}>
               <SectionHead icon={<MessageCircleQuestion size={13} />} title="Client input" />
@@ -482,7 +541,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
       {tab === "quote" ? (
         showQuoteBuilder ? (
           <>
-            <QuoteBuilder opp={opp} canEdit={canEdit} />
+            <QuoteBuilder opp={opp} unit={unit} canEdit={canEdit} />
             {quoteDone ? (
               <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("variations")}>
                 Continue to variation check
@@ -520,6 +579,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
           opportunity={opp}
           stage={2}
           kind="assignment"
+          template="pre_site_inspection"
           department="operations"
           people={siteOps.length ? siteOps : active}
           onClose={() => setRequestingInspection(false)}
