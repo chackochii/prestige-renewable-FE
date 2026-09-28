@@ -47,8 +47,31 @@ export const PRIORITIES = [
   { key: "urgent", label: "Urgent", tone: "danger", order: 0 },
 ];
 
+/**
+ * An assignment's priority says whether the activity has to happen, not how
+ * urgent it is — operations schedules off necessity.
+ */
+export const ASSIGNMENT_PRIORITIES = [
+  { key: "required", label: "Required", tone: "danger", order: 0 },
+  { key: "not_required", label: "Not required", tone: "neutral", order: 3 },
+  { key: "preferred", label: "Preferred", tone: "warning", order: 1 },
+];
+
+export function prioritiesFor(kind) {
+  return kind === "assignment" ? ASSIGNMENT_PRIORITIES : PRIORITIES;
+}
+
+/** Never throws on a priority the API added, or one from the other scale. */
 export function priorityMeta(key) {
-  return PRIORITIES.find((p) => p.key === key) || PRIORITIES[0];
+  const found =
+    PRIORITIES.find((p) => p.key === key) || ASSIGNMENT_PRIORITIES.find((p) => p.key === key);
+  if (found) return found;
+  return {
+    key: key || "medium",
+    label: String(key || "Medium").replace(/_/g, " "),
+    tone: "neutral",
+    order: 2,
+  };
 }
 
 // ---- Statuses --------------------------------------------------------------
@@ -156,6 +179,27 @@ export function contextualAction(request, user) {
   if (request.kind === "assignment") return { key: "view", label: "View visit progress" };
   if (request.department === "procurement") return { key: "view", label: "Review cost changes" };
   return { key: "view", label: "View details" };
+}
+
+/**
+ * The site-visit form a coordinator hands out. It is the assignment's own
+ * to-do: pending from the moment the link is created until the person
+ * attending submits the form, whatever the assignment's status says.
+ */
+export const SITE_VISIT_STATUSES = [
+  { key: "pending", label: "Pending — form not submitted", tone: "warning", open: true },
+  { key: "submitted", label: "Form submitted", tone: "success", open: false },
+];
+
+/** The task on a request, or null when no link has been created yet. */
+export function siteVisitTask(request) {
+  return request?.siteVisit && typeof request.siteVisit === "object" ? request.siteVisit : null;
+}
+
+/** Submitted only once the form actually came back; pending until then. */
+export function siteVisitStatusMeta(task) {
+  const key = task?.submittedAt || task?.status === "submitted" ? "submitted" : "pending";
+  return SITE_VISIT_STATUSES.find((s) => s.key === key) || SITE_VISIT_STATUSES[0];
 }
 
 /** Every live pre-site inspection on a job, newest first. */

@@ -5,17 +5,20 @@
 // you asked for and you get it back in a shape you can read.
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardCheck, ClipboardList, Plus, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import Modal from "@/components/Modal";
+import Tabs from "@/components/Tabs";
+import InspectionChecklist from "./InspectionChecklist";
+import { SELECTABLE_FIELDS } from "@/constants/inspectionReport";
 import {
   ASSIGNMENT_TEMPLATES,
   DEPARTMENTS,
   DOCUMENT_TYPES,
   INFORMATION_TEMPLATES,
-  PRIORITIES,
   REQUEST_KINDS,
+  prioritiesFor,
 } from "@/constants/collaboration";
 import { stageById } from "@/constants/stages";
 import { isBlank } from "@/utils/validators";
@@ -37,6 +40,10 @@ export default function RequestFormModal({
   kind = "information",
   department: initialDepartment,
   people = [],
+  // Which template the modal opens on, by key. Raising a pre-site inspection
+  // from a stage panel opens on that one, so its title and description are
+  // filled in and the inspection checklist is there from the start.
+  template,
   // Prefilled by whoever raised it — the lead-input rows an estimator ticked,
   // for instance. It opens on the custom template so nothing overwrites it,
   // and every field stays editable.
@@ -46,26 +53,38 @@ export default function RequestFormModal({
 }) {
   const isAssignment = kind === "assignment";
   const templates = isAssignment ? ASSIGNMENT_TEMPLATES : INFORMATION_TEMPLATES;
-  const start = initial ? templates.find((t) => t.key === "custom") || templates[0] : templates[0];
+  const priorities = prioritiesFor(kind);
+  const start = initial
+    ? templates.find((t) => t.key === "custom") || templates[0]
+    : templates.find((t) => t.key === template) || templates[0];
   const [templateKey, setTemplateKey] = useState(start.key);
   const [form, setForm] = useState(() => ({
     department: initialDepartment || (isAssignment ? "operations" : "sales"),
     assigneeId: "",
     title: initial?.title ?? start.title ?? "",
     description: initial?.description ?? start.description ?? "",
-    priority: "medium",
+    priority: priorities[0].key,
     dueAt: "",
+    dueTime: "",
     fields: initial?.fields?.length ? initial.fields.map((f) => ({ ...f })) : isAssignment ? [] : [blankField()],
     documents: [],
   }));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // A pre-site inspection carries a second screen: everything a visit could
+  // bring back, with the requester ticking what this job needs. What is ticked
+  // reaches the coordinator, and becomes a field on the site member's form.
+  const [screen, setScreen] = useState("request");
+  const [checklist, setChecklist] = useState([]);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const isInspection = isAssignment && templateKey === "pre_site_inspection";
+
 
   const applyTemplate = (key) => {
     const template = templates.find((t) => t.key === key) || templates[0];
     setTemplateKey(key);
+    if (key !== "pre_site_inspection") setScreen("request");
     // Only the subject changes — whatever the requester has typed as the
             // items they need stays put.
     setForm((f) => ({
@@ -118,7 +137,11 @@ export default function RequestFormModal({
         title: form.title.trim(),
         description: form.description.trim(),
         priority: form.priority,
-        dueAt: form.dueAt || null,
+        // Date alone stays a date; with a time it becomes a local datetime.
+        dueAt: form.dueAt ? (form.dueTime ? `${form.dueAt}T${form.dueTime}` : form.dueAt) : null,
+        // What the visit has to confirm. The coordinator hands these to
+        // whoever attends, one field each.
+        inspectionChecklist: isInspection ? checklist : null,
         requestedFields: isAssignment
           ? null
           : form.fields.map((f, i) => ({
@@ -147,12 +170,48 @@ export default function RequestFormModal({
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>
             Cancel
           </button>
+          {isInspection && screen === "inspection" ? (
+            <button type="button" className="btn btn-ghost" onClick={() => setScreen("request")} disabled={saving}>
+              <ArrowLeft size={14} /> Back
+            </button>
+          ) : null}
+          {isInspection && screen === "request" ? (
+            <button type="button" className="btn btn-ghost" onClick={() => setScreen("inspection")} disabled={saving}>
+              Inspection checklist <ArrowRight size={14} />
+            </button>
+          ) : null}
           <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
             {saving ? "Sending…" : isAssignment ? "Send assignment" : "Send request"}
           </button>
         </>
       }
     >
+      {isInspection ? (
+        <Tabs
+          value={screen}
+          onChange={setScreen}
+          items={[
+            { key: "request", label: "Request details", icon: <ClipboardList size={14} /> },
+            {
+              key: "inspection",
+              label: "Inspection checklist",
+              icon: <ClipboardCheck size={14} />,
+              count: `${checklist.length}/${SELECTABLE_FIELDS.length}`,
+            },
+          ]}
+        />
+      ) : null}
+
+      {isInspection && screen === "inspection" ? (
+        <div className="section" style={{ marginBottom: 0 }}>
+          <p className="lede" style={{ marginBottom: 0 }}>
+            Tick what this visit has to bring back. Each one becomes a field the person attending fills in, so ask for
+            what you need and leave the rest — everything here is optional.
+          </p>
+          <InspectionChecklist selected={checklist} onChange={setChecklist} disabled={saving} />
+        </div>
+      ) : (
+        <>
       <div className="form-grid">
         <Field label="What do you need?" className="span-2">
           <select value={templateKey} onChange={(e) => applyTemplate(e.target.value)}>
@@ -198,7 +257,7 @@ export default function RequestFormModal({
 
         <Field label="Priority">
           <select value={form.priority} onChange={(e) => set("priority", e.target.value)}>
-            {PRIORITIES.map((p) => (
+            {priorities.map((p) => (
               <option key={p.key} value={p.key}>
                 {p.label}
               </option>
@@ -207,6 +266,14 @@ export default function RequestFormModal({
         </Field>
         <Field label="Needed by">
           <input type="date" value={form.dueAt} onChange={(e) => set("dueAt", e.target.value)} />
+        </Field>
+        <Field label="Needed by (time)" hint={form.dueAt ? "optional" : "pick a date first"}>
+          <input
+            type="time"
+            value={form.dueTime}
+            disabled={!form.dueAt}
+            onChange={(e) => set("dueTime", e.target.value)}
+          />
         </Field>
       </div>
 
@@ -280,6 +347,9 @@ export default function RequestFormModal({
           <Plus size={14} /> Add a photo or document
         </button>
       </div>
+
+        </>
+      )}
 
       {error ? (
         <Alert tone="danger" style={{ marginTop: 16, marginBottom: 0 }}>

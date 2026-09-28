@@ -187,14 +187,14 @@ const errText = (err, fallback) => (typeof err === "string" ? err : err?.message
  * Shows the quote PDF in the browser. `source` is { version } for a saved
  * version or {} for the live quote; the blob URL is released on close.
  */
-function QuotePreviewModal({ opp, quote, source, title, actions, onClose }) {
+function QuotePreviewModal({ opp, quote, unit, source, title, actions, onClose }) {
   const [url, setUrl] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     let created = null;
-    invoicePreviewUrl({ opp, quote, version: source.version })
+    invoicePreviewUrl({ opp, quote, unit, version: source.version })
       .then((next) => {
         created = next;
         if (cancelled) URL.revokeObjectURL(next);
@@ -226,7 +226,7 @@ const TAX_TREATMENT_HINT = {
   no_gst: "No GST applies to this quote.",
 };
 
-export default function QuoteBuilder({ opp, canEdit }) {
+export default function QuoteBuilder({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
   const { notify, error: notifyError } = useNotifications();
   const quote = useAppSelector((s) => s.leads.quote);
@@ -497,7 +497,7 @@ export default function QuoteBuilder({ opp, canEdit }) {
   const handleDownload = async (version) => {
     setDownloading(version?.id ?? "draft");
     try {
-      await downloadInvoice({ opp, quote, version });
+      await downloadInvoice({ opp, quote, unit, version });
     } catch (err) {
       notifyError(errText(err, "Could not generate the PDF."));
     } finally {
@@ -850,6 +850,7 @@ export default function QuoteBuilder({ opp, canEdit }) {
         <QuotePreviewModal
           opp={opp}
           quote={quote}
+          unit={unit}
           source={preview}
           title={preview.version ? `${quote.quoteNumber} · ${versionLabel(preview.version)}` : `${quote.quoteNumber} · current quote`}
           onClose={() => setPreview(null)}

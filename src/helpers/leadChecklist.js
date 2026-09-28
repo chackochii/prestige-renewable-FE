@@ -11,7 +11,6 @@
 import {
   BACKUP_OPTIONS,
   DRAWING_CATEGORY,
-  PERMIT_OPTIONS,
   SITE_PHOTO_CATEGORY,
   SWITCHBOARD_CONDITIONS,
   VPP_OPTIONS,
@@ -150,7 +149,7 @@ export const TECHNICAL_GROUP = "Technical & Electrical Specification";
 export const OPTIONAL_GROUPS = [
   "Site & Inspection",
   TECHNICAL_GROUP,
-  "Installation, Permits & Utility",
+  "Installation & Utility",
   "Customer-Specific Notes",
 ];
 
@@ -344,22 +343,14 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
 
     // ---- Installation, Permits & Utility ----
     {
-      group: "Installation, Permits & Utility",
+      group: "Installation & Utility",
       field: "specialRequirements",
       label: "Special installation requirements",
       type: "textarea",
       value: input.specialRequirements,
     },
     {
-      group: "Installation, Permits & Utility",
-      field: "permits",
-      label: "Permits & approvals",
-      type: "permits",
-      value: (input.permits || []).length ? input.permits : "",
-      display: (input.permits || []).map((key) => label(PERMIT_OPTIONS, key)).join(", "),
-    },
-    {
-      group: "Installation, Permits & Utility",
+      group: "Installation & Utility",
       field: "vppEligibility",
       label: "VPP eligibility",
       type: "select",
@@ -368,14 +359,14 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       display: label(VPP_OPTIONS, input.vppEligibility),
     },
     {
-      group: "Installation, Permits & Utility",
+      group: "Installation & Utility",
       field: "meterRequirements",
       label: "Utility / meter requirements",
       type: "text",
       value: input.meterRequirements,
     },
     {
-      group: "Installation, Permits & Utility",
+      group: "Installation & Utility",
       field: "__drawings",
       label: "Drawings, layouts & SLD",
       type: "files",
@@ -389,6 +380,13 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
     },
 
     // ---- Customer-Specific Notes ----
+    {
+      group: "Customer-Specific Notes",
+      field: "clientSpecialRequirements",
+      label: "Client special requirement",
+      type: "textarea",
+      value: input.clientSpecialRequirements,
+    },
     {
       group: "Customer-Specific Notes",
       field: "inclusions",

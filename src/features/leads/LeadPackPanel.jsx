@@ -48,11 +48,11 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [uploadingCategory, setUploadingCategory] = useState(null);
   const [requestingInspection, setRequestingInspection] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(null);
-  // Open ready to edit. The checklist runs across several tabs and people
-  // fill it in over more than one sitting, so locking it behind a pencil only
-  // got in the way. Read-only is for people without the permission, and for
-  // anyone who has pressed Cancel.
-  const [editing, setEditing] = useState(true);
+  // Lead capture opens ready to edit: the checklist runs across several tabs
+  // and people fill it in over more than one sitting. A record that has moved
+  // on opens read-only instead — an estimator reviewing the pack is reading it,
+  // and unlocking it is a deliberate act that needs the Leads permission.
+  const [editing, setEditing] = useState(() => Number(opp?.stage) === LEAD_STAGE);
   const [confirmEdit, setConfirmEdit] = useState(false);
   // "", "saving", "saved" or "error" — what the autosave line shows.
   const [autosaveState, setAutosaveState] = useState("");
@@ -68,7 +68,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     const changedRecord = openedId.current !== opp?.id;
     if (changedRecord) {
       openedId.current = opp?.id;
-      setEditing(true);
+      setEditing(Number(opp?.stage) === LEAD_STAGE);
     }
     // A refresh of the record already open must not overwrite unsaved typing
     // — autosave's own response comes back through here too.
@@ -464,6 +464,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           opportunity={opp}
           stage={LEAD_STAGE}
           kind="assignment"
+          template="pre_site_inspection"
           department="operations"
           people={siteOps.length ? siteOps : sales}
           onClose={() => setRequestingInspection(false)}

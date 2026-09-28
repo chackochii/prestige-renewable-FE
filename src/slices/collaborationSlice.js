@@ -141,6 +141,28 @@ export const fileAttachmentOnOpportunity = createAsyncThunk(
   },
 );
 
+export const saveSiteVisitTask = createAsyncThunk(
+  "collaboration/siteVisit",
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await api.saveSiteVisitTask(id, body);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
+export const deleteSiteVisitPhoto = createAsyncThunk(
+  "collaboration/siteVisitPhotoDelete",
+  async ({ id, photoId }, { rejectWithValue }) => {
+    try {
+      return await api.deleteSiteVisitPhoto(id, photoId);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
 export const cancelRequest = createAsyncThunk("collaboration/cancel", async ({ id, body }, { rejectWithValue }) => {
   try {
     return await api.cancelRequest(id, body);
@@ -248,6 +270,8 @@ const collaborationSlice = createSlice({
       .addCase(submitResponse.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(decideResponse.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(addProgress.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(saveSiteVisitTask.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(deleteSiteVisitPhoto.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(cancelRequest.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(uploadRequestAttachment.fulfilled, (state, action) => upsert(state, action.payload?.request))
       .addCase(fileAttachmentOnOpportunity.fulfilled, (state, action) => upsert(state, action.payload))

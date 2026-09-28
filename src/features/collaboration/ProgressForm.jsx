@@ -13,8 +13,11 @@ import { isBlank } from "@/utils/validators";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
-export default function ProgressForm({ request, onSubmit, onUpload, uploading = false }) {
+export default function ProgressForm({ request, people = [], onSubmit, onUpload, uploading = false }) {
   const [status, setStatus] = useState(request.status);
+  // Who is actually going out. Operations picks the electrician or site member
+  // here; the requester sees the name on the assignment.
+  const [assigneeId, setAssigneeId] = useState(request.assigneeId ? String(request.assigneeId) : "");
   const [scheduledFor, setScheduledFor] = useState(toDateInput(request.scheduledFor));
   const [note, setNote] = useState("");
   const [internal, setInternal] = useState(false);
@@ -22,6 +25,18 @@ export default function ProgressForm({ request, onSubmit, onUpload, uploading = 
   const [saving, setSaving] = useState(false);
 
   const options = nextAssignmentStatuses(request.status);
+  // The person already on the request stays selectable even when they are not
+  // in the unit directory this screen loaded.
+  const crew = people.some((p) => Number(p.id) === Number(request.assigneeId))
+    ? people
+    : [
+        ...(request.assigneeId
+          ? [{ id: request.assigneeId, name: request.assigneeName || "Currently assigned" }]
+          : []),
+        ...people,
+      ];
+  const assignedName =
+    crew.find((p) => Number(p.id) === Number(assigneeId))?.name || "";
   const rescheduling = status === "rescheduled" || status === "scheduled";
 
   const submit = async () => {
@@ -29,8 +44,9 @@ export default function ProgressForm({ request, onSubmit, onUpload, uploading = 
       setError("Pick the date you are scheduling this for.");
       return;
     }
-    if (status === request.status && isBlank(note)) {
-      setError("Add a note, or move the status on.");
+    const reassigned = assigneeId && Number(assigneeId) !== Number(request.assigneeId);
+    if (status === request.status && isBlank(note) && !reassigned) {
+      setError("Add a note, move the status on, or assign someone.");
       return;
     }
     setSaving(true);
@@ -38,6 +54,7 @@ export default function ProgressForm({ request, onSubmit, onUpload, uploading = 
     try {
       await onSubmit({
         status,
+        assigneeId: assigneeId ? Number(assigneeId) : null,
         scheduledFor: scheduledFor || null,
         note: note.trim(),
         internal,
@@ -67,6 +84,25 @@ export default function ProgressForm({ request, onSubmit, onUpload, uploading = 
         </Field>
         <Field label="Scheduled for" hint={rescheduling ? "required" : "optional"}>
           <input type="date" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} />
+        </Field>
+        <Field
+          label="Assign to"
+          className="span-2"
+          hint={
+            assignedName
+              ? `currently ${assignedName}`
+              : "the electrician or site member attending"
+          }
+        >
+          <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
+            <option value="">Nobody assigned yet</option>
+            {crew.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+                {person.title ? ` · ${person.title}` : ""}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Progress note" className="span-2" hint="what the requester will read">
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />

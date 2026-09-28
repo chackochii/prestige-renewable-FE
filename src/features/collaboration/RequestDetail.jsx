@@ -9,13 +9,22 @@
 // It never sends anyone into another department's module.
 
 import { useEffect, useState } from "react";
-import { Check, Clock, Download, FolderInput, MessageCircleQuestion, Paperclip, X } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Download,
+  FolderInput,
+  MessageCircleQuestion,
+  Paperclip,
+  X,
+} from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import LoadingState from "@/components/LoadingState";
 import Modal from "@/components/Modal";
 import ProgressForm from "./ProgressForm";
+import SiteVisitTaskForm from "./SiteVisitTaskForm";
 import ResponseForm from "./ResponseForm";
 import RequestStatusBadge from "./RequestStatusBadge";
 import {
@@ -35,14 +44,18 @@ import {
   visibleProgress,
 } from "@/constants/collaboration";
 import { stageById } from "@/constants/stages";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { formatDate, hasClockTime } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
+import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   addProgress,
   cancelRequest,
   decideResponse,
+  deleteSiteVisitPhoto,
+  saveSiteVisitTask,
+  updateRequest,
   fetchRequestHistory,
   fileAttachmentOnOpportunity,
   submitResponse,
@@ -112,6 +125,7 @@ function Fact({ label, value }) {
 export default function RequestDetail({ request, onClose, timeZone }) {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
+  const { active, siteOps } = useUnitUsers();
   const { notify, error: notifyError } = useNotifications();
   const { history, historyStatus } = useAppSelector((s) => s.collaboration);
   const [uploading, setUploading] = useState(null);
@@ -166,10 +180,25 @@ export default function RequestDetail({ request, onClose, timeZone }) {
     if (!body.draft) onClose?.();
   };
 
-  const progressUpdate = async (body) => {
+  const progressUpdate = async ({ assigneeId, ...body }) => {
+    // Who it is assigned to is a property of the request, not a progress
+    // entry, so it goes through the request update endpoint.
+    if (assigneeId && Number(assigneeId) !== Number(request.assigneeId)) {
+      await dispatch(updateRequest({ id: request.id, body: { assigneeId } })).unwrap();
+    }
     await dispatch(addProgress({ id: request.id, body })).unwrap();
     await dispatch(fetchRequestHistory(request.id));
     notify("Update submitted");
+  };
+
+  const removeSiteVisitPhoto = async (photoId) => {
+    await dispatch(deleteSiteVisitPhoto({ id: request.id, photoId })).unwrap();
+    notify("Photo deleted");
+  };
+
+  const saveSiteVisit = async (body) => {
+    await dispatch(saveSiteVisitTask({ id: request.id, body })).unwrap();
+    notify("Site-visit form saved — copy the link and send it over");
   };
 
   const decide = async (outcome) => {
@@ -249,7 +278,14 @@ export default function RequestDetail({ request, onClose, timeZone }) {
           <Fact label="Raised by" value={request.createdByName} />
           <Fact label="Assigned to" value={request.assigneeName || departmentLabel(request.department)} />
           <Fact label="Requested" value={formatDate(request.createdAt, { withTime: true, timeZone })} />
-          <Fact label="Due" value={request.dueAt ? formatDate(request.dueAt, { timeZone }) : "No date set"} />
+          <Fact
+            label="Due"
+            value={
+              request.dueAt
+                ? formatDate(request.dueAt, { withTime: hasClockTime(request.dueAt), timeZone })
+                : "No date set"
+            }
+          />
           {request.kind === "assignment" ? (
             <Fact
               label="Scheduled for"
@@ -390,10 +426,22 @@ export default function RequestDetail({ request, onClose, timeZone }) {
           <div style={{ marginTop: 18 }}>
             <ProgressForm
               request={request}
+              people={siteOps.length ? siteOps : active}
               onSubmit={progressUpdate}
               onUpload={upload("report")}
               uploading={uploading}
             />
+            {/* Handing the visit to whoever is attending, and what they sent
+                back. Only assignments go out to site. */}
+            <div style={{ marginTop: 18 }}>
+              <SiteVisitTaskForm
+                request={request}
+                people={siteOps.length ? siteOps : active}
+                onSave={saveSiteVisit}
+                onDeletePhoto={removeSiteVisitPhoto}
+                timeZone={timeZone}
+              />
+            </div>
           </div>
         ) : null}
 

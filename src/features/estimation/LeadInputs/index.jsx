@@ -12,7 +12,7 @@ import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
 import NumberInput from "@/components/NumberInput";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
-import { DRAWING_CATEGORY, PERMIT_OPTIONS, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
+import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { countDone, groupOptionalItems, leadMandatoryItems, leadOptionalItems } from "@/helpers/leadChecklist";
 import { oppTitle } from "@/helpers/opportunity";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -89,26 +89,6 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
             </option>
           ))}
         </select>
-      );
-    if (row.type === "permits")
-      return (
-        <div className="choice-grid">
-          {PERMIT_OPTIONS.map((permit) => {
-            const list = Array.isArray(value) ? value : [];
-            return (
-              <label key={permit.key} className="choice">
-                <input
-                  type="checkbox"
-                  checked={list.includes(permit.key)}
-                  onChange={() =>
-                    setValue(list.includes(permit.key) ? list.filter((k) => k !== permit.key) : [...list, permit.key])
-                  }
-                />
-                <span>{permit.label}</span>
-              </label>
-            );
-          })}
-        </div>
       );
     if (row.type === "checkbox")
       return (
@@ -210,7 +190,7 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
             className="btn btn-ghost btn-sm"
             style={{ marginLeft: 8 }}
             onClick={() => {
-              setValue(row.type === "permits" ? (Array.isArray(row.value) ? row.value : []) : row.value ?? "");
+              setValue(row.value ?? "");
               setEditing(true);
             }}
           >

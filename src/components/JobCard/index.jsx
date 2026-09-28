@@ -4,18 +4,13 @@ import Avatar from "@/components/Avatar";
 import Badge from "@/components/Badge";
 import { oppSite, oppTitle, oppValue } from "@/helpers/opportunity";
 import { daysSince } from "@/helpers/dateTimeHelpers";
+import { jobStatus } from "@/helpers/jobStatus";
 import { formatCurrency } from "@/utils/formatCurrency";
 
-function flag(opp) {
-  const ageDays = daysSince(opp.createdAt);
-  if (ageDays != null && ageDays <= 7) return { label: "New", tone: "info" };
-  if (opp.leadSource === "referrer") return { label: "Referral", tone: "neutral" };
-  if (opp.variationPending) return { label: "Variation", tone: "warning" };
-  return null;
-}
-
-export default function JobCard({ opp, owner, draggable, dragging, onDragStart, onDragEnd, onOpen }) {
-  const badge = flag(opp);
+export default function JobCard({ opp, owner, userName, draggable, dragging, onDragStart, onDragEnd, onOpen }) {
+  // New, Blocked, Variation or Referral — see helpers/jobStatus. A blocked
+  // card's tooltip names whoever is holding it.
+  const badge = jobStatus(opp, { userName });
   const inStage = daysSince(opp.slaStartedAt || opp.createdAt);
   const site = oppSite(opp);
 
@@ -35,7 +30,11 @@ export default function JobCard({ opp, owner, draggable, dragging, onDragStart, 
     >
       <div className="kanban-card-top">
         <span className="row-title">{oppTitle(opp)}</span>
-        {badge ? <Badge tone={badge.tone}>{badge.label}</Badge> : null}
+        {badge ? (
+          <Badge tone={badge.tone} title={badge.title}>
+            {badge.label}
+          </Badge>
+        ) : null}
       </div>
       <div className="kanban-card-company">
         {site}

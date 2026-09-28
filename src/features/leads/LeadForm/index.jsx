@@ -36,7 +36,6 @@ import {
 import { COMMON_LANGUAGES, DEFAULT_LANGUAGE } from "@/constants/languages";
 import {
   BACKUP_OPTIONS,
-  PERMIT_OPTIONS,
   SITE_TYPES,
   SWITCHBOARD_CONDITIONS,
   VPP_OPTIONS,
@@ -215,9 +214,6 @@ export default function LeadForm({
       {label}
     </label>
   );
-  const togglePermit = (key) =>
-    set("permits", (form.permits || []).includes(key) ? form.permits.filter((k) => k !== key) : [...(form.permits || []), key]);
-
   const inspectionNeeded = form.preSiteInspectionRequired === "yes";
   const inspectionStatus = inspectionStatusFrom(inspection);
   const retrofit = form.isRetrofit === "yes";
@@ -315,6 +311,8 @@ export default function LeadForm({
   // One entry per mandatory row — the single source of truth for the row
   // ticks, the progress bar and the "Potential" gate below.
   const requiredRows = [
+    { label: "Initial requirements & comments", done: doneComments },
+    { label: "Genuine interest", done: doneIntent },
     { label: "Contact client", done: doneContact },
     { label: "Customer details", done: doneCustomer, missing: customerMissing },
     { label: "Service requirement", done: doneService },
@@ -329,8 +327,6 @@ export default function LeadForm({
     { label: "Site requirements & extra costs", done: doneSiteRequirements },
     { label: "Preferred timeframe", done: doneTimeframe },
     { label: "Preferred location", done: doneLocation },
-    { label: "Genuine interest", done: doneIntent },
-    { label: "Initial requirements & comments", done: doneComments },
     { label: "Where they got our details", done: doneSource },
   ];
   const outstanding = requiredRows.filter((r) => !r.done);
@@ -481,6 +477,32 @@ export default function LeadForm({
             </div>
 
               <div className="checklist" style={{ marginBottom: 20 }}>
+              <ChecklistRow done={doneComments} label="Initial requirements & comments">
+                <Field
+                  hint="what they want from the system, anything else they asked for, financial options discussed"
+                  error={err("customerComments")}
+                >
+                  {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
+                </Field>
+              </ChecklistRow>
+
+              <ChecklistRow done={doneIntent} label="Genuine interest">
+                <label className="check" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.customerIntentConfirmed}
+                    disabled={disabled}
+                    onChange={(e) => set("customerIntentConfirmed", e.target.checked)}
+                  />
+                  Customer confirmed they are genuinely interested in proceeding
+                </label>
+                {err("customerIntentConfirmed") ? (
+                  <p className="field-error" style={{ marginTop: 6 }}>
+                    {err("customerIntentConfirmed")}
+                  </p>
+                ) : null}
+              </ChecklistRow>
+
               <ChecklistRow done={doneContact} label="Contact client?">
                 <p className="lede" style={{ margin: "0 0 10px" }}>
                   Did you have to contact the client to collect the mandatory details?
@@ -840,32 +862,6 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneIntent} label="Genuine interest">
-                <label className="check" style={{ margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.customerIntentConfirmed}
-                    disabled={disabled}
-                    onChange={(e) => set("customerIntentConfirmed", e.target.checked)}
-                  />
-                  Customer confirmed they are genuinely interested in proceeding
-                </label>
-                {err("customerIntentConfirmed") ? (
-                  <p className="field-error" style={{ marginTop: 6 }}>
-                    {err("customerIntentConfirmed")}
-                  </p>
-                ) : null}
-              </ChecklistRow>
-
-              <ChecklistRow done={doneComments} label="Initial requirements & comments">
-                <Field
-                  hint="what they want from the system, anything else they asked for, financial options discussed"
-                  error={err("customerComments")}
-                >
-                  {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
-                </Field>
-              </ChecklistRow>
-
               <ChecklistRow done={doneSource} label="Where they got our details">
                 <Field hint="feeds the referral reward program" error={err("leadSource")}>
                   {automated ? (
@@ -1121,30 +1117,13 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow
-                done={(form.permits || []).length > 0 || !isBlank(form.vppEligibility)}
-                label="Permits, approvals & VPP"
-              >
-                <div className="choice-grid">
-                  {PERMIT_OPTIONS.map((permit) => (
-                    <label key={permit.key} className="choice">
-                      <input
-                        type="checkbox"
-                        checked={(form.permits || []).includes(permit.key)}
-                        disabled={disabled}
-                        onChange={() => togglePermit(permit.key)}
-                      />
-                      <span>{permit.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  {checkbox("vppDiscussed", "VPP requirements discussed with the customer, if applicable")}
-                </div>
+              {/* Permits and approvals are the estimator's call, not a customer
+                  conversation — they live in the estimation module. */}
+              <ChecklistRow done={!isBlank(form.vppEligibility)} label="VPP requirements">
+                {checkbox("vppDiscussed", "VPP requirements discussed with the customer, if applicable")}
                 <div className="form-grid" style={{ marginTop: 10 }}>
                   <Field label="VPP incentive / eligibility">{selectField("vppEligibility", VPP_OPTIONS, "Select eligibility")}</Field>
                   <Field label="VPP requirements" hint="retailer, program">{input("vppNotes")}</Field>
-                  <Field label="Permit / approval notes" className="span-2">{input("permitNotes")}</Field>
                 </div>
               </ChecklistRow>
 
@@ -1182,6 +1161,13 @@ export default function LeadForm({
                 label="Customer-specific notes"
               >
                 <div className="form-grid">
+                  <Field
+                    label="Client special requirement"
+                    className="span-2"
+                    hint="optional — anything the client specifically asked for"
+                  >
+                    {textarea("clientSpecialRequirements")}
+                  </Field>
                   <Field label="Inclusions" hint="what the customer was promised">{textarea("inclusions")}</Field>
                   <Field label="Exclusions" hint="what is not covered">{textarea("exclusions")}</Field>
                 </div>

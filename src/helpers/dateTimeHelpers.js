@@ -41,6 +41,18 @@ export function slaStatus(dueAt) {
   return { label: `${days}d remaining`, tone: "success", overdue: false };
 }
 
+/**
+ * True when a stored date carries a clock time rather than just a day.
+ * Checked on the string, not a parsed Date, so a timezone shift cannot turn a
+ * date-only value into a false positive.
+ */
+export function hasClockTime(value) {
+  if (typeof value !== "string") return false;
+  const time = value.split("T")[1];
+  if (!time) return false;
+  return !/^00:00(:00)?(\.\d+)?Z?$/.test(time);
+}
+
 export function isOverdue(dueAt) {
   return Boolean(dueAt) && new Date(dueAt) < new Date();
 }
