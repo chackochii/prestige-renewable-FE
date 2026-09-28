@@ -188,6 +188,11 @@
   .table.clickable tbody tr:hover td { background: var(--surface-2); color: var(--brand); }
   .table.clickable tbody tr:hover td:first-child { border-radius: 10px 0 0 10px; }
   .table.clickable tbody tr:hover td:last-child { border-radius: 0 10px 10px 0; }
+  /* The row whose detail is open below the table — same surface as hover, so
+     the eye reads "this one" without a second colour. */
+  .table.clickable tbody tr.selected td { background: var(--surface-2); }
+  .table.clickable tbody tr.selected td:first-child { border-radius: 10px 0 0 10px; }
+  .table.clickable tbody tr.selected td:last-child { border-radius: 0 10px 10px 0; }
   .row-title { font-weight: 600; }
   .row-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .row-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; flex-shrink: 0; }
@@ -384,6 +389,12 @@
      this person's to open. Dimmer than :disabled, which only means "not yet". */
   .step.locked .step-dot { background: var(--neutral-bg); color: var(--muted); border-style: dashed; }
   .step.locked .step-label { color: var(--muted); font-style: italic; }
+  /* Foot of a lazily-loaded list: the count on the left, the control on the
+     right, and enough height that scrolling to it reliably trips the observer. */
+  .load-more {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 14px 4px 4px; min-height: 44px;
+  }
   .step.done .step-dot { background: var(--brand); color: #fff; border-color: var(--brand); }
   .step.current .step-dot { background: var(--accent-soft); color: var(--brand-2); border-color: var(--accent); box-shadow: 0 0 0 4px #f2a93c33; }
   .step-label { font-size: 11px; color: var(--muted); transition: color var(--fast); }

@@ -121,8 +121,8 @@ export default function EnquiryPage() {
           <Link to="/" className="brand" style={{ width: "fit-content" }}>
             <BrandMark size={40} />
             <div>
-              <div className="brand-name">Prestige Renewable</div>
-              <div className="brand-sub">Sales &amp; delivery</div>
+              {/* <div className="brand-name">Prestige Renewable</div>
+              <div className="brand-sub">Sales &amp; delivery</div> */}
             </div>
           </Link>
           <h2>Tell us about your project.</h2>
@@ -131,7 +131,7 @@ export default function EnquiryPage() {
             next steps.
           </p>
         </div>
-        <p>Prestige Business Units · Enquiries</p>
+        {/* <p>Prestige Business Units · Enquiries</p> */}
       </section>
 
       <section className="login-panel">
@@ -140,8 +140,8 @@ export default function EnquiryPage() {
             <Link to="/" className="brand login-brand">
               <BrandMark size={34} />
               <div>
-                <div className="brand-name">Prestige Renewable</div>
-                <div className="brand-sub">Sales &amp; delivery</div>
+                {/* <div className="brand-name">Prestige Renewable</div>
+                <div className="brand-sub">Sales &amp; delivery</div> */}
               </div>
             </Link>
             <div style={{ color: "var(--brand)", marginBottom: 12 }}>
@@ -174,8 +174,8 @@ export default function EnquiryPage() {
             <Link to="/" className="brand login-brand">
               <BrandMark size={34} />
               <div>
-                <div className="brand-name">Prestige Renewable</div>
-                <div className="brand-sub">Sales &amp; delivery</div>
+                {/* <div className="brand-name">Prestige Renewable</div>
+                <div className="brand-sub">Sales &amp; delivery</div> */}
               </div>
             </Link>
             <h1>Get in touch</h1>

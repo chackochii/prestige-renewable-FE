@@ -16,6 +16,8 @@ import LeadPackPanel from "@/features/leads/LeadPackPanel";
 import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
 import LifecycleModal from "@/features/pipeline/LifecycleModal";
+import ProcurementStagePanel from "@/features/procurement/ProcurementStagePanel";
+import { PROCUREMENT_STAGE } from "@/lib/mockData/procurement";
 import { enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { stageHiddenReason, viewableStages } from "@/helpers/stageAccess";
@@ -229,6 +231,8 @@ export default function OpportunityPage() {
             <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : viewing === 2 ? (
             <EstimationPanel key={opp.id} opp={opp} unit={unit} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} />
+          ) : viewing === PROCUREMENT_STAGE.id ? (
+            <ProcurementStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : (
             <StagePanel stageId={viewing} opp={opp} unit={unit} canEdit={canEdit} />
           )}

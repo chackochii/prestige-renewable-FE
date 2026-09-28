@@ -18,6 +18,7 @@ import LoadingState from "@/components/LoadingState";
 import Alert from "@/components/Alert";
 import JobCard from "@/components/JobCard";
 import OppCell from "@/components/OppCell";
+import LoadMore from "@/components/LoadMore";
 import { oppTitle, oppValue } from "@/helpers/opportunity";
 import { enabledStagesFor, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -27,6 +28,7 @@ import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -61,7 +63,19 @@ export default function PipelinePage() {
   const stageFilter = requestedStage && canViewStage(user, requestedStage) ? requestedStage : "";
   const lifecycle = params.get("life") || "Active";
   const view = params.get("view") === "board" ? "board" : "list";
-  const { items, status, error, ready, reload } = useOpportunities(lifecycle === "all" ? {} : { lifecycle });
+  // Lifecycle, search, owner and stage are applied by the API, not in the
+  // browser: with only part of the pipeline loaded, filtering here would
+  // silently miss everything not yet fetched.
+  const settledSearch = useDebouncedValue(search.trim(), 300);
+  const { items, status, error, ready, reload, total, loaded, hasMore, loadingMore, loadMore } = useOpportunities(
+    {
+      ...(lifecycle === "all" ? {} : { lifecycle }),
+      ...(settledSearch ? { search: settledSearch } : {}),
+      ...(ownerId ? { ownerId } : {}),
+      ...(stageFilter ? { stage: stageFilter } : {}),
+    },
+    { pageSize: 50 },
+  );
 
   /** Keeps the other URL filters when one of them changes. */
   const setParam = (key, value) => {
@@ -81,20 +95,16 @@ export default function PipelinePage() {
   const canMoveFrom = useCallback((stage) => canAdvanceFrom(user, stage), [user]);
   const movableStages = useMemo(() => advanceableStages(user, stages), [user, stages]);
 
+  // Status and Created by are worked out here rather than by the API — one is
+  // derived from several fields, the other from whichever author field the
+  // record carries — so they narrow what has been loaded, not the whole set.
   const rows = useMemo(
     () =>
       items
-        .filter((o) => (stageFilter ? String(o.stage) === stageFilter : true))
-        .filter((o) => (ownerId ? String(o.salespersonId || o.leadOwnerId) === ownerId : true))
         .filter((o) => (authorId ? String(createdById(o)) === authorId : true))
         .filter((o) => (statusKey ? (jobStatus(o, { userName })?.key || "none") === statusKey : true))
-        .filter((o) =>
-          `${o.number || ""} ${o.customerLegalName || ""} ${o.customerTradingName || ""} ${o.siteSuburb || ""}`
-            .toLowerCase()
-            .includes(search.toLowerCase()),
-        )
         .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
-    [items, stageFilter, ownerId, authorId, statusKey, search, userName],
+    [items, authorId, statusKey, userName],
   );
 
   const columns = useMemo(() => {
@@ -361,6 +371,17 @@ export default function PipelinePage() {
           })}
         </div>
       )}
+
+      {/* One control for the whole board: a card's column depends on its stage,
+          so the next page feeds every column at once rather than one of them. */}
+      <LoadMore
+        loaded={loaded}
+        total={total}
+        hasMore={hasMore}
+        loading={loadingMore}
+        onMore={loadMore}
+        noun="opportunities"
+      />
     </>
   );
 }

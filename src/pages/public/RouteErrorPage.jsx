@@ -23,7 +23,7 @@ export default function RouteErrorPage() {
       <div className="card card-pad gate-card">
         <div className="brand" style={{ padding: "0 0 8px" }}>
           <BrandMark size={32} />
-          <div className="brand-name">Prestige Renewable</div>
+          {/* <div className="brand-name">Prestige Renewable</div> */}
         </div>
         <EmptyState
           icon={<TriangleAlert size={28} strokeWidth={1.5} />}

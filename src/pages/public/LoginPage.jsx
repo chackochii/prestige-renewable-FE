@@ -59,8 +59,8 @@ export default function LoginPage() {
           <Link to="/" className="brand" style={{ width: "fit-content" }}>
             <BrandMark size={40} />
             <div>
-              <div className="brand-name">Prestige Renewable</div>
-              <div className="brand-sub">Sales &amp; delivery</div>
+              {/* <div className="brand-name">Prestige Renewable</div>
+              <div className="brand-sub">Sales &amp; delivery</div> */}
             </div>
           </Link>
           <h2>One record from lead to service. Every business unit.</h2>
@@ -69,7 +69,7 @@ export default function LoginPage() {
             right people seeing the right stage.
           </p>
         </div>
-        <p>Prestige Business Units · Sales &amp; Delivery</p>
+        {/* <p>Prestige Business Units · Sales &amp; Delivery</p> */}
       </section>
 
       <section className="login-panel">
@@ -78,8 +78,8 @@ export default function LoginPage() {
           <Link to="/" className="brand login-brand">
             <BrandMark size={34} />
             <div>
-              <div className="brand-name">Prestige Renewable</div>
-              <div className="brand-sub">Sales &amp; delivery</div>
+              {/* <div className="brand-name">Prestige Renewable</div>
+              <div className="brand-sub">Sales &amp; delivery</div> */}
             </div>
           </Link>
           <h1>Sign in</h1>
