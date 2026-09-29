@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, Clock, FileStack } from "lucide-react";
+import { ArrowRight, Clock, FileStack, Send } from "lucide-react";
 import Badge from "@/components/Badge";
 import Alert from "@/components/Alert";
 import Tabs from "@/components/Tabs";
@@ -17,10 +17,14 @@ import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
 import LifecycleModal from "@/features/pipeline/LifecycleModal";
 import ProcurementStagePanel from "@/features/procurement/ProcurementStagePanel";
+import ApprovalsStagePanel from "@/features/approvals/ApprovalsStagePanel";
+import { APPROVALS_STAGE } from "@/lib/mockData/approvals";
+import ProposalStagePanel from "@/features/proposals/ProposalStagePanel";
+import { PROPOSAL_STAGE_ID } from "@/helpers/proposals";
 import { PROCUREMENT_STAGE } from "@/lib/mockData/procurement";
 import { enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
-import { stageHiddenReason, viewableStages } from "@/helpers/stageAccess";
+import { canAdvanceFrom, stageHiddenReason, viewableStages } from "@/helpers/stageAccess";
 import { advanceState } from "@/helpers/stageTransition";
 import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
@@ -43,6 +47,8 @@ export default function OpportunityPage() {
   const [viewStage, setViewStage] = useState(null);
   const [advanceError, setAdvanceError] = useState("");
   const [advancing, setAdvancing] = useState(false);
+  // Bumped by the header's "Send to Proposal" to open estimation's hand-over step.
+  const [handoverAsk, setHandoverAsk] = useState(0);
   const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -104,6 +110,16 @@ export default function OpportunityPage() {
   const value = Number(opp.acceptedValue) || Number(opp.estimatedValue) || 0;
   const timeZone = unit?.timezone;
 
+  // Leaving estimation is a hand-over, not a bare stage move: the header
+  // button opens estimation's "Send to proposal" step, which saves the quote
+  // version and takes a note to sales.
+  const openHandover = () => {
+    setTab("work");
+    setViewStage(null);
+    setHandoverAsk((n) => n + 1);
+    requestAnimationFrame(() => document.querySelector(".tabs [role='tab'][aria-selected='true']")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
+
   const advance = async () => {
     setAdvancing(true);
     setAdvanceError("");
@@ -164,16 +180,22 @@ export default function OpportunityPage() {
               Delete
             </button>
           ) : null}
-          {canEdit && next !== null && opp.lifecycle === "Active" ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={advance}
-              disabled={!gate.canAdvance || advancing}
-              title={gate.canAdvance ? undefined : gate.missing.join(", ")}
-            >
-              {advancing ? "Moving…" : `Advance to ${stageById(next).short}`} <ArrowRight size={16} />
-            </button>
+          {canAdvanceFrom(user, current) && next !== null && opp.lifecycle === "Active" ? (
+            current === 2 ? (
+              <button type="button" className="btn btn-primary" onClick={openHandover}>
+                <Send size={16} /> Send to {stageById(next).short} <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={advance}
+                disabled={!gate.canAdvance || advancing}
+                title={gate.canAdvance ? undefined : gate.missing.join(", ")}
+              >
+                {advancing ? "Moving…" : `Advance to ${stageById(next).short}`} <ArrowRight size={16} />
+              </button>
+            )
           ) : null}
         </div>
       </div>
@@ -230,7 +252,11 @@ export default function OpportunityPage() {
           ) : viewing === 1 ? (
             <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : viewing === 2 ? (
-            <EstimationPanel key={opp.id} opp={opp} unit={unit} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} />
+            <EstimationPanel key={opp.id} opp={opp} unit={unit} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} focusHandover={handoverAsk} onSent={() => setViewStage(null)} />
+          ) : viewing === PROPOSAL_STAGE_ID ? (
+            <ProposalStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} onMoved={() => dispatch(fetchOpportunity(opp.id))} />
+          ) : viewing === APPROVALS_STAGE.id ? (
+            <ApprovalsStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : viewing === PROCUREMENT_STAGE.id ? (
             <ProcurementStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
           ) : (

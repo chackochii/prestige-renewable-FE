@@ -81,7 +81,14 @@ export function advanceState(opp, { quote, user } = {}) {
   if (Number(opp.stage) >= LAST_STAGE) return { canAdvance: false, missing: ["Already at the final stage"] };
   const stage = Number(opp.stage);
   const missing =
-    stage === 1 ? leadGateItems(opp) : stage === 2 ? [...estimationGateItems(opp), ...quoteGateItems(quote)] : [];
+    stage === 1
+      ? leadGateItems(opp)
+      : stage === 2
+        ? [...estimationGateItems(opp), ...quoteGateItems(quote)]
+        : stage === 3
+          ? // The customer accepting (online, or recorded by sales) moves the job on by itself.
+            ["Customer accepts the proposal — the job then moves on to Approvals by itself"]
+          : [];
   // Listed last: the checklist tells them what the record still needs, this
   // tells them it is not theirs to move even once it is complete.
   const denied = user === undefined ? null : advanceDeniedReason(user, stage);

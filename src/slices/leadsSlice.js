@@ -95,6 +95,14 @@ export const advanceStage = createAsyncThunk("leads/advance", async (id, { rejec
   }
 });
 
+export const handOverToProposal = createAsyncThunk("leads/estimation/handover", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.handOverToProposal(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
 export const deleteLead = createAsyncThunk("leads/delete", async (id, { rejectWithValue }) => {
   try {
     await api.deleteLead(id);
@@ -498,6 +506,7 @@ const leadsSlice = createSlice({
       .addCase(createLead.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(updateLead.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(advanceStage.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(handOverToProposal.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(deleteLead.fulfilled, (state, action) => {
         state.items = state.items.filter((o) => o.id !== action.payload);
         if (state.selected?.id === action.payload) state.selected = null;

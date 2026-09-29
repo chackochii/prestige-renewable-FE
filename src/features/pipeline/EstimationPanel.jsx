@@ -1,6 +1,7 @@
 // Stage-2 work: the estimation workflow, as one module split into tabs —
 // requirements (from sales, the requirements checklist, client input), the
-// estimator checklist, the pre-site visit and the quote. Every tab can be
+// estimator checklist, the pre-site visit, the quote, the variation check,
+// and sending the finished quote on to proposal. Every tab can be
 // opened to review what was entered; a step that isn't unlocked yet says what
 // has to happen first rather than disappearing.
 //
@@ -51,6 +52,7 @@ import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import { inspectionRequests, requestCode } from "@/constants/collaboration";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
 import VariationCheck from "@/features/pipeline/VariationCheck";
+import ProposalHandover from "@/features/pipeline/ProposalHandover";
 import { leadMandatoryItems } from "@/helpers/leadChecklist";
 import { DRAWING_CATEGORY, PERMIT_OPTIONS } from "@/constants/estimationInput";
 import { estimationInputFromOpp } from "@/constants/estimationInput";
@@ -144,7 +146,9 @@ const formFromOpp = (opp) => ({
   preSiteInspectionRequired: opp.estimationPreSiteInspectionRequired ?? null,
 });
 
-export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
+// focusHandover: bump it to open the "Send to proposal" tab (the page's
+// header button does). onSent: runs once the job has moved on.
+export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusHandover = 0, onSent }) {
   const dispatch = useAppDispatch();
   const { notify, error: notifyError } = useNotifications();
   const attachments = useAppSelector((s) => s.leads.attachments);
@@ -288,6 +292,10 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
     return showQuoteBuilder ? "quote" : "requirements";
   });
 
+  useEffect(() => {
+    if (focusHandover) setTab("handover");
+  }, [focusHandover]);
+
   const tabIcon = (done, icon) => (done ? <Check size={14} /> : icon);
   const tabs = [
     { key: "requirements", label: "Requirements", icon: tabIcon(requirementsDone, <ClipboardList size={14} />) },
@@ -295,6 +303,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
     { key: "quote", label: "Quote", icon: tabIcon(quoteDone, <Receipt size={14} />) },
     { key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> },
     { key: "variations", label: "Variations", icon: <BadgeDollarSign size={14} /> },
+    { key: "handover", label: "Send to proposal", icon: tabIcon(Number(opp.stage) > 2, <Send size={14} />) },
   ];
 
   // Why the checklist and site-visit tabs are closed, depending on how far
@@ -558,11 +567,27 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead }) {
 
       {tab === "variations" ? (
         showQuoteBuilder && quoteDone ? (
-          <VariationCheck opp={opp} canEdit={canEdit} />
+          <>
+            <VariationCheck opp={opp} canEdit={canEdit} />
+            <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("handover")}>
+              Continue to send to proposal
+            </button>
+          </>
         ) : (
           <LockedStep
             title="Nothing to check yet"
             body="The variation check compares the quote with the default price list — create the quote and add items first."
+          />
+        )
+      ) : null}
+
+      {tab === "handover" ? (
+        showQuoteBuilder && quoteDone ? (
+          <ProposalHandover opp={opp} unit={unit} onReviewVariations={() => setTab("variations")} onSent={onSent} />
+        ) : (
+          <LockedStep
+            title="Nothing to send yet"
+            body="Sending to proposal opens once the quote is created and has at least one priced item."
           />
         )
       ) : null}

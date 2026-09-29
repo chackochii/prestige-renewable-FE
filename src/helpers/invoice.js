@@ -150,7 +150,20 @@ export function invoiceFileName({ quote, version }) {
 export function matchesSnapshot({ opp, quote }, version) {
   if (!version?.snapshot) return false;
   const current = invoiceSnapshot({ opp, quote });
-  return JSON.stringify(current.quote) === JSON.stringify(version.snapshot.quote);
+  return stableJson(current.quote) === stableJson(version.snapshot.quote);
+}
+
+/**
+ * JSON with object keys sorted. A saved snapshot comes back from Postgres
+ * JSONB with its keys re-ordered (shortest first), so a plain JSON.stringify
+ * never matched the live quote and every save looked like a change.
+ */
+function stableJson(value) {
+  return JSON.stringify(value, (key, inner) =>
+    inner && typeof inner === "object" && !Array.isArray(inner)
+      ? Object.fromEntries(Object.keys(inner).sort().map((k) => [k, inner[k]]))
+      : inner,
+  );
 }
 
 // ---- Drawing ----------------------------------------------------------------

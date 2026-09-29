@@ -27,6 +27,14 @@ export async function advanceOpportunity(id) {
   return unwrap(await apiClient.post(`/opportunities/${id}/advance`));
 }
 
+/**
+ * Estimation sends its saved quote on to proposal: the stage-2 advance with a
+ * note to sales. body: { quoteVersionId?, note? } → the opportunity, moved on.
+ */
+export async function handOverToProposal(id, body = {}) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/estimation/handover`, body));
+}
+
 /** Only records still at stage 1 can be removed. */
 export async function deleteLead(id) {
   await apiClient.delete(`/opportunities/${id}`);

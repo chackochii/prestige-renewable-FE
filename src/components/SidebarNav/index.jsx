@@ -14,6 +14,7 @@ import {
   Megaphone,
   Receipt,
   Search,
+  Send,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -32,6 +33,7 @@ const ICONS = {
   home: House,
   leads: ClipboardCheck,
   pipeline: Briefcase,
+  proposals: Send,
   marketing: Megaphone,
   approvals: FileText,
   procurement: ShoppingCart,
@@ -62,7 +64,7 @@ export default function SidebarNav({ open, onClose, onSearch }) {
         <UnitBrandMark unit={unit} size={36} />
         <div>
           <div className="brand-name">
-            Prestige
+            {/* Prestige */}
             {unit?.code ? <span className="brand-tag">{unit.code}</span> : null}
           </div>
           <div className="brand-sub">{unit?.name || "Lead to service"}</div>

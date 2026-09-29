@@ -122,30 +122,8 @@ export const PO_STATUSES = {
   delivered: { key: "delivered", label: "Delivered", tone: "success" },
 };
 
-/** The admin team behind this stage, as the process chart lists them. */
-export const ADMIN_TEAM = [
-  {
-    name: "Hema",
-    title: "Admin coordinator",
-    duties: [
-      "Sales team coordination",
-      "Admin team management",
-      "Social media team coordination",
-      "Electrician & roofers job assignment",
-      "Internal & external electrician invoicing",
-    ],
-  },
-  {
-    name: "Arshitha",
-    title: "Finance & procurement",
-    duties: ["Loan", "Finance", "Invoice", "PO", "Tax filing", "Material purchase & schedule delivery"],
-  },
-  {
-    name: "Monisha",
-    title: "Green Deal & after-sales",
-    duties: ["Green Deal", "Invoice payment chasing", "PDRS", "PTC", "STC", "After sales support"],
-  },
-];
+/** The admin team behind this stage — shared with approvals (see ./adminTeam). */
+export { ADMIN_TEAM } from "./adminTeam";
 
 // ---- Jobs -------------------------------------------------------------------
 // Four jobs, each parked at a different point in the flow so every branch of

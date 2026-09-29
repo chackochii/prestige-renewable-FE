@@ -21,7 +21,7 @@ export default function QuotesPage() {
     .filter((o) => Number(o.stage) >= 3)
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   const quoted = rows.reduce((s, o) => s + (Number(o.acceptedValue) || Number(o.estimatedValue) || 0), 0);
-  const accepted = rows.filter((o) => Number(o.stage) >= 4 || ["Won", "Closed"].includes(o.lifecycle));
+  const accepted = rows.filter((o) => Number(o.stage) >= 5 || ["Won", "Closed"].includes(o.lifecycle));
   const acceptedValue = accepted.reduce((s, o) => s + (Number(o.acceptedValue) || 0), 0);
 
   return (

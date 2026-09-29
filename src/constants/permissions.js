@@ -28,6 +28,7 @@ export const pageViewPermission = (pageCode) => `page.${pageCode}.view`;
 export const PAGE_CODES = {
   LEADS: "leads",
   PIPELINE: "pipeline",
+  PROPOSALS: "proposals",
   MARKETING: "marketing",
   APPROVALS: "approvals",
   PROCUREMENT: "procurement",

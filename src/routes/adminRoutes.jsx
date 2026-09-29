@@ -24,6 +24,7 @@ const LeadsPage = lazy(() => import("@/pages/admin/LeadsPage"));
 const NewLeadPage = lazy(() => import("@/pages/admin/NewLeadPage"));
 const OpportunityPage = lazy(() => import("@/pages/admin/OpportunityPage"));
 const PipelinePage = lazy(() => import("@/pages/admin/PipelinePage"));
+const ProposalsPage = lazy(() => import("@/pages/admin/ProposalsPage"));
 const MarketingPage = lazy(() => import("@/pages/admin/MarketingPage"));
 const ApprovalsPage = lazy(() => import("@/pages/admin/ApprovalsPage"));
 const ProcurementPage = lazy(() => import("@/pages/admin/ProcurementPage"));
@@ -51,6 +52,7 @@ export const workspaceRoutes = [
   { path: "opportunities", element: <Navigate to="/pipeline" replace /> },
   { path: "opportunities/:id", element: permission(PERMISSIONS.LEADS_READ, <OpportunityPage />) },
   { path: "pipeline", element: page(PAGE_CODES.PIPELINE, <PipelinePage />) },
+  { path: "proposals", element: page(PAGE_CODES.PROPOSALS, <ProposalsPage />) },
   { path: "marketing", element: page(PAGE_CODES.MARKETING, <MarketingPage />) },
   { path: "approvals", element: page(PAGE_CODES.APPROVALS, <ApprovalsPage />) },
   { path: "procurement", element: page(PAGE_CODES.PROCUREMENT, <ProcurementPage />) },

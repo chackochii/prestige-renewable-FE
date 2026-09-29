@@ -1,4 +1,7 @@
-// The 9 pipeline stages, matching prestige-be (Opportunity.stage 1–9).
+// The pipeline stages, matching prestige-be (Opportunity.stage 1–9). Stage 4
+// (Sales closure) is retired: a client accepting the proposal sends the job
+// straight to Approvals, as the Sydpro process chart has it. Numbers are never
+// reused, so stage ids stay 1–9 with 4 simply absent.
 // Business units may disable stages via config (enabledStages); disabled
 // stages are skipped, never renumbered.
 
@@ -23,14 +26,7 @@ export const STAGES = [
     key: "proposal",
     short: "Proposal",
     label: "Proposal & negotiation",
-    description: "Controlled proposal generated from the selected option, presented to the customer and negotiated.",
-  },
-  {
-    id: 4,
-    key: "closure",
-    short: "Closure",
-    label: "Sales closure",
-    description: "Signed acceptance recorded; the deposit billing request is raised and the job baseline is set.",
+    description: "The sales rep reviews the final quote, applies any approved discount and emails it to the client, then follows up until the client accepts (on to Approvals) or declines.",
   },
   {
     id: 5,
@@ -72,8 +68,12 @@ export const STAGES = [
 export const FIRST_STAGE = 1;
 export const LAST_STAGE = 9;
 
+// A record still at retired stage 4 was already won, so it reads as Approvals.
+const RETIRED_TO = { 4: 5 };
+
 export function stageById(id) {
-  return STAGES.find((s) => s.id === Number(id)) || STAGES[0];
+  const n = RETIRED_TO[Number(id)] ?? Number(id);
+  return STAGES.find((s) => s.id === n) || STAGES[0];
 }
 
 /** Stages a business unit runs, in order. */

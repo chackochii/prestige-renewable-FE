@@ -7,6 +7,7 @@ import EnquiryPage from "@/pages/public/EnquiryPage";
 import LoginPage from "@/pages/public/LoginPage";
 import LogoutPage from "@/pages/public/LogoutPage";
 import SiteVisitPage from "@/pages/public/SiteVisitPage";
+import ProposalPage from "@/pages/public/ProposalPage";
 import RouteErrorPage from "@/pages/public/RouteErrorPage";
 import { RedirectIfAuthenticated } from "./routeGuards";
 
@@ -29,6 +30,8 @@ export const publicRoutes = [
       // Same again for the site-visit report: the token in the link is the
       // whole of the caller's authority, so no sign-in and no app shell.
       { path: "/site-visit/:token", element: <SiteVisitPage /> },
+      // The customer's proposal, from the link in the email sales sent them.
+      { path: "/proposal/:token", element: <ProposalPage /> },
     ],
   },
 ];
