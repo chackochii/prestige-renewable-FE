@@ -1,5 +1,6 @@
 // Stage 5 on an opportunity: the same approvals workflow the approvals page
-// shows, where people work the job. Looks the record up in the sample data by
+// shows — the tracks, the coordinator's checklists and the job's answer —
+// where people work the job. Looks the record up in the sample data by
 // opportunity number until the approvals service is connected; a job with no
 // approvals record yet says so and points at the approvals page.
 
@@ -9,12 +10,17 @@ import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import ApprovalWorkflow from "@/features/approvals/ApprovalWorkflow";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
-import { APPROVAL_JOBS, APPROVALS_STAGE } from "@/lib/mockData/approvals";
+import { PERMISSIONS } from "@/constants/permissions";
 import { stageById } from "@/constants/stages";
+import { useApprovalChecklists } from "@/hooks/useApprovalChecklists";
+import { useAuth } from "@/hooks/useAuth";
+import { APPROVAL_JOBS, APPROVALS_STAGE } from "@/lib/mockData/approvals";
 
 export default function ApprovalsStagePanel({ opp, unit, canEdit = false }) {
   const stage = stageById(APPROVALS_STAGE.id);
-  const job = APPROVAL_JOBS.find((candidate) => candidate.number === opp?.number) ?? null;
+  const { hasPermission } = useAuth();
+  const { jobs, update } = useApprovalChecklists(APPROVAL_JOBS);
+  const job = jobs.find((candidate) => candidate.number === opp?.number) ?? null;
 
   return (
     <div className="card card-pad">
@@ -33,7 +39,12 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false }) {
       </p>
 
       {job ? (
-        <ApprovalWorkflow job={job} embedded />
+        <ApprovalWorkflow
+          job={job}
+          canEdit={hasPermission(PERMISSIONS.APPROVALS_UPDATE)}
+          onChecklistChange={(sectionKey, patch) => update(job, sectionKey, patch)}
+          embedded
+        />
       ) : (
         <EmptyState
           icon={<SquareCheckBig size={26} strokeWidth={1.5} />}

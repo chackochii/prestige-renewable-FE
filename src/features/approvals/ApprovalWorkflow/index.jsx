@@ -1,40 +1,60 @@
-// One job's passage through approvals: the four tracks and the "All approved?"
-// gate, the finance application, the notifications raised and the history.
+// One job's passage through approvals: the overview (the four tracks and the
+// "All approved?" gate), the Operations Coordinator's checklists — CL-07 DNSP
+// application, CL-08 DA applicability and CL-09 finance application — the
+// notifications raised and the history. Once every approval is through the
+// job goes to procurement, where it is created in Green Deal (CL-10).
+//
+// `job` comes from useApprovalChecklists: its tracks are driven by its
+// checklist answers, and `onChecklistChange(sectionKey, patch)` changes them.
+// `canEdit` — the person may complete the checklists (approvals.update).
 //
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-5 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { BellRing, ClipboardCheck, Clock, Landmark, SquareCheckBig } from "lucide-react";
+import { BellRing, Building2, ClipboardCheck, Clock, Landmark, Plug, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
+import ChecklistOverview from "@/components/ChecklistOverview";
 import Tabs from "@/components/Tabs";
 import ApprovalBoard from "@/features/approvals/ApprovalBoard";
+import ApprovalChecklist from "@/features/approvals/ApprovalChecklist";
 import ApprovalNotifications from "@/features/approvals/ApprovalNotifications";
-import FinanceApproval from "@/features/approvals/FinanceApproval";
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
-import { applicableItems, approvalStatus, financeRequired, isOverdue } from "@/helpers/approvals";
+import { APPROVAL_CHECKLISTS } from "@/constants/approvalChecklists";
+import { approvalContext } from "@/helpers/approvalChecklist";
+import { approvalStatus, isOverdue } from "@/helpers/approvals";
+import { checklistSummary } from "@/helpers/checklist";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 
-export default function ApprovalWorkflow({ job, embedded = false }) {
-  const [tab, setTab] = useState("approvals");
+const CHECKLIST_ICONS = { dnsp: Plug, da: Building2, finance: Landmark };
 
-  // A different job opens on its approvals, not wherever the last one was.
+export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, embedded = false }) {
+  const [tab, setTab] = useState("overview");
+
+  // A different job opens on its overview, not wherever the last one was.
   useEffect(() => {
-    setTab("approvals");
+    setTab("overview");
   }, [job?.id]);
 
   if (!job) return null;
 
   const status = approvalStatus(job);
+  const checklist = job.checklist ?? {};
+  const ctx = approvalContext(checklist);
+  const checklists = APPROVAL_CHECKLISTS.map((section) => ({ section, summary: checklistSummary(section, checklist[section.key] ?? {}, ctx) }));
   const tabs = [
-    { key: "approvals", label: "Approvals", icon: <ClipboardCheck size={14} />, count: applicableItems(job).length },
-    ...(financeRequired(job) ? [{ key: "finance", label: "Finance", icon: <Landmark size={14} /> }] : []),
+    { key: "overview", label: "Overview", icon: <ClipboardCheck size={14} /> },
+    ...checklists.map(({ section, summary }) => {
+      const Icon = CHECKLIST_ICONS[section.key] ?? ClipboardCheck;
+      return { key: section.key, label: section.tab, icon: <Icon size={14} />, count: summary.applies ? `${summary.done}/${summary.total}` : undefined };
+    }),
     { key: "notifications", label: "Notifications", icon: <BellRing size={14} />, count: (job.notifications ?? []).length || undefined },
     { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length },
   ];
+  const section = APPROVAL_CHECKLISTS.find((candidate) => candidate.key === tab) ?? null;
 
   const body = (
     <>
@@ -45,10 +65,18 @@ export default function ApprovalWorkflow({ job, embedded = false }) {
       ) : null}
       <Tabs items={tabs} value={tab} onChange={setTab} />
       <div className="panel">
-        {tab === "approvals" ? (
-          <ApprovalBoard job={job} />
-        ) : tab === "finance" ? (
-          <FinanceApproval job={job} />
+        {tab === "overview" ? (
+          <>
+            <ApprovalBoard job={job} />
+            <div style={{ marginTop: 20 }}>
+              <div className="row-title" style={{ marginBottom: 8 }}>
+                Checklists
+              </div>
+              <ChecklistOverview rows={checklists} onOpen={setTab} />
+            </div>
+          </>
+        ) : section ? (
+          <ApprovalChecklist section={section} job={job} canEdit={canEdit} onChange={(patch) => onChecklistChange?.(section.key, patch)} />
         ) : tab === "notifications" ? (
           <ApprovalNotifications job={job} />
         ) : (

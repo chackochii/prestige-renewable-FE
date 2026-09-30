@@ -1,10 +1,13 @@
 // Procurement & delivery (stage 6): the jobs in this stage, the team that
 // runs it, and each job's way through the BOQ → quotes → variation →
-// approvals → Green Deal flow from the Sydpro process chart.
+// approvals → orders and deliveries → Green Deal flow from the Sydpro process
+// chart, with the Operations Coordinator's checklists for each step (CL-11
+// to CL-14, then CL-10 job creation).
 //
 // Reads hardcoded records from lib/mockData/procurement.js until the
 // purchase-order service is connected; the panels take a job record, so the
-// swap is in this file, not in them.
+// swap is in this file, not in them. Checklist answers are kept in the
+// procurement slice.
 
 import { useMemo, useState } from "react";
 import { BellRing, Leaf, PackageSearch, Send } from "lucide-react";
@@ -14,13 +17,17 @@ import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
 import ProcurementTeam from "@/features/procurement/ProcurementTeam";
 import ProcurementWorkflow from "@/features/procurement/ProcurementWorkflow";
+import { PERMISSIONS } from "@/constants/permissions";
+import { useAuth } from "@/hooks/useAuth";
+import { useProcurementChecklists } from "@/hooks/useProcurementChecklists";
 import { PROCUREMENT_JOBS, PROCUREMENT_STAGE } from "@/lib/mockData/procurement";
 import { currentStep, greenDealCreated, procurementStatus, sentOrders } from "@/helpers/procurement";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 export default function ProcurementPage() {
-  const jobs = PROCUREMENT_JOBS;
+  const { hasPermission } = useAuth();
+  const { jobs, update } = useProcurementChecklists(PROCUREMENT_JOBS);
   const [selectedId, setSelectedId] = useState(jobs[0]?.id ?? null);
   const selected = jobs.find((job) => job.id === selectedId) ?? jobs[0] ?? null;
 
@@ -38,7 +45,7 @@ export default function ProcurementPage() {
     <>
       <PageHeader
         title={PROCUREMENT_STAGE.label}
-        description="Verify the bill of quantities against the site, get quotes, clear any price variation with the right approvers, then raise the Green Deal job for construction."
+        description="Check the bill of quantities against the site, confirm the supplier quote, clear any price variation with the right approvers, release the purchase orders and receive the materials, then create the Green Deal job for construction — each step through its checklist."
         actions={<Badge tone="neutral">Sample data — purchase-order service not connected</Badge>}
       />
 
@@ -110,7 +117,12 @@ export default function ProcurementPage() {
       </div>
 
       <div style={{ marginTop: 20 }}>
-        <ProcurementWorkflow job={selected} />
+        <ProcurementWorkflow
+          job={selected}
+          canEdit={hasPermission(PERMISSIONS.PROCUREMENT_UPDATE)}
+          canApprove={hasPermission(PERMISSIONS.PROCUREMENT_APPROVE)}
+          onChecklistChange={(sectionKey, patch) => update(selected, sectionKey, patch)}
+        />
       </div>
     </>
   );

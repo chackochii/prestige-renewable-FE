@@ -1,32 +1,51 @@
 // One job's passage through procurement & delivery: the step strip across the
-// top says where it is, the tabs open each step's records. The tab opens on
-// the job's current step, and steps the job has not reached yet say what has
-// to happen first rather than showing an empty screen.
+// top says where it is, the tabs open each step's records with the
+// checklist that belongs to it — CL-11 BOQ vs site with the BOQ table, CL-12
+// supplier quote with the quotes received, the price variation and its
+// approvals, CL-13 PO release with the purchase orders, CL-14 material
+// receipt with the deliveries, and CL-10 job creation in Green Deal, which
+// opens once the variation approval and the material receipt are complete.
+//
+// `job` comes from useProcurementChecklists (it carries `checklist`, and its
+// Green Deal record follows CL-10); `onChecklistChange(sectionKey, patch)`
+// changes the answers. `canEdit` — may complete the coordinator's items
+// (procurement.update); `canApprove` — may sign the Procurement Manager's
+// (procurement.approve).
 //
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-6 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { BellRing, ClipboardCheck, Clock, Leaf, PackageSearch, Percent, Truck } from "lucide-react";
+import { BellRing, ClipboardCheck, Clock, FileText, Leaf, PackageCheck, PackageSearch, Percent, Truck } from "lucide-react";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
 import Tabs from "@/components/Tabs";
 import ApprovalsPanel from "@/features/procurement/ApprovalsPanel";
 import BoqVerification from "@/features/procurement/BoqVerification";
-import GreenDealJobCreation from "@/features/procurement/GreenDealJobCreation";
+import Deliveries from "@/features/procurement/Deliveries";
 import PriceVariationCheck from "@/features/procurement/PriceVariationCheck";
+import ProcurementChecklist from "@/features/procurement/ProcurementChecklist";
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
 import PurchaseOrders from "@/features/procurement/PurchaseOrders";
+import SupplierQuotes from "@/features/procurement/SupplierQuotes";
 import WorkflowSteps from "@/features/procurement/WorkflowSteps";
-import { boqLines, currentRound, currentStep, procurementStatus, purchaseOrders, requiredApprovers } from "@/helpers/procurement";
+import { PROCUREMENT_CHECKLISTS, procurementChecklistOf } from "@/constants/procurementChecklists";
+import { checklistSummary } from "@/helpers/checklist";
+import { currentRound, currentStep, procurementStatus, requiredApprovers } from "@/helpers/procurement";
+import { jobCreationBlocker, procurementContext } from "@/helpers/procurementChecklist";
 import { formatCurrency } from "@/utils/formatCurrency";
 
-// The BOQ table and the matching decision are one screen; "done" opens on
-// the Green Deal record, which is where a finished job's evidence lives.
-const tabForStep = (step) => (step === "matching" ? "boq" : step === "done" ? "green_deal" : step);
-const stepForTab = (tab, step) => (tab === "boq" ? (step === "matching" ? "matching" : "boq") : tab === "history" ? null : tab);
+// Which tab each step of the strip opens, and which step a tab sits in. The
+// BOQ table and the matching decision are one screen; getting quotes is part
+// of matching; releasing orders and receiving them are both "delivery"; "done"
+// opens on the Green Deal record, where a finished job's evidence lives.
+const TAB_FOR_STEP = { boq: "boq", matching: "boq", variation: "variation", approvals: "approvals", delivery: "po", green_deal: "green_deal", done: "green_deal" };
+const STEP_FOR_TAB = { quote: "matching", variation: "variation", approvals: "approvals", po: "delivery", receipt: "delivery", green_deal: "green_deal" };
+const SECTION_FOR_TAB = { boq: "boq", quote: "quote", po: "po", receipt: "receipt", green_deal: "jobCreation" };
+const tabForStep = (step) => TAB_FOR_STEP[step] ?? "boq";
+const stepForTab = (tab, step) => (tab === "boq" ? (step === "matching" ? "matching" : "boq") : (STEP_FOR_TAB[tab] ?? null));
 
-export default function ProcurementWorkflow({ job, embedded = false }) {
+export default function ProcurementWorkflow({ job, canEdit = false, canApprove = false, onChecklistChange, embedded = false }) {
   const step = currentStep(job);
   const [tab, setTab] = useState(tabForStep(step));
 
@@ -38,14 +57,31 @@ export default function ProcurementWorkflow({ job, embedded = false }) {
   if (!job) return null;
 
   const status = procurementStatus(job);
+  const checklist = job.checklist ?? {};
+  const ctx = procurementContext(job, checklist);
+  const summaries = Object.fromEntries(
+    PROCUREMENT_CHECKLISTS.map((section) => [
+      section.key,
+      checklistSummary(section, checklist[section.key] ?? {}, ctx, { locked: Boolean(section.afterMaterials && jobCreationBlocker(job, checklist)) }),
+    ]),
+  );
+  const count = (key) => (summaries[key].locked ? undefined : `${summaries[key].done}/${summaries[key].total}`);
   const tabs = [
-    { key: "boq", label: "BOQ & matching", icon: <ClipboardCheck size={14} />, count: boqLines(job).length },
+    { key: "boq", label: "BOQ vs site", icon: <ClipboardCheck size={14} />, count: count("boq") },
+    { key: "quote", label: "Supplier quote", icon: <FileText size={14} />, count: count("quote") },
     { key: "variation", label: "Price variation", icon: <Percent size={14} /> },
     { key: "approvals", label: "Approvals", icon: <BellRing size={14} />, count: requiredApprovers(job).length || undefined },
-    { key: "delivery", label: "POs & delivery", icon: <Truck size={14} />, count: purchaseOrders(job).length || undefined },
-    { key: "green_deal", label: "Green Deal job", icon: <Leaf size={14} /> },
+    { key: "po", label: "PO release", icon: <Truck size={14} />, count: count("po") },
+    { key: "receipt", label: "Material receipt", icon: <PackageCheck size={14} />, count: count("receipt") },
+    { key: "green_deal", label: "Job creation", icon: <Leaf size={14} />, count: count("jobCreation") },
     { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length },
   ];
+
+  const section = procurementChecklistOf(SECTION_FOR_TAB[tab]);
+  const checklistFor = (key) => {
+    const entry = procurementChecklistOf(key);
+    return <ProcurementChecklist section={entry} job={job} canEdit={canEdit} canApprove={canApprove} onChange={(patch) => onChecklistChange?.(entry.key, patch)} />;
+  };
 
   const body = (
     <>
@@ -53,15 +89,33 @@ export default function ProcurementWorkflow({ job, embedded = false }) {
       <Tabs items={tabs} value={tab} onChange={setTab} />
       <div className="panel">
         {tab === "boq" ? (
-          <BoqVerification job={job} />
+          <>
+            <BoqVerification job={job} />
+            <div className="cl-divider" />
+            {checklistFor("boq")}
+          </>
+        ) : tab === "quote" ? (
+          <>
+            <SupplierQuotes job={job} />
+            {checklistFor("quote")}
+          </>
         ) : tab === "variation" ? (
           <PriceVariationCheck job={job} />
         ) : tab === "approvals" ? (
           <ApprovalsPanel job={job} />
-        ) : tab === "delivery" ? (
-          <PurchaseOrders job={job} />
-        ) : tab === "green_deal" ? (
-          <GreenDealJobCreation job={job} />
+        ) : tab === "po" ? (
+          <>
+            <PurchaseOrders job={job} />
+            <div className="cl-divider" />
+            {checklistFor("po")}
+          </>
+        ) : tab === "receipt" ? (
+          <>
+            <Deliveries job={job} />
+            {checklistFor("receipt")}
+          </>
+        ) : section ? (
+          checklistFor(section.key)
         ) : (
           <ProcurementHistory job={job} />
         )}

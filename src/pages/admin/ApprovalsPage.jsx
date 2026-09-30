@@ -1,10 +1,11 @@
 // Approvals (stage 5): the jobs waiting on DA, DNSP, finance and additional
-// approvals, the rules the stage runs on, the team, and each job's way
-// through the "All approved?" gate from the Sydpro process chart.
+// approvals, the Operations Coordinator's checklists for each (CL-07 DNSP,
+// CL-08 DA, CL-09 finance), the rules the stage runs on, the team, and each
+// job's way through the "All approved?" gate from the Sydpro process chart.
 //
 // Reads hardcoded records from lib/mockData/approvals.js until the approvals
 // service is connected; the panels take a job record, so the swap is in this
-// file, not in them.
+// file, not in them. Checklist answers are kept in the approvals slice.
 
 import { useMemo, useState } from "react";
 import { AlarmClock, CircleCheck, CornerUpLeft, Hourglass, SquareCheckBig } from "lucide-react";
@@ -15,13 +16,18 @@ import StatCard from "@/components/StatCard";
 import ApprovalRules from "@/features/approvals/ApprovalRules";
 import ApprovalWorkflow from "@/features/approvals/ApprovalWorkflow";
 import ProcurementTeam from "@/features/procurement/ProcurementTeam";
+import { PERMISSIONS } from "@/constants/permissions";
+import { useApprovalChecklists } from "@/hooks/useApprovalChecklists";
+import { useAuth } from "@/hooks/useAuth";
 import { APPROVAL_JOBS, APPROVALS_STAGE } from "@/lib/mockData/approvals";
 import { approvalItems, approvalOutcome, approvalStatus, isOverdue, itemStatus } from "@/helpers/approvals";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 export default function ApprovalsPage() {
-  const jobs = APPROVAL_JOBS;
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
+  const { jobs, update } = useApprovalChecklists(APPROVAL_JOBS);
   const [selectedId, setSelectedId] = useState(jobs[0]?.id ?? null);
   const selected = jobs.find((job) => job.id === selectedId) ?? jobs[0] ?? null;
 
@@ -39,7 +45,7 @@ export default function ApprovalsPage() {
     <>
       <PageHeader
         title={APPROVALS_STAGE.label}
-        description="DA, DNSP, finance and any additional approvals, run side by side. When every one is in, the job moves to procurement; if one is not given, it goes back to its salesperson."
+        description="DA, DNSP, finance and any additional approvals, run side by side — each worked through its checklist by the Operations Coordinator. When every one is in, the job moves to procurement; if one is not given, it goes back to its salesperson."
         actions={<Badge tone="neutral">Sample data — approvals service not connected</Badge>}
       />
 
@@ -112,7 +118,7 @@ export default function ApprovalsPage() {
       </Card>
 
       <div style={{ marginTop: 20 }}>
-        <ApprovalWorkflow job={selected} />
+        <ApprovalWorkflow job={selected} canEdit={canEdit} onChecklistChange={(sectionKey, patch) => update(selected, sectionKey, patch)} />
       </div>
 
       <div className="grid-2" style={{ marginTop: 20 }}>

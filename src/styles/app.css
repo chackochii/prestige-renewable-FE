@@ -989,6 +989,44 @@
 .approval-gate-exit.taken.rejected { border-color: var(--danger); background: var(--danger-bg); }
 .approval-gate-exit.waiting { opacity: 1; border-style: dashed; }
 
+/* ---- Stage checklists (approvals CL-07/08/09, procurement CL-10 to CL-14) — components/ChecklistForm */
+.cl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.cl-title { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.cl-applies { margin: 0 0 12px; font-weight: 600; }
+.cl-lock { display: flex; align-items: center; gap: 8px; }
+.cl-items { margin-top: 14px; }
+.cl-item { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.cl-items > .cl-item:first-child { border-top: 0; padding-top: 4px; }
+.cl-no {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  background: var(--surface-2); color: var(--muted); margin-top: 1px;
+}
+.cl-item.done .cl-no { background: var(--success-bg); color: var(--success); }
+.cl-body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.cl-label { font-weight: 600; font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cl-divider { border-top: 1px solid var(--line); margin: 20px 0 16px; }
+.cl-body input:not([type="checkbox"]):not([type="radio"]), .cl-body select, .cl-body textarea { width: 100%; }
+.cl-body > .field { max-width: 460px; }
+.cl-check { margin: 0; font-weight: 500; align-items: center; }
+.cl-check input { width: 18px; height: 18px; flex-shrink: 0; }
+.cl-note { white-space: normal; }
+.cl-not-needed { white-space: normal; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.cl-auto { max-width: 560px; }
+.cl-auto .list-row { padding: 8px 12px; align-items: baseline; }
+.cl-auto .list-row > .row-meta:first-child { flex-shrink: 0; white-space: nowrap; }
+.cl-auto .list-row > .row-title { white-space: normal; min-width: 0; }
+.cl-missing { color: var(--warning); }
+.cl-grid { max-width: 640px; }
+.cl-action { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cl-files { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cl-files .list-stack { width: 100%; }
+.cl-filename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.cl-slot { border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.cl-slot-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cl-blockers { white-space: normal; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.cl-summary-row:hover { background: var(--surface-2); }
+
 /* The customer's proposal page (/proposal/:token): public, no app shell. */
 @layer components {
   .proposal-public { min-height: 100vh; min-height: 100dvh; background: var(--paper); color: var(--ink); }

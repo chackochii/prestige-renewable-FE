@@ -335,3 +335,97 @@ export const PROCUREMENT_JOBS = [
     ],
   },
 ];
+
+// ---- Checklists -------------------------------------------------------------
+// The CL-11 / CL-12 / CL-13 / CL-14 / CL-10 answers behind each sample job,
+// worked out from how far its record has got so the checklists agree with the
+// step strip: a job whose orders are delivered has its material receipt
+// ticked; one still gathering quotes has only the BOQ table done. Once the
+// purchase-order service is connected the checklist comes back with the job.
+// Worked from the raw record rather than helpers/procurement.js, which
+// imports this file.
+
+const day = (iso) => (iso ? iso.slice(0, 10) : "");
+const file = (name) => ({ id: name, filename: name });
+const isQuoted = (line) => line.quotedUnitCost !== null && line.quotedUnitCost !== undefined;
+
+export function sampleProcurementChecklist(job) {
+  const lines = job.boq ?? [];
+  const quoted = lines.length > 0 && lines.every(isQuoted);
+  const quotes = job.quotes ?? [];
+  const suppliers = quotes.map((quote) => quote.supplier);
+  const orders = job.purchaseOrders ?? [];
+  const sent = orders.filter((order) => order.status !== "draft");
+  const delivered = sent.length > 0 && sent.every((order) => order.status === "delivered");
+  const approvals = job.approvals ?? [];
+  const approvalsDone = approvals.length > 0 && approvals.every((approval) => approval.status === "approved");
+  const verified = (job.history ?? []).some((entry) => entry.action === "BOQ / BOS verified");
+  const revision = (job.revisions ?? [])[job.revisions.length - 1];
+  const mismatched = lines.filter((line) => Number(line.proposalQty) !== Number(line.siteQty));
+  const quotedTotal = quoted ? Math.round(lines.reduce((sum, line) => sum + Number(line.siteQty) * Number(line.quotedUnitCost), 0)) : null;
+  const firstDelivery = orders.map((order) => order.scheduledFor || order.deliveryEta).filter(Boolean).sort()[0] ?? day(job.slaDueAt);
+  const changes = revision
+    ? `${revision.reason} — approved`
+    : mismatched.length
+      ? `${mismatched.map((line) => `${line.item} ${line.proposalQty} → ${line.siteQty}`).join(", ")} — approved by the procurement manager`
+      : "No changes — the BOQ stands as proposed";
+
+  return {
+    boq: verified
+      ? { boqMatches: true, materialsIncluded: true, quantitiesCorrect: true, siteRequirementsIncluded: true, changesApproved: true, changesApprovedDetails: changes }
+      : {},
+    quote: quoted
+      ? {
+          quoteCurrentConfirmed: true,
+          quoteFile: suppliers.map((supplier) => file(`${job.number}-quote-${supplier.replace(/\W+/g, "-")}.pdf`)),
+          supplierApproved: true,
+          quoteMatchesBoq: true,
+          quotesCompared: true,
+          comparedSuppliers: suppliers.join(", "),
+          pricingConfirmed: true,
+          stockConfirmed: true,
+          fulfilmentMethod: "delivery",
+          fulfilmentDate: firstDelivery,
+          fulfilmentTime: "08:00",
+          freightCharges: 180,
+          paymentDueDate: quotes[0]?.validUntil ?? "",
+          termsConfirmed: true,
+          finalQuoteFile: [file(`${job.number}-final-quotes.pdf`)],
+        }
+      : quotes.length
+        ? { supplierApproved: true }
+        : {},
+    po: quoted
+      ? {
+          basisConfirmed: true,
+          poAmountValue: quotedTotal,
+          poAmountMatches: true,
+          variationChecked: true,
+          variationApproved: approvalsDone,
+          variationApprovedBy: approvalsDone ? approvals.map((approval) => approval.approver).join(", ") : "",
+          supplierConfirmed: true,
+          deliveryConfirmed: true,
+          termsConfirmed: true,
+          ...(sent.length
+            ? { releaseApproved: true, poReleasedConfirmed: true, poReleasedOn: day(sent[0].sentAt), poRecords: sent.map((order) => file(`${order.number}.pdf`)) }
+            : {}),
+        }
+      : {},
+    receipt: delivered
+      ? {
+          matchesPo: true,
+          specsCorrect: true,
+          quantitiesMatch: true,
+          damageChecked: true,
+          allArrived: true,
+          discrepancyFound: "no",
+          materialsReady: true,
+          recordsUpdated: true,
+          receiptFiles: sent.map((order) => file(`${order.number}-packing-slip.pdf`)),
+        }
+      : {},
+    jobCreation: job.greenDeal?.created
+      ? { greenDealJobId: job.greenDeal.jobId, greenDealCreatedOn: day(job.greenDeal.createdAt), syncConfirmed: true, matchConfirmed: true }
+      : {},
+  };
+}

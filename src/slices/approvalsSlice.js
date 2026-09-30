@@ -1,4 +1,7 @@
-// approvals slice
+// Approvals (stage 5). `checklists` holds each job's CL-07 / CL-08 / CL-09 /
+// CL-10 answers by job id — in memory only until the approvals service is
+// connected, when saving becomes a thunk here. Shape: see
+// helpers/approvalChecklist.js.
 
 import { createSlice } from "@reduxjs/toolkit";
 
@@ -7,6 +10,7 @@ const initialState = {
   selectedId: null,
   status: "idle",
   error: null,
+  checklists: {},
 };
 
 const approvalsSlice = createSlice({
@@ -32,6 +36,12 @@ const approvalsSlice = createSlice({
     setError(state, action) {
       state.status = "failed";
       state.error = action.payload;
+    },
+    /** Merges `patch` into one section of a job's checklist; `base` is the checklist to start from when nothing is held yet. */
+    updateChecklist(state, action) {
+      const { jobId, sectionKey, patch, base } = action.payload;
+      const current = state.checklists[jobId] ?? base ?? {};
+      state.checklists[jobId] = { ...current, [sectionKey]: { ...(current[sectionKey] ?? {}), ...patch } };
     },
   },
 });

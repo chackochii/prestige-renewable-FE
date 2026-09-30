@@ -26,7 +26,7 @@ export default function ApprovalsPanel({ job }) {
   return (
     <>
       {complete ? (
-        <Alert tone="success">All required approvals received — the Green Deal job can be created.</Alert>
+        <Alert tone="success">All required approvals received — the purchase orders can be released.</Alert>
       ) : (
         <Alert tone="danger">
           Not every approval is in. Frequent high-priority notifications go to the people still to decide, and each one is
