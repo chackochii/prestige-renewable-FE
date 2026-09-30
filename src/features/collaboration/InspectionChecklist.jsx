@@ -2,14 +2,15 @@
 // bring back, with the requester ticking what this job actually needs.
 //
 // What is ticked travels with the request to the operations coordinator, who
-// hands it to whoever is attending — each ticked item becomes a field on their
-// form. Nothing is ticked by default: an inspection asked to confirm forty
-// things is an inspection nobody finishes.
+// hands it to whoever is attending. The crew member always gets the whole
+// inspection form (CL-04); each ticked item becomes required on it. Nothing
+// is ticked by default: an inspection asked to confirm forty things is an
+// inspection nobody finishes.
 
-import { INSPECTION_SECTIONS } from "@/constants/inspectionReport";
+import { INSPECTION_SECTIONS, isSelectable } from "@/constants/inspectionReport";
 
-/** Only items a person can answer; photos are asked for as document slots. */
-const askable = (field) => field.kind !== "files";
+/** Only items a person can be required to answer — see isSelectable. */
+const askable = isSelectable;
 
 export default function InspectionChecklist({ selected = [], onChange, disabled = false }) {
   const toggle = (key) =>

@@ -18,7 +18,8 @@ import Badge from "@/components/Badge";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import Field from "@/components/Field";
 import { DOCUMENT_TYPES, documentTypeLabel, siteVisitStatusMeta, siteVisitTask } from "@/constants/collaboration";
-import { inspectionChecklistFrom, inspectionFieldsFor } from "@/constants/inspectionReport";
+import { SITE_PHOTOS_KEY, inspectionChecklistFrom, inspectionFieldsFor } from "@/constants/inspectionReport";
+import InspectionReportView from "@/features/collaboration/InspectionReportView";
 import { siteVisitLink } from "@/features/collaboration/siteVisitLink";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { isBlank } from "@/utils/validators";
@@ -232,7 +233,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
               </select>
             </Field>
             <Field label="Comment" hint="what it has to show">
-              <input value={doc.comment} onChange={(e) => setDoc(i, "comment", e.target.value)} />
+              <input value={doc.comment ?? ""} onChange={(e) => setDoc(i, "comment", e.target.value)} />
             </Field>
             <div>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeDoc(i)} aria-label="Remove">
@@ -288,13 +289,8 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
                 <span className="row-meta">{formatDate(task.submittedAt, { withTime: true, timeZone })}</span>
               </div>
             ) : null}
-            {asList(task?.requestedFields).map((field) => (
-              <div key={field.key} className="list-row">
-                <span className="row-title">{field.label}</span>
-                <span className="row-meta">{response?.fields?.[field.key] || "Not answered"}</span>
-              </div>
-            ))}
           </div>
+          <InspectionReportView response={response} requestedFields={asList(task?.requestedFields)} submittedAt={task?.submittedAt} timeZone={timeZone} />
 
         </div>
       ) : task ? (
@@ -335,7 +331,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
                     </a>
                     <figcaption>
                       <span className="row-title" title={file.filename}>
-                        {slot ? slot.label : "Extra"}
+                        {slot ? slot.label : file.documentKey === SITE_PHOTOS_KEY ? "Site photos" : "Extra"}
                       </span>
                       <span className="row-meta">{file.filename}</span>
                       <span className="site-photo-actions">
