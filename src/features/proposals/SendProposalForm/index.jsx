@@ -1,12 +1,14 @@
 // Prepare the proposal email: which saved quote version, to whom, the subject
-// and the message. "Open in Gmail" creates the customer's link and opens the
-// sender's Gmail with the email written (greeting, message, link, sign-off);
-// the PDF downloads alongside for them to attach. The customer's page shows
-// the same PDF and lets them accept, ask for changes or decline.
+// and the message. "Open in email app" creates the customer's link and opens
+// the email app signed in on this device with the email written (greeting,
+// message, link, sign-off); "Open in Gmail" does the same in Gmail. The PDF
+// downloads alongside for them to attach. The customer's page shows the same
+// PDF and lets them accept, ask for changes or decline.
 //
 // The Gmail tab is opened straight from the click, before the link exists —
 // a tab opened after waiting on the server would be blocked as a popup — and
-// pointed at Gmail once the link comes back (see ProposalWorkflow).
+// pointed at Gmail once the link comes back (see ProposalWorkflow). The email
+// app needs no tab: a mail link does not leave the page.
 
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Mail } from "lucide-react";
@@ -72,7 +74,7 @@ export default function SendProposalForm({ opportunity, versions, proposals = []
     message: DEFAULT_MESSAGE,
   }));
   const [errors, setErrors] = useState({});
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null); // "mail" | "gmail" while preparing
   const [failure, setFailure] = useState("");
   const [preview, setPreview] = useState(null);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -99,8 +101,10 @@ export default function SendProposalForm({ opportunity, versions, proposals = []
     setErrors(next);
     if (Object.keys(next).length) return;
 
-    const tab = openPendingTab();
-    setBusy(true);
+    // Enter in a field submits with the first button: the email app.
+    const via = event.nativeEvent.submitter?.value === "gmail" ? "gmail" : "mail";
+    const tab = via === "gmail" ? openPendingTab() : null;
+    setBusy(via);
     setFailure("");
     try {
       const result = await sendProposal(opportunity.id, {
@@ -109,12 +113,12 @@ export default function SendProposalForm({ opportunity, versions, proposals = []
         subject: form.subject.trim() || undefined,
         message: form.message.trim() || undefined,
       });
-      onSent?.(result, tab);
+      onSent?.(result, { via, tab });
     } catch (err) {
       tab?.close();
       setFailure(getErrorMessage(err, "The proposal could not be prepared."));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -153,11 +157,14 @@ export default function SendProposalForm({ opportunity, versions, proposals = []
       ) : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
-          <Mail size={14} /> {busy ? "Preparing…" : "Open in Gmail"}
+        <button type="submit" value="mail" className="btn btn-primary btn-sm" disabled={Boolean(busy)} title="Opens the email app signed in on this device, e.g. Outlook">
+          <Mail size={14} /> {busy === "mail" ? "Preparing…" : "Open in email app"}
+        </button>
+        <button type="submit" value="gmail" className="btn btn-ghost btn-sm" disabled={Boolean(busy)} title="Opens Gmail in a new tab, signed in as your Google account">
+          <Mail size={14} /> {busy === "gmail" ? "Preparing…" : "Open in Gmail"}
         </button>
         {onCancel ? (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={Boolean(busy)}>
             Cancel
           </button>
         ) : null}

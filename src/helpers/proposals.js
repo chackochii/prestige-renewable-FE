@@ -1,7 +1,8 @@
 // Proposal (stage 3) rules shared by the proposals page, the stage-3 panel and
 // the customer's page. The flow: sales sends the customer a link to their
-// proposal from their own Gmail (the app opens it with the email written and
-// downloads the PDF to attach); the customer accepts (the job moves on to
+// proposal from their own email — the device's email app or Gmail (the app
+// opens it with the email written and downloads the PDF to attach); the
+// customer accepts (the job moves on to
 // Approvals), asks to renegotiate (sales revises the quote and sends a new
 // version), or declines. Records come from services/api/proposalsApi.js.
 
@@ -76,7 +77,7 @@ export const DEFAULT_MESSAGE = [
 /**
  * The email as the customer reads it: greeting, the sender's message, the
  * link to view and answer the proposal, and the sign-off. Plain text, because
- * a Gmail compose link can only carry plain text.
+ * an email link can only carry plain text.
  */
 export function proposalEmailBody({ customerFirstName, message, link, proposal, senderName, businessName }) {
   const total = proposal?.grandTotal !== null && proposal?.grandTotal !== undefined ? formatCurrency(proposal.grandTotal, { withCents: true }) : "";
@@ -96,15 +97,39 @@ export function proposalEmailBody({ customerFirstName, message, link, proposal, 
 }
 
 /**
- * Gmail's compose window with the email filled in. Gmail compose links carry
- * the recipient, subject and body only — a file cannot be attached this way,
- * so the PDF is downloaded alongside for the sender to drag in.
+ * A mailto: link with the email filled in. It opens the email app already
+ * signed in on the sender's device (Outlook, Mail, or Gmail when the browser
+ * hands mail links to it). Like any email link it carries the recipient,
+ * subject and body only — a file cannot be attached this way, so the PDF is
+ * downloaded alongside for the sender to drag in.
  */
-export function gmailComposeUrl({ to, subject, body }) {
-  // encodeURIComponent rather than URLSearchParams: spaces must arrive as %20,
-  // not "+", or Gmail shows the plus signs in the subject and body.
+export function mailtoUrl({ to, subject, body }) {
+  // encodeURIComponent, not URLSearchParams: a "+" is a literal plus in a
+  // mailto link, so spaces must be %20. Line breaks go as CRLF (RFC 6068).
   const q = (value) => encodeURIComponent(value || "");
-  return `https://mail.google.com/mail/?view=cm&fs=1&to=${q(to)}&su=${q(subject)}&body=${q(body)}`;
+  const crlf = (value) => String(value || "").replace(/\r?\n/g, "\r\n");
+  return `mailto:${q(to).replace(/%40/g, "@")}?subject=${q(subject)}&body=${q(crlf(body))}`;
+}
+
+/**
+ * Gmail's compose window with the same email, through Gmail's own mail-link
+ * handler. Not ?view=cm&su=…&body=…: when the browser has to sign in or pick
+ * an account first, Google's sign-in page re-encodes that link and every space
+ * reaches Gmail as a "+". Wrapped in a mailto: link the fields arrive intact.
+ */
+export function gmailComposeUrl(email) {
+  return `https://mail.google.com/mail/?extsrc=mailto&url=${encodeURIComponent(mailtoUrl(email))}`;
+}
+
+/**
+ * Hands a mailto: link to the device's email app. Mail links do not leave the
+ * page, so this is safe after waiting on the server.
+ */
+export function openMailApp(url) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.rel = "noreferrer";
+  link.click();
 }
 
 /**

@@ -1,11 +1,11 @@
 // One job's proposal: the "Customer accepted the proposal?" gate, sending the
-// proposal from the rep's own Gmail (and a revised one after the customer asks
+// proposal from the rep's own email (and a revised one after the customer asks
 // for changes), resending with a new link, recording an answer given by
 // phone, and every proposal sent so far.
 //
 // Nothing is emailed by the server. Sending creates the customer's link, opens
-// Gmail with the email written, and downloads the quote PDF to attach — a
-// Gmail compose link cannot carry a file.
+// the email app signed in on the device (or Gmail) with the email written, and
+// downloads the quote PDF to attach — an email link cannot carry a file.
 //
 // `opportunity` is a record or a board row's opportunity: { id, number, stage,
 // lifecycle, customerEmail, customerFirstName, ... }. `onChanged(result)` runs
@@ -32,7 +32,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { downloadInvoice, invoiceFileName } from "@/helpers/invoice";
-import { PROPOSAL_STAGE_ID, gmailComposeUrl, isLive, isOpen, navigateTab, openPendingTab, proposalEmailBody, proposalStatus } from "@/helpers/proposals";
+import { PROPOSAL_STAGE_ID, gmailComposeUrl, isLive, isOpen, mailtoUrl, navigateTab, openMailApp, proposalEmailBody, proposalStatus } from "@/helpers/proposals";
 import { getErrorMessage } from "@/services/api/client";
 import { listQuoteVersions } from "@/services/api/leadsApi";
 import { listProposals, resendProposal } from "@/services/api/proposalsApi";
@@ -49,18 +49,34 @@ function waitingText(latest) {
   return `Prepared for ${latest.sentTo} on ${formatDate(latest.sentAt)} — not opened yet.`;
 }
 
+// Longer mail links can be cut short by the email app; the copy button is the way round.
+const LONG_MAIL_LINK = 2000;
+
 /**
- * After Gmail was opened: what is left for the sender to do (attach the PDF,
- * press Send), and the link and email text again in case the tab was blocked
- * or closed. Shown once — only the link's hash is kept.
+ * After the email was opened: what is left for the sender to do (attach the
+ * PDF, press Send), both ways to open the email again, and the link and email
+ * text in case nothing opened. Shown once — only the link's hash is kept.
  */
-function GmailNotice({ prepared, onDownload, onDismiss }) {
-  const { proposal, link, gmailUrl, body, fileName, tabOpened } = prepared;
+function EmailNotice({ prepared, onDownload, onDismiss }) {
+  const { proposal, link, mailUrl, gmailUrl, body, fileName, via, opened } = prepared;
+  const where = via === "gmail" ? "Gmail" : "your email app";
+  const mailButton = (
+    <a key="mail" className={`btn btn-sm ${via === "mail" ? "btn-primary" : "btn-ghost"}`} href={mailUrl} rel="noreferrer">
+      <Mail size={14} /> {via === "mail" ? "Open email app again" : "Open in email app"}
+    </a>
+  );
+  const gmailButton = (
+    <a key="gmail" className={`btn btn-sm ${via === "gmail" ? "btn-primary" : "btn-ghost"}`} href={gmailUrl} target="_blank" rel="noreferrer">
+      <Mail size={14} /> {via !== "gmail" ? "Open in Gmail" : opened ? "Open Gmail again" : "Open Gmail"}
+    </a>
+  );
   return (
-    <Alert tone={tabOpened ? "success" : "warning"} style={{ marginBottom: 14 }}>
-      {tabOpened ? (
+    <Alert tone={opened ? "success" : "warning"} style={{ marginBottom: 14 }}>
+      {opened ? (
         <>
-          <strong>Gmail is open with the proposal for {proposal.sentTo}.</strong>{" "}
+          <strong>
+            {via === "gmail" ? "Gmail is open" : "Your email app is opening"} with the proposal for {proposal.sentTo}.
+          </strong>{" "}
         </>
       ) : (
         // The browser's pop-up blocker stopped the tab. The email is ready; a
@@ -71,12 +87,12 @@ function GmailNotice({ prepared, onDownload, onDismiss }) {
           right end of the address bar and choose “Always allow”.
         </div>
       )}
-      Attach the PDF that just downloaded{fileName ? ` (${fileName})` : ""} — Gmail links cannot attach files — then press Send in Gmail. You will be
+      Attach the PDF that just downloaded{fileName ? ` (${fileName})` : ""} — email links cannot attach files — then press Send in {where}. You will be
       notified when the customer opens it and when they answer.
+      {via === "mail" ? " Nothing opened? Use Open in Gmail, or copy the email text into any email." : ""}
+      {mailUrl.length > LONG_MAIL_LINK ? " The message is long, so some email apps cut it short — check it all arrived, or paste the copied email text." : ""}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-        <a className={`btn btn-primary ${tabOpened ? "btn-sm" : ""}`.trim()} href={gmailUrl} target="_blank" rel="noreferrer">
-          <Mail size={14} /> {tabOpened ? "Open Gmail again" : "Open Gmail"}
-        </a>
+        {via === "gmail" ? [gmailButton, mailButton] : [mailButton, gmailButton]}
         <button type="button" className="btn btn-ghost btn-sm" onClick={onDownload}>
           <Download size={14} /> Download PDF again
         </button>
@@ -105,7 +121,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
   const [versions, setVersions] = useState([]);
   const [error, setError] = useState("");
   const [composing, setComposing] = useState(false);
-  const [prepared, setPrepared] = useState(null); // the last send or resend: { proposal, link, gmailUrl, body, fileName, tabOpened }
+  const [prepared, setPrepared] = useState(null); // the last send or resend: { proposal, link, mailUrl, gmailUrl, body, fileName, via, opened }
   const [recording, setRecording] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -149,9 +165,10 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
     if (version?.snapshot) downloadInvoice({ unit, version }).catch(() => setError("The PDF could not be built."));
   };
 
-  // The server has made the link: write the email, point the waiting tab at
-  // Gmail, and download the PDF for the sender to attach.
-  const afterSend = async (result, tab) => {
+  // The server has made the link: write the email, open it in the device's
+  // email app (or point the waiting tab at Gmail), and download the PDF for
+  // the sender to attach.
+  const afterSend = async (result, { via = "mail", tab = null } = {}) => {
     const { proposal, link } = result;
     const body = proposalEmailBody({
       customerFirstName: opportunity.customerFirstName,
@@ -161,23 +178,26 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
       senderName: user?.name,
       businessName: unit?.name,
     });
-    const gmailUrl = gmailComposeUrl({ to: proposal.sentTo, subject: proposal.emailSubject, body });
-    const tabOpened = navigateTab(tab, gmailUrl);
+    const email = { to: proposal.sentTo, subject: proposal.emailSubject, body };
+    const mailUrl = mailtoUrl(email);
+    const gmailUrl = gmailComposeUrl(email);
+    let opened = true;
+    if (via === "gmail") opened = navigateTab(tab, gmailUrl);
+    else openMailApp(mailUrl);
     const version = versionOf(proposal);
     downloadPdf(proposal);
-    setPrepared({ proposal, link, gmailUrl, body, tabOpened, fileName: version ? invoiceFileName({ version }) : null });
+    setPrepared({ proposal, link, mailUrl, gmailUrl, body, via, opened, fileName: version ? invoiceFileName({ version }) : null });
     setComposing(false);
     await load();
     onChanged?.(result);
   };
 
+  // A resend opens the device's email app; the notice offers Gmail as well.
   const resend = async () => {
-    const tab = openPendingTab();
     setResending(true);
     try {
-      await afterSend(await resendProposal(opportunity.id, latest.id), tab);
+      await afterSend(await resendProposal(opportunity.id, latest.id));
     } catch (err) {
-      tab?.close();
       setError(getErrorMessage(err, "The proposal could not be resent."));
     } finally {
       setResending(false);
@@ -227,7 +247,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
         ) : null}
 
         <div style={{ marginTop: 18 }}>
-          {prepared ? <GmailNotice prepared={prepared} onDownload={() => downloadPdf(prepared.proposal)} onDismiss={() => setPrepared(null)} /> : null}
+          {prepared ? <EmailNotice prepared={prepared} onDownload={() => downloadPdf(prepared.proposal)} onDismiss={() => setPrepared(null)} /> : null}
 
           {canEdit && isLive(latest) ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>

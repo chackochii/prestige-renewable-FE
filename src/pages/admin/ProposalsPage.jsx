@@ -75,7 +75,7 @@ export default function ProposalsPage() {
     <>
       <PageHeader
         title="Proposals"
-        description="Send the customer their proposal from your Gmail — the email, link and PDF are prepared for you. From the link they can view the PDF and accept it (the job then moves straight on to Approvals), ask for changes, or decline."
+        description="Send the customer their proposal from your own email app or Gmail — the email, link and PDF are prepared for you. From the link they can view the PDF and accept it (the job then moves straight on to Approvals), ask for changes, or decline."
       />
 
       <div className="stats">

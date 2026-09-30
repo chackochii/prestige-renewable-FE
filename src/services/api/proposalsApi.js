@@ -1,5 +1,5 @@
 // Proposals (stage 3): sales sends the customer a link to their proposal from
-// their own Gmail (the server sends no mail), and the customer answers it
+// their own email app or Gmail (the server sends no mail), and the customer answers it
 // there — accept (the job moves on to Approvals), ask to renegotiate, or
 // decline. See prestige-be proposalService.js.
 //
@@ -29,7 +29,7 @@ export async function listProposals(opportunityId) {
 /**
  * body: { quoteVersionId, to?, subject?, message? } → { proposal, link }
  * The link is only ever returned here — it goes into the email the app opens
- * in the sender's Gmail.
+ * in the sender's email app or Gmail.
  */
 export async function sendProposal(opportunityId, body) {
   return unwrap(await apiClient.post(`/opportunities/${opportunityId}/proposals`, body));
