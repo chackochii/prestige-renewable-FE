@@ -53,6 +53,8 @@ import { inspectionRequests, requestCode } from "@/constants/collaboration";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
 import VariationCheck from "@/features/pipeline/VariationCheck";
 import ProposalHandover from "@/features/pipeline/ProposalHandover";
+import RequoteSummary from "@/features/proposals/RequoteSummary";
+import { isRequoteOpen } from "@/helpers/proposals";
 import { leadMandatoryItems } from "@/helpers/leadChecklist";
 import { DRAWING_CATEGORY, PERMIT_OPTIONS } from "@/constants/estimationInput";
 import { estimationInputFromOpp } from "@/constants/estimationInput";
@@ -285,8 +287,14 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const siteVisitDone = showEstimatorChecklist && preSiteResolved;
   const quoteDone = Boolean(quote?.items?.length);
 
-  // Open on the first step that still needs work.
+  // Sales sent the job back from proposal: the customer wants changes, and
+  // the round (their message, sales' comments, the version they saw) rides
+  // on the record until the revised quote is handed back.
+  const requote = isRequoteOpen(opp.requote) ? opp.requote : null;
+
+  // Open on the first step that still needs work — the quote, on a re-quote.
   const [tab, setTab] = useState(() => {
+    if (requote && showQuoteBuilder) return "quote";
     if (!requirementsDone) return "requirements";
     if (showEstimatorChecklist && !siteVisitDone) return "site-visit";
     return showQuoteBuilder ? "quote" : "requirements";
@@ -303,7 +311,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
     { key: "quote", label: "Quote", icon: tabIcon(quoteDone, <Receipt size={14} />) },
     { key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> },
     { key: "variations", label: "Variations", icon: <BadgeDollarSign size={14} /> },
-    { key: "handover", label: "Send to proposal", icon: tabIcon(Number(opp.stage) > 2, <Send size={14} />) },
+    { key: "handover", label: requote ? "Send revised quote" : "Send to proposal", icon: tabIcon(Number(opp.stage) > 2, <Send size={14} />) },
   ];
 
   // Why the checklist and site-visit tabs are closed, depending on how far
@@ -330,9 +338,29 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           </span>
           <h2>Estimation & validation</h2>
         </div>
-        <Badge tone={status.tone}>{status.label}</Badge>
+        <Badge tone={requote ? "warning" : status.tone}>{requote ? `Re-quote · round ${requote.round}` : status.label}</Badge>
       </div>
       <p className="sub">Solution options, cost build-up, sell price and target margin, verified before a proposal is prepared.</p>
+
+      {requote ? (
+        <Alert tone="warning" style={{ marginBottom: 12 }}>
+          <strong>Re-quote requested — the customer wants changes.</strong> Revise the quote, save it as a new version, then hand it back with a
+          note on what changed; sales sends the revised proposal.
+          <div style={{ marginTop: 10 }}>
+            <RequoteSummary requote={requote} timeZone={unit?.timezone} />
+          </div>
+          {canEdit ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setTab("quote")}>
+                <Receipt size={14} /> Open the quote
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTab("handover")}>
+                <Send size={14} /> Send the revised quote
+              </button>
+            </div>
+          ) : null}
+        </Alert>
+      ) : null}
 
       {onViewLead ? (
         <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={onViewLead}>
@@ -583,7 +611,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
       {tab === "handover" ? (
         showQuoteBuilder && quoteDone ? (
-          <ProposalHandover opp={opp} unit={unit} onReviewVariations={() => setTab("variations")} onSent={onSent} />
+          <ProposalHandover opp={opp} unit={unit} requote={requote} onReviewVariations={() => setTab("variations")} onSent={onSent} />
         ) : (
           <LockedStep
             title="Nothing to send yet"

@@ -4,7 +4,7 @@
 // The PDF is built here in the browser from the saved quote version's
 // snapshot (helpers/invoice.js), so it is exactly the quote that was sent.
 // The customer then answers it: accept (the job moves on to Approvals), ask
-// for changes (sales revises and sends a new version), or decline.
+// for changes (sales has it re-quoted and sends a new version), or decline.
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -35,11 +35,18 @@ function ClosedNotice({ proposal }) {
         <strong>Accepted{response?.name ? ` by ${response.name}` : ""}</strong> {when ? `on ${when}` : ""}. Thank you — we will be in touch about the next steps.
       </Alert>
     );
-  if (state === "negotiation")
+  if (state === "negotiation" || (state === "re-estimated" && response?.decision === "renegotiate"))
     return (
       <Alert tone="info">
         <strong>Changes requested</strong> {when ? `on ${when}` : ""}. We are revising your proposal and will send you an updated one.{reach}
         {response?.note ? <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>“{response.note}”</div> : null}
+      </Alert>
+    );
+  // Sent back for a re-quote after a call, or before an answer came through the link.
+  if (state === "re-estimated")
+    return (
+      <Alert tone="info">
+        <strong>Being revised.</strong> This proposal is being updated and we will send you a new one shortly.{reach}
       </Alert>
     );
   if (state === "rejected")

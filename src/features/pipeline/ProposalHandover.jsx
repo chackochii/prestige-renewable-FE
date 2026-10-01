@@ -6,6 +6,11 @@
 // quote as a new version first when it has changed since the last one, then
 // moves the job on; the salesperson is notified that the quote is ready to
 // send to the customer (prestige-be estimationHandover.js).
+//
+// On a re-quote (`requote` — the open round sales sent back from proposal)
+// the same step returns the revised quote: it warns when the quote is still
+// the version the customer saw, and the note — what changed — is required,
+// because sales explains it to the customer.
 
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, CircleAlert, Send } from "lucide-react";
@@ -45,7 +50,7 @@ function CheckRow({ done, title, detail, warn = false }) {
   );
 }
 
-export default function ProposalHandover({ opp, unit, onReviewVariations, onSent }) {
+export default function ProposalHandover({ opp, unit, requote = null, onReviewVariations, onSent }) {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { notify } = useNotifications();
@@ -79,7 +84,11 @@ export default function ProposalHandover({ opp, unit, onReviewVariations, onSent
   const matching = quote ? versions.find((version) => matchesSnapshot({ opp, quote }, version)) : null;
   const latestNumber = versions.reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0);
   const totals = quote?.items?.length ? invoiceTotals(quote) : null;
+  // On a re-quote the note says what changed, and sales needs it.
+  const noteMissing = Boolean(requote) && !note.trim();
   const ready = !estimationMissing.length && !quoteMissing.length && !denied && opp.lifecycle === "Active";
+  // The quote as it stands is the very version the customer asked to change.
+  const unchanged = Boolean(requote?.quoteVersion && matching && matching.id === requote.quoteVersion.id);
 
   const send = async () => {
     setBusy(true);
@@ -95,7 +104,7 @@ export default function ProposalHandover({ opp, unit, onReviewVariations, onSent
         ).unwrap();
       }
       const moved = await dispatch(handOverToProposal({ id: opp.id, body: { quoteVersionId: version.id, note: note.trim() || undefined } })).unwrap();
-      notify(`Sent to ${stageById(moved.stage).label}${opp.salesperson?.name ? ` — ${opp.salesperson.name} has been notified` : ""}`);
+      notify(`${requote ? "Revised quote sent" : "Sent"} to ${stageById(moved.stage).label}${opp.salesperson?.name ? ` — ${opp.salesperson.name} has been notified` : ""}`);
       onSent?.(moved);
     } catch (err) {
       setError(errText(err, "The quote could not be sent to proposal."));
@@ -106,12 +115,34 @@ export default function ProposalHandover({ opp, unit, onReviewVariations, onSent
 
   return (
     <div className="section" style={{ marginTop: 20 }}>
-      <SectionHead icon={<Send size={13} />} title="Send to proposal" />
+      <SectionHead icon={<Send size={13} />} title={requote ? "Send the revised quote to proposal" : "Send to proposal"} />
       <p className="lede" style={{ marginBottom: 12 }}>
-        When the quote is final, send it to {nextLabel}. Sales then sends the proposal to the customer, who accepts it online.
+        {requote
+          ? `The customer asked for changes (re-quote round ${requote.round}). When the revised quote is final, send it back to ${nextLabel} with a note on what changed — sales sends the new proposal.`
+          : `When the quote is final, send it to ${nextLabel}. Sales then sends the proposal to the customer, who accepts it online.`}
       </p>
 
       <div className="list-stack">
+        {requote ? (
+          <CheckRow
+            done={!unchanged}
+            warn
+            title={
+              unchanged
+                ? `Unchanged from what the customer saw (v${requote.quoteVersion.version})`
+                : requote.quoteVersion
+                  ? `Revised since the customer saw v${requote.quoteVersion.version}`
+                  : "Revised for the customer"
+            }
+            detail={
+              unchanged
+                ? "The quote is still the version the customer asked to change. Revise it — or say in the note why it stays as quoted."
+                : requote.customerMessage
+                  ? `They asked: “${requote.customerMessage}”`
+                  : null
+            }
+          />
+        ) : null}
         <CheckRow
           done={!estimationMissing.length}
           title="Estimation complete"
@@ -155,13 +186,22 @@ export default function ProposalHandover({ opp, unit, onReviewVariations, onSent
       </div>
 
       <div className="form-grid" style={{ marginTop: 16 }}>
-        <Field className="span-2" label="Note to sales" hint="optional — goes with the notification and into the history" htmlFor="handover-note">
+        <Field
+          className="span-2"
+          label={requote ? "What changed — note to sales" : "Note to sales"}
+          hint={requote ? "required — sales explains it to the customer" : "optional — goes with the notification and into the history"}
+          htmlFor="handover-note"
+        >
           <textarea
             id="handover-note"
             rows={3}
             maxLength={2000}
             value={note}
-            placeholder="e.g. Battery option priced separately; roof access needs scaffolding"
+            placeholder={
+              requote
+                ? "e.g. Panels changed to 440W and a 10 kWh battery added; total up by $11,170. Inverter unchanged."
+                : "e.g. Battery option priced separately; roof access needs scaffolding"
+            }
             onChange={(e) => setNote(e.target.value)}
             disabled={!ready}
           />
@@ -185,8 +225,15 @@ export default function ProposalHandover({ opp, unit, onReviewVariations, onSent
         </Alert>
       ) : null}
 
-      <button type="button" className="btn btn-primary" style={{ marginTop: 14 }} onClick={send} disabled={!ready || busy}>
-        <Send size={15} /> {busy ? "Sending…" : `Send to ${next ? stageById(next).short : "next stage"}`} <ArrowRight size={15} />
+      <button
+        type="button"
+        className="btn btn-primary"
+        style={{ marginTop: 14 }}
+        onClick={send}
+        disabled={!ready || noteMissing || busy}
+        title={noteMissing ? "Say what changed first" : undefined}
+      >
+        <Send size={15} /> {busy ? "Sending…" : `Send ${requote ? "revised quote " : ""}to ${next ? stageById(next).short : "next stage"}`} <ArrowRight size={15} />
       </button>
       {opp.salesperson?.name ? (
         <p className="row-meta" style={{ marginTop: 8 }}>
