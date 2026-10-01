@@ -112,13 +112,18 @@ export function mailtoUrl({ to, subject, body }) {
 }
 
 /**
- * Gmail's compose window with the same email, through Gmail's own mail-link
- * handler. Not ?view=cm&su=…&body=…: when the browser has to sign in or pick
- * an account first, Google's sign-in page re-encodes that link and every space
- * reaches Gmail as a "+". Wrapped in a mailto: link the fields arrive intact.
+ * Gmail's compose window with the email filled in, in the form Gmail uses
+ * today: /mail/u/0/?tf=cm with to, su and body. (The older ?view=cm&fs=1 is
+ * redirected to this, and the ?extsrc=mailto&url= mail-handler form is no
+ * longer reliable.) Spaces go as %20; when the browser has to sign in or pick
+ * an account first, Google's sign-in page turns them into "+", which this
+ * form reads as spaces too. /u/0/ is the account the browser is signed in to
+ * first. Gmail on an iPhone's Safari opens the inbox instead of compose —
+ * there, the email app button is the one to use.
  */
-export function gmailComposeUrl(email) {
-  return `https://mail.google.com/mail/?extsrc=mailto&url=${encodeURIComponent(mailtoUrl(email))}`;
+export function gmailComposeUrl({ to, subject, body }) {
+  const q = (value) => encodeURIComponent(value || "");
+  return `https://mail.google.com/mail/u/0/?tf=cm&fs=1&to=${q(to)}&su=${q(subject)}&body=${q(body)}`;
 }
 
 /**
