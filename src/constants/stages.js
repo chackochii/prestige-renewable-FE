@@ -1,7 +1,13 @@
-// The pipeline stages, matching prestige-be (Opportunity.stage 1–9). Stage 4
+// The pipeline stages, matching prestige-be (Opportunity.stage 1–9) and named
+// for the process chart: Leads & Marketing, Estimation, Proposals, Approvals,
+// Procurement & Delivery, Construction, Invoicing & Payments, DLP/O&M. Stage 4
 // (Sales closure) is retired: a client accepting the proposal sends the job
 // straight to Approvals, as the Sydpro process chart has it. Numbers are never
 // reused, so stage ids stay 1–9 with 4 simply absent.
+//
+// Warranty registration, referrals & feedback and the DLP/O&M period are the
+// last three stages as well as modules of their own in the sidebar: the
+// module is where that team works, the stage is where the job has got to.
 // Business units may disable stages via config (enabledStages); disabled
 // stages are skipped, never renumbered.
 
@@ -9,23 +15,23 @@ export const STAGES = [
   {
     id: 1,
     key: "lead",
-    short: "Lead",
-    label: "Lead capture & qualification",
+    short: "Leads",
+    label: "Leads & Marketing",
     description:
       "Capture the customer, site and decision-maker, then qualify the lead and assign an estimator before it moves on.",
   },
   {
     id: 2,
     key: "estimation",
-    short: "Estimate",
-    label: "Estimation & validation",
+    short: "Estimation",
+    label: "Estimation",
     description: "Solution options, cost build-up, sell price and target margin, verified before a proposal is prepared.",
   },
   {
     id: 3,
     key: "proposal",
-    short: "Proposal",
-    label: "Proposal & negotiation",
+    short: "Proposals",
+    label: "Proposals",
     description: "The sales rep reviews the final quote, applies any approved discount and emails it to the client, then follows up until the client accepts (on to Approvals) or declines.",
   },
   {
@@ -38,35 +44,49 @@ export const STAGES = [
   {
     id: 6,
     key: "procurement",
-    short: "Procure",
-    label: "Procurement",
+    short: "Procurement",
+    label: "Procurement & Delivery",
     description: "Purchase orders raised and delivery dates confirmed so site windows line up with what is arriving.",
   },
   {
     id: 7,
     key: "site_works",
-    short: "Site works",
-    label: "Site works",
+    short: "Construction",
+    label: "Construction",
     description: "Pre-start, materials, installation and commissioning sub-stages signed off on site.",
   },
   {
     id: 8,
     key: "billing",
-    short: "Billing",
-    label: "Billing",
+    short: "Invoicing",
+    label: "Invoicing & Payments",
     description: "Milestone billing requests reconciled against tax invoices and payments recorded from accounting.",
   },
   {
     id: 9,
-    key: "handover",
-    short: "Handover",
-    label: "Handover",
-    description: "Warranty contact, documentation and follow-up captured; the record is closed.",
+    key: "warranty",
+    short: "Warranty",
+    label: "Warranty Registration",
+    description: "Warranty certificates issued and logged against the installed equipment.",
+  },
+  {
+    id: 10,
+    key: "referrals",
+    short: "Referrals",
+    label: "Referrals & Feedback",
+    description: "The client's review captured and any referral they make recorded against the job.",
+  },
+  {
+    id: 11,
+    key: "dlp_om",
+    short: "DLP / O&M",
+    label: "DLP, O&M Period",
+    description: "Defects liability and ongoing maintenance run out; the record is closed at the end of it.",
   },
 ];
 
 export const FIRST_STAGE = 1;
-export const LAST_STAGE = 9;
+export const LAST_STAGE = 11;
 
 // A record still at retired stage 4 was already won, so it reads as Approvals.
 const RETIRED_TO = { 4: 5 };

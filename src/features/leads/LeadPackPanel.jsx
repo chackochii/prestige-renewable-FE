@@ -1,16 +1,21 @@
 // Stage-1 work: the lead pack, editable while the record lives.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardCheck, Pencil } from "lucide-react";
+import { ClipboardCheck } from "lucide-react";
 import Alert from "@/components/Alert";
 import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
-import RequestDetail from "@/features/collaboration/RequestDetail";
-import RequestFormModal from "@/features/collaboration/RequestFormModal";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
-import { autosavePayload, formToPayload, idOrNull, leadToForm, validateLeadForm } from "@/features/leads/leadFormModel";
+import {
+  autosavePayload,
+  formToPayload,
+  idOrNull,
+  isLoggedAttempt,
+  leadToForm,
+  validateLeadForm,
+} from "@/features/leads/leadFormModel";
 import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
-import { leadCompletenessItems, leadGateItems } from "@/helpers/stageTransition";
+import { leadGateItems } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
@@ -23,8 +28,7 @@ import {
   uploadOpportunityAttachment,
 } from "@/slices/leadsSlice";
 import { fetchReferrers } from "@/slices/referralsSlice";
-import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationSlice";
-import { inspectionRequests } from "@/constants/collaboration";
+import { fetchOpportunityRequests } from "@/slices/collaborationSlice";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -32,22 +36,51 @@ import { useNotifications } from "@/hooks/useNotifications";
 /** Everything raised from the lead pack is filed against stage 1. */
 const LEAD_STAGE = 1;
 
+// Keystrokes are kept in this browser, not sent to the API. Storage can be
+// unavailable (private browsing, full), so every access is allowed to fail
+// quietly — the form still works, it just has nothing to restore.
+const draftKey = (id) => `lead-draft:${id}`;
+
+const readDraft = (opp) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(draftKey(opp?.id)) || "null");
+    // Only restore a draft taken against the version of the record that is on
+    // screen now. Anything older is stale and would undo somebody else's edit.
+    return saved && saved.updatedAt === opp?.updatedAt ? saved.form : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeDraft = (opp, form) => {
+  try {
+    localStorage.setItem(draftKey(opp?.id), JSON.stringify({ updatedAt: opp?.updatedAt, form }));
+  } catch {
+    // Not kept — the form still works.
+  }
+};
+
+const clearDraft = (id) => {
+  try {
+    localStorage.removeItem(draftKey(id));
+  } catch {
+    // Nothing to clear.
+  }
+};
+
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
-  const { estimators, sales, siteOps, userName } = useUnitUsers();
+  const { estimators, sales, userName } = useUnitUsers();
   const referrers = useAppSelector((s) => s.referrals.items);
-  const { oppId: collabOppId, byOpp: requests } = useAppSelector((s) => s.collaboration);
   const referrersStatus = useAppSelector((s) => s.referrals.status);
   const attachments = useAppSelector((s) => s.leads.attachments);
   const { notify, error: notifyError } = useNotifications();
-  const [form, setForm] = useState(() => leadToForm(opp));
+  const [form, setForm] = useState(() => readDraft(opp) ?? leadToForm(opp));
   const [errors, setErrors] = useState({});
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingBills, setUploadingBills] = useState(false);
   const [uploadingCategory, setUploadingCategory] = useState(null);
-  const [requestingInspection, setRequestingInspection] = useState(false);
-  const [viewingInspection, setViewingInspection] = useState(null);
   // Lead capture opens ready to edit: the checklist runs across several tabs
   // and people fill it in over more than one sitting. A record that has moved
   // on opens read-only instead — an estimator reviewing the pack is reading it,
@@ -106,45 +139,38 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  // Autosave. The checklist runs over several tabs and more than one sitting,
-  // so every change goes to the record about a second after typing stops, and
-  // nothing is left living only in this browser tab. The decision fields are
-  // left out (see autosavePayload) and nothing is validated: a half-filled
-  // checklist is precisely what needs keeping.
+  // Typing is kept locally and written to the record when a tab is done with,
+  // rather than a PATCH every second: the checklist runs to a hundred-odd
+  // fields and a request per keystroke is a lot of traffic for no benefit.
   useEffect(() => {
-    if (!canEdit || !editing || !dirty || saving) return undefined;
-    const timer = setTimeout(async () => {
-      const previousAttemptCount = (opp.contactAttempts || []).length;
-      setAutosaveState("saving");
-      try {
-        await dispatch(updateLead({ id: opp.id, body: autosavePayload(form) })).unwrap();
-        await logNewFailedAttempts(previousAttemptCount);
-        setAutosaveState("saved");
-      } catch {
-        // Kept quiet: the Save button is still there, and the line below says
-        // the change has not landed.
-        setAutosaveState("error");
-      }
-    }, 1200);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, canEdit, editing, dirty, saving]);
+    if (dirty) writeDraft(opp, form);
+  }, [form, opp, dirty]);
 
-  // The pre-site inspection row tracks the most recent assignment raised for
-  // it; a job may have more than one.
-  const inspections = collabOppId === Number(opp?.id) ? inspectionRequests(requests) : [];
-  const inspection = inspections[0] || null;
-
-  /** Opens the existing inspection, or starts a new request when there is none. */
-  const handleInspection = async (existing) => {
-    if (existing) {
-      setViewingInspection(existing);
-      return;
+  /**
+   * Writes what is on screen without validating any of it. Half a checklist is
+   * exactly what needs keeping, so this never refuses — only the Save button
+   * validates, and only when someone presses it.
+   */
+  const persist = async () => {
+    const previousAttemptCount = (opp.contactAttempts || []).length;
+    setAutosaveState("saving");
+    try {
+      await dispatch(updateLead({ id: opp.id, body: autosavePayload(form) })).unwrap();
+      await logNewFailedAttempts(previousAttemptCount);
+      clearDraft(opp.id);
+      setAutosaveState("saved");
+      return true;
+    } catch {
+      // Kept quiet: the Save button is still there, and the line by it says
+      // the change has not landed.
+      setAutosaveState("error");
+      return false;
     }
-    // Save what is on screen before the request leaves. Without this the
-    // checklist stays in this browser tab only, and a logout loses it.
-    if (dirty && !(await save())) return;
-    setRequestingInspection(true);
+  };
+
+  /** Leaving a tab commits what was filled in on it. */
+  const handleTabChange = () => {
+    if (canEdit && editing && dirty && !saving) persist();
   };
 
   const billFiles = attachments.filter((a) => a.category === "bill");
@@ -193,7 +219,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
    * `previousCount` is how many attempts the record held before this write.
    */
   const logNewFailedAttempts = async (previousCount) => {
-    const added = (form.contactAttempts || []).slice(previousCount);
+    const added = (form.contactAttempts || []).filter(isLoggedAttempt).slice(previousCount);
     for (const attempt of added.filter((a) => a.reached === false)) {
       await dispatch(
         addOpportunityHistoryEntry({
@@ -285,6 +311,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
 
       // Deliberately stays in edit mode: the checklist spans several tabs and
       // people save as they go.
+      clearDraft(opp.id);
       notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
       return true;
     } catch (err) {
@@ -306,7 +333,6 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     setEditing(false);
   };
   const gate = leadGateItems(opp);
-  const completeness = leadCompletenessItems(opp);
   const errorList = [...new Set(Object.values(errors))];
 
   return (
@@ -319,17 +345,41 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           </span>
           <h2>Lead pack</h2>
         </div>
-        {canEdit && !editing ? (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={startEditing}>
-            <Pencil size={14} /> Edit
-          </button>
-        ) : null}
       </div>
       <p className="sub">
         {atLeadStage
           ? "A lead becomes an opportunity once it's marked Potential with an estimator assigned."
           : "This lead has already moved on. You can still review and update the details."}
       </p>
+
+      {errorList.length ? (
+        <Alert tone="danger" style={{ marginBottom: 12 }}>
+          Fix {errorList.length} {errorList.length === 1 ? "field" : "fields"} before saving. Each one is marked on its
+          tab.
+          <ul>
+            {errorList.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
+      {saveError ? (
+        <Alert tone="danger" style={{ marginBottom: 12 }}>
+          {saveError}
+        </Alert>
+      ) : null}
+
+      {atLeadStage ? (
+        gate.length ? (
+          <Alert tone="info" style={{ marginBottom: 12 }}>
+            Complete the checklist to mark this lead Potential and move it on.
+          </Alert>
+        ) : (
+          <Alert tone="success" style={{ marginBottom: 12 }}>
+            Checklist complete — this lead is ready to advance.
+          </Alert>
+        )
+      ) : null}
 
       {canEdit && editing && handedOver ? (
         <Alert tone="warning" style={{ marginBottom: 12 }}>
@@ -357,9 +407,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         onUploadDrawings={canEdit && editing ? uploadCategory(DRAWING_CATEGORY) : undefined}
         onUploadSitePhotos={canEdit && editing ? uploadCategory(SITE_PHOTO_CATEGORY) : undefined}
         uploadingCategory={uploadingCategory}
-        inspection={inspection}
-        inspectionCount={inspections.length}
-        onRequestInspection={canEdit ? handleInspection : undefined}
+        onTabChange={handleTabChange}
         requestsPanel={
           <StageRequestsPanel
             opp={opp}
@@ -372,31 +420,6 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           />
         }
       />
-
-      {errorList.length ? (
-        <Alert tone="danger" style={{ marginTop: 16 }}>
-          Fix {errorList.length} {errorList.length === 1 ? "field" : "fields"} before saving.
-          <ul>
-            {errorList.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-        </Alert>
-      ) : null}
-      {saveError ? <Alert tone="danger">{saveError}</Alert> : null}
-
-      {atLeadStage ? (
-        gate.length ? (
-          <Alert tone="info" style={{ marginTop: 16 }}>
-            To leave lead capture: {gate.join(" · ")}
-            {completeness.length ? ` · Also worth completing: ${completeness.join(", ")}` : ""}
-          </Alert>
-        ) : (
-          <Alert tone="success" style={{ marginTop: 16 }}>
-            Ready to advance{completeness.length ? ` — still worth completing: ${completeness.join(", ")}` : ""}.
-          </Alert>
-        )
-      ) : null}
 
       {!canEdit ? (
         <p className="lede" style={{ marginTop: 16 }}>
@@ -412,12 +435,14 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
           </button>
           <span className="row-meta" style={{ alignSelf: "center" }}>
             {autosaveState === "error"
-              ? "Autosave failed — use Save lead details."
-              : dirty || autosaveState === "saving"
+              ? "Could not save — try Save lead details."
+              : autosaveState === "saving"
                 ? "Saving…"
-                : autosaveState === "saved"
-                  ? "All changes saved"
-                  : ""}
+                : dirty
+                  ? "Unsaved — kept on this device until you save"
+                  : autosaveState === "saved"
+                    ? "All changes saved"
+                    : ""}
           </span>
           {handedOver ? (
             <span className="row-meta" style={{ alignSelf: "center" }}>
@@ -427,13 +452,14 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         </div>
       ) : (
         <p className="lede" style={{ marginTop: 16 }}>
-          Read-only. Use Edit above to change the lead details.
+          Read-only. Use “Edit lead details” above to make changes.
         </p>
       )}
 
       {confirmEdit ? (
         <Modal
           title="This lead is with estimation"
+          confirmClose={false}
           body={`${estimatorName || "An estimator"} is working from these details${
             opp.estimatorAssignedAt ? ` (assigned ${formatWhen(opp.estimatorAssignedAt)})` : ""
           }. Editing now changes what they are pricing, and they will be notified when you save.`}
@@ -459,27 +485,6 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
       ) : null}
       </div>
 
-      {requestingInspection ? (
-        <RequestFormModal
-          opportunity={opp}
-          stage={LEAD_STAGE}
-          kind="assignment"
-          template="pre_site_inspection"
-          department="operations"
-          people={siteOps.length ? siteOps : sales}
-          onClose={() => setRequestingInspection(false)}
-          onSubmit={async (body) => {
-            await dispatch(
-              createRequest({ opportunityId: opp.id, body: { ...body, title: body.title || "Pre-site inspection" } }),
-            ).unwrap();
-            notify("Pre-site inspection requested — the operations coordinator is notified");
-          }}
-        />
-      ) : null}
-
-      {viewingInspection ? (
-        <RequestDetail request={viewingInspection} onClose={() => setViewingInspection(null)} />
-      ) : null}
     </>
   );
 }

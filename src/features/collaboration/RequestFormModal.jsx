@@ -5,20 +5,21 @@
 // you asked for and you get it back in a shape you can read.
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, ClipboardCheck, ClipboardList, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardCheck, ClipboardList, ListChecks, Plus, X } from "lucide-react";
 import Alert from "@/components/Alert";
+import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import Modal from "@/components/Modal";
+import TimeSelect from "@/components/TimeSelect";
 import Tabs from "@/components/Tabs";
 import InspectionChecklist from "./InspectionChecklist";
-import { SELECTABLE_FIELDS } from "@/constants/inspectionReport";
 import {
   ASSIGNMENT_TEMPLATES,
   DEPARTMENTS,
-  DOCUMENT_TYPES,
+  documentTypeLabel,
   INFORMATION_TEMPLATES,
+  PRIORITIES,
   REQUEST_KINDS,
-  prioritiesFor,
 } from "@/constants/collaboration";
 import { stageById } from "@/constants/stages";
 import { isBlank } from "@/utils/validators";
@@ -53,21 +54,20 @@ export default function RequestFormModal({
 }) {
   const isAssignment = kind === "assignment";
   const templates = isAssignment ? ASSIGNMENT_TEMPLATES : INFORMATION_TEMPLATES;
-  const priorities = prioritiesFor(kind);
-  const start = initial
-    ? templates.find((t) => t.key === "custom") || templates[0]
-    : templates.find((t) => t.key === template) || templates[0];
+  const start =
+    templates.find((t) => t.key === template) ||
+    (initial ? templates.find((t) => t.key === "custom") : null) ||
+    templates[0];
   const [templateKey, setTemplateKey] = useState(start.key);
   const [form, setForm] = useState(() => ({
     department: initialDepartment || (isAssignment ? "operations" : "sales"),
     assigneeId: "",
     title: initial?.title ?? start.title ?? "",
     description: initial?.description ?? start.description ?? "",
-    priority: priorities[0].key,
+    priority: PRIORITIES[0].key,
     dueAt: "",
     dueTime: "",
     fields: initial?.fields?.length ? initial.fields.map((f) => ({ ...f })) : isAssignment ? [] : [blankField()],
-    documents: [],
   }));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -76,9 +76,23 @@ export default function RequestFormModal({
   // reaches the coordinator, and becomes a field on the site member's form.
   const [screen, setScreen] = useState("request");
   const [checklist, setChecklist] = useState([]);
+  // Anything the checklist does not cover, written by the requester.
+  const [custom, setCustom] = useState([]);
+  const [documents, setDocuments] = useState(() =>
+    Array.isArray(initial?.documents) ? initial.documents.map((d) => ({ ...d })) : [],
+  );
+  const removeDocument = (i) => setDocuments(documents.filter((_, n) => n !== i));
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const isInspection = isAssignment && templateKey === "pre_site_inspection";
+  // The note can run to a line per item asked for; three rows would hide
+  // most of it, so the box grows with what is in it, up to a point.
+  const descriptionRows = Math.min(16, Math.max(3, String(form.description || "").split(/\r?\n/).length + 1));
+  const namedCustom = custom.filter((x) => !isBlank(x.label));
+  const askedCount = checklist.length + namedCustom.length;
+  const setCustomItem = (i, value) => setCustom(custom.map((x, n) => (n === i ? { ...x, label: value } : x)));
+  const addCustom = () => setCustom([...custom, { label: "" }]);
+  const removeCustom = (i) => setCustom(custom.filter((_, n) => n !== i));
 
 
   const applyTemplate = (key) => {
@@ -94,14 +108,6 @@ export default function RequestFormModal({
     }));
   };
 
-  const setDocument = (index, key, value) =>
-    set(
-      "documents",
-      form.documents.map((d, i) => (i === index ? { ...d, [key]: value } : d)),
-    );
-  const addDocument = () => set("documents", [...form.documents, { label: "", type: "image", comment: "" }]);
-  const removeDocument = (index) => set("documents", form.documents.filter((_, i) => i !== index));
-
   const setField = (index, key, value) =>
     set(
       "fields",
@@ -113,7 +119,7 @@ export default function RequestFormModal({
   const submit = async () => {
     if (isBlank(form.title)) return setError("Give the request a title.");
     if (!form.assigneeId) return setError("Choose who this goes to.");
-    if (!isAssignment && !form.fields.length)
+    if (!isAssignment && !form.fields.length && !documents.length)
       return setError("Add at least one piece of information you need back.");
     if (!isAssignment && form.fields.some((f) => isBlank(f.label)))
       return setError("Name every item you need — that is what the other team sees.");
@@ -124,14 +130,12 @@ export default function RequestFormModal({
       await onSubmit({
         kind,
         stage,
-        requestedDocuments: form.documents
-          .filter((d) => !isBlank(d.label))
-          .map((d, i) => ({
-            key: d.key || slug(d.label, i),
-            label: d.label.trim(),
-            type: d.type || "image",
-            comment: (d.comment || "").trim(),
-          })),
+        requestedDocuments: documents.map((d, i) => ({
+          key: d.key || slug(d.label, i),
+          label: d.label.trim(),
+          type: d.type || "image",
+          comment: (d.comment || "").trim(),
+        })),
         department: form.department,
         assigneeId: Number(form.assigneeId),
         title: form.title.trim(),
@@ -142,8 +146,10 @@ export default function RequestFormModal({
         // What the visit has to confirm. The coordinator hands these to
         // whoever attends, one field each.
         inspectionChecklist: isInspection ? checklist : null,
-        requestedFields: isAssignment
-          ? null
+        requestedFields: isInspection
+          ? namedCustom.map((f, i) => ({ key: slug(f.label, i), label: f.label.trim(), kind: "text" }))
+          : isAssignment
+            ? null
           : form.fields.map((f, i) => ({
               key: f.key?.trim() || slug(f.label, i),
               label: f.label.trim(),
@@ -196,7 +202,7 @@ export default function RequestFormModal({
               key: "inspection",
               label: "Inspection checklist",
               icon: <ClipboardCheck size={14} />,
-              count: `${checklist.length}/${SELECTABLE_FIELDS.length}`,
+              count: `${askedCount}`,
             },
           ]}
         />
@@ -209,6 +215,32 @@ export default function RequestFormModal({
             what you need and leave the rest — everything here is optional.
           </p>
           <InspectionChecklist selected={checklist} onChange={setChecklist} disabled={saving} />
+
+          <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
+            <h3>Anything else to confirm</h3>
+            <p className="lede" style={{ marginBottom: 12 }}>
+              Not on the list? Write it here — one line each, and the person attending gets a field for it.
+            </p>
+            {custom.map((item, i) => (
+              <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
+                <Field>
+                  <input
+                    value={item.label}
+                    placeholder="e.g. Confirm the neighbour's eave clearance"
+                    onChange={(e) => setCustomItem(i, e.target.value)}
+                  />
+                </Field>
+                <div>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeCustom(i)} aria-label="Remove">
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={addCustom}>
+              <Plus size={14} /> Add an item
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -232,7 +264,7 @@ export default function RequestFormModal({
             ))}
           </select>
         </Field>
-        <Field label="Assign to" hint="they see it in their assigned list">
+        <Field label="Assign to" required>
           <select value={form.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
             <option value="">Choose a person</option>
             {people.map((p) => (
@@ -244,20 +276,40 @@ export default function RequestFormModal({
           </select>
         </Field>
 
-        <Field label="Title" className="span-2">
+        <Field label="Title" className="span-2" required>
           <input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Short summary" />
         </Field>
-        <Field
-          label={isAssignment ? "What needs doing" : "Why you need it"}
-          className="span-2"
-          hint={isAssignment ? "the coordinator sees this" : "context for whoever answers"}
-        >
-          <textarea rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
-        </Field>
+        {/* An inspection's brief is its checklist, and a request raised with
+            its items already filled in says the same thing twice. Only a
+            request typed from scratch needs a paragraph of context. */}
+        {isInspection ? (
+          <div className="span-2">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm site-visit-details"
+              onClick={() => setScreen("inspection")}
+            >
+              <ListChecks size={14} />
+              Inspection checklist — {askedCount} item{askedCount === 1 ? "" : "s"} requested
+            </button>
+          </div>
+        ) : initial ? null : (
+          <Field
+            label={isAssignment ? "What needs doing" : "Why you need it"}
+            className="span-2"
+            hint={isAssignment ? "the coordinator sees this" : "context for whoever answers"}
+          >
+            <textarea
+              rows={descriptionRows}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+            />
+          </Field>
+        )}
 
         <Field label="Priority">
           <select value={form.priority} onChange={(e) => set("priority", e.target.value)}>
-            {priorities.map((p) => (
+            {PRIORITIES.map((p) => (
               <option key={p.key} value={p.key}>
                 {p.label}
               </option>
@@ -268,12 +320,7 @@ export default function RequestFormModal({
           <input type="date" value={form.dueAt} onChange={(e) => set("dueAt", e.target.value)} />
         </Field>
         <Field label="Needed by (time)" hint={form.dueAt ? "optional" : "pick a date first"}>
-          <input
-            type="time"
-            value={form.dueTime}
-            disabled={!form.dueAt}
-            onChange={(e) => set("dueTime", e.target.value)}
-          />
+          <TimeSelect value={form.dueTime} disabled={!form.dueAt} onChange={(v) => set("dueTime", v)} />
         </Field>
       </div>
 
@@ -285,7 +332,7 @@ export default function RequestFormModal({
           </p>
           {form.fields.map((field, i) => (
             <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
-              <Field label={`Item ${i + 1}`}>
+              <Field>
                 <input
                   value={field.label}
                   placeholder="e.g. Annual usage (kWh)"
@@ -305,51 +352,35 @@ export default function RequestFormModal({
         </div>
       ) : null}
 
-      <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
-        <h3>Photos &amp; documents needed</h3>
-        <p className="lede" style={{ marginBottom: 12 }}>
-          Name each one — &ldquo;sketch of the switchboard run&rdquo; — and it becomes its own upload slot on their
-          response, with your comment as the instruction.
-        </p>
-        {form.documents.map((doc, i) => (
-          <div key={i} className="row-grid" style={{ "--row-cols": "1fr 150px 1fr auto" }}>
-            <Field label="What is needed">
-              <input
-                value={doc.label}
-                placeholder="e.g. Sketch of the switchboard run"
-                onChange={(e) => setDocument(i, "label", e.target.value)}
-              />
-            </Field>
-            <Field label="Type">
-              <select value={doc.type} onChange={(e) => setDocument(i, "type", e.target.value)}>
-                {DOCUMENT_TYPES.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Comment" hint="what it has to show">
-              <input
-                value={doc.comment}
-                placeholder="e.g. include the meter number"
-                onChange={(e) => setDocument(i, "comment", e.target.value)}
-              />
-            </Field>
-            <div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeDocument(i)} aria-label="Remove">
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-        <button type="button" className="btn btn-ghost btn-sm" onClick={addDocument}>
-          <Plus size={14} /> Add a photo or document
-        </button>
-      </div>
-
         </>
       )}
+
+      {documents.length ? (
+        <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
+          <h3>Photos or documents required</h3>
+          <p className="lede" style={{ marginBottom: 12 }}>
+            Each one becomes its own upload slot on their response.
+          </p>
+          <div className="list-stack">
+            {documents.map((doc, i) => (
+              <div className="list-row" key={doc.key}>
+                <span className="row-title">{doc.label}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Badge tone="neutral">{documentTypeLabel(doc.type)}</Badge>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => removeDocument(i)}
+                    aria-label={`Remove ${doc.label}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <Alert tone="danger" style={{ marginTop: 16, marginBottom: 0 }}>

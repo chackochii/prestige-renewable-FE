@@ -9,7 +9,6 @@
 
 import { useState } from "react";
 import { Building2, Check, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, X } from "lucide-react";
-import { formatDate } from "@/helpers/dateTimeHelpers";
 import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
@@ -39,8 +38,6 @@ import {
   SITE_TYPES,
   SWITCHBOARD_CONDITIONS,
   VPP_OPTIONS,
-  inspectionStatusFrom,
-  inspectionStatusLabel,
   systemSizeKw,
 } from "@/constants/estimationInput";
 import { TECHNICAL_GROUP } from "@/helpers/leadChecklist";
@@ -152,11 +149,10 @@ export default function LeadForm({
   onUploadDrawings,
   onUploadSitePhotos,
   uploadingCategory = null,
-  inspection = null,
-  inspectionCount = 0,
-  onRequestInspection,
   // Rendered under its own tab when the panel passes one in.
   requestsPanel = null,
+  // Called as the person leaves a tab, so the panel can commit that tab's work.
+  onTabChange,
   // Unlocks a saved lead for editing. Passed only when the person may edit;
   // without it a locked form just says why it is locked.
   onUnlock,
@@ -215,7 +211,6 @@ export default function LeadForm({
     </label>
   );
   const inspectionNeeded = form.preSiteInspectionRequired === "yes";
-  const inspectionStatus = inspectionStatusFrom(inspection);
   const retrofit = form.isRetrofit === "yes";
   const sizeKw = systemSizeKw(form);
 
@@ -234,35 +229,28 @@ export default function LeadForm({
   const [languageOther, setLanguageOther] = useState(false);
   const languageIsOther = languageOther || (!isBlank(form.preferredLanguage) && !languageListed);
 
+  // Each attempt is typed straight into the lead. There is no draft to commit:
+  // filling the boxes is logging the attempt, and anything half-typed is saved
+  // with the lead like every other field rather than lost on the way out.
   const contactAttempts = form.contactAttempts || [];
-  const emptyAttemptDraft = { method: "", contactedAt: "", reached: true, reason: "", notes: "" };
-  const [attemptDraft, setAttemptDraft] = useState(emptyAttemptDraft);
-  const attemptDraftMissing = [
-    isBlank(attemptDraft.method) ? "how you tried" : null,
-    attemptDraft.contactedAt ? null : "the date",
-    !attemptDraft.reached && isBlank(attemptDraft.reason) ? "a reason they weren't reached" : null,
-  ].filter(Boolean);
-  const attemptDraftValid = attemptDraftMissing.length === 0;
-  const addContactAttempt = () => {
-    if (!attemptDraftValid) return;
-    set("contactAttempts", [...contactAttempts, attemptDraft]);
-    setAttemptDraft(emptyAttemptDraft);
-  };
-  // This form can sit inside a <form> (the new-lead page), where Enter in a
-  // text box would submit the lead instead of logging the attempt.
-  const attemptKeyDown = (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    addContactAttempt();
-  };
+  const blankAttempt = () => ({ method: "", contactedAt: "", reached: true, reason: "", notes: "" });
+  const setAttempt = (i, key, value) =>
+    set(
+      "contactAttempts",
+      contactAttempts.map((a, n) => (n === i ? { ...a, [key]: value } : a)),
+    );
+  const addContactAttempt = () => set("contactAttempts", [...contactAttempts, blankAttempt()]);
   const removeContactAttempt = (i) => set("contactAttempts", contactAttempts.filter((_, idx) => idx !== i));
+  /** An attempt counts once it says how and when; the rest is detail. */
+  const attemptLogged = (a) => !isBlank(a?.method) && !isBlank(a?.contactedAt);
+  const loggedAttempts = contactAttempts.filter(attemptLogged);
 
   // One boolean per mandatory row — the single source of truth for both the
   // row ticks and the "Potential" gate/progress bar below.
   // Answered "no", or answered "yes" and backed up with a logged attempt.
   // An unanswered question is never complete.
   const doneContact =
-    form.needsClientContact === "no" || (form.needsClientContact === "yes" && contactAttempts.length > 0);
+    form.needsClientContact === "no" || (form.needsClientContact === "yes" && loggedAttempts.length > 0);
   const doneName = !isBlank(form.customerFirstName) && !isBlank(form.customerLastName);
   const doneAddress = !isBlank(form.siteLine1) && !isBlank(form.siteSuburb) && !isBlank(form.sitePostcode);
   const siteAddressLine = [form.siteLine1, form.siteSuburb, `${form.siteState || ""} ${form.sitePostcode || ""}`.trim()]
@@ -346,7 +334,7 @@ export default function LeadForm({
                   icon: <ClipboardCheck size={14} />,
                   count: `${doneCount}/${requiredRows.length}`,
                 },
-                { key: "decision", label: "Notes & decision", icon: <Check size={14} /> },
+                { key: "decision", label: "Mark Potential", icon: <Check size={14} /> },
               ]
             : []),
           ...(requestsPanel
@@ -354,7 +342,10 @@ export default function LeadForm({
             : []),
         ]}
         value={activeTab}
-        onChange={setTab}
+        onChange={(next) => {
+          if (next !== activeTab) onTabChange?.(activeTab, next);
+          setTab(next);
+        }}
       />
 
       {/* The Edit button sits in the card head, above the tabs and often off
@@ -382,7 +373,7 @@ export default function LeadForm({
           <div className="form-grid">
             {/* First: a commercial lead is a business with an ABN, a
                 residential one is a person — the rest of the section follows. */}
-            <Field label="Type of lead" className="span-2" error={err("leadType")}>
+            <Field label="Type of lead" className="span-2" required error={err("leadType")}>
               <select value={form.leadType} disabled={disabled} onChange={(e) => set("leadType", e.target.value)}>
                 <option value="">Select type</option>
                 {leadTypeOptions.map((t) => (
@@ -395,7 +386,7 @@ export default function LeadForm({
 
             {business ? (
               <>
-                <Field label="Business name" error={err("customerLegalName")}>
+                <Field label="Business name" required error={err("customerLegalName")}>
                   {input("customerLegalName")}
                 </Field>
                 <Field label="ABN" hint="commercial leads only">
@@ -404,24 +395,24 @@ export default function LeadForm({
               </>
             ) : null}
 
-            <Field label="First name" error={err("customerFirstName")}>
+            <Field label="First name" required error={err("customerFirstName")}>
               {input("customerFirstName", { autoComplete: "given-name" })}
             </Field>
-            <Field label="Last name" error={err("customerLastName")}>
+            <Field label="Last name" required error={err("customerLastName")}>
               {input("customerLastName", { autoComplete: "family-name" })}
             </Field>
 
-            <Field label="Phone" error={err("customerPhone")}>
+            <Field label="Phone" required hint="phone or email" error={err("customerPhone")}>
               {input("customerPhone")}
             </Field>
-            <Field label="Email" error={err("customerEmail")}>
+            <Field label="Email" required hint="phone or email" error={err("customerEmail")}>
               {input("customerEmail", { type: "email" })}
             </Field>
 
-            <Field label="Site address" className="span-2" error={err("siteLine1")}>
+            <Field label="Site address" className="span-2" required error={err("siteLine1")}>
               {input("siteLine1", { placeholder: "Street" })}
             </Field>
-            <Field label="Suburb" error={err("siteSuburb")}>{input("siteSuburb", { placeholder: "Suburb" })}</Field>
+            <Field label="Suburb" required error={err("siteSuburb")}>{input("siteSuburb", { placeholder: "Suburb" })}</Field>
             <div className="form-grid" style={{ gap: 12 }}>
               <Field label="State">
                 <select value={form.siteState} disabled={disabled} onChange={(e) => set("siteState", e.target.value)}>
@@ -430,7 +421,7 @@ export default function LeadForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Postcode" error={err("sitePostcode")}>
+              <Field label="Postcode" required error={err("sitePostcode")}>
                 {input("sitePostcode", { placeholder: "Postcode", inputMode: "numeric", maxLength: 4 })}
               </Field>
             </div>
@@ -446,7 +437,7 @@ export default function LeadForm({
               </select>
             </Field>
             {isBlank(form.salespersonId) ? (
-              <Field label="Reason no salesperson is assigned yet" className="span-2" error={err("unassignedReason")}>
+              <Field label="Reason no salesperson is assigned yet" className="span-2" required error={err("unassignedReason")}>
                 <textarea
                   rows={2}
                   value={form.unassignedReason}
@@ -477,7 +468,7 @@ export default function LeadForm({
             </div>
 
               <div className="checklist" style={{ marginBottom: 20 }}>
-              <ChecklistRow done={doneComments} label="Initial requirements & comments">
+              <ChecklistRow done={doneComments} label="Initial requirements & comments" required>
                 <Field
                   hint="what they want from the system, anything else they asked for, financial options discussed"
                   error={err("customerComments")}
@@ -486,7 +477,7 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneIntent} label="Genuine interest">
+              <ChecklistRow done={doneIntent} label="Genuine interest" required>
                 <label className="check" style={{ margin: 0 }}>
                   <input
                     type="checkbox"
@@ -503,7 +494,7 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneContact} label="Contact client?">
+              <ChecklistRow done={doneContact} label="Contact client?" required>
                 <p className="lede" style={{ margin: "0 0 10px" }}>
                   Did you have to contact the client to collect the mandatory details?
                 </p>
@@ -514,118 +505,104 @@ export default function LeadForm({
                   value={form.needsClientContact}
                   disabled={disabled}
                   error={err("needsClientContact")}
-                  onChange={(v) => set("needsClientContact", v)}
+                  onChange={(v) => {
+                    set("needsClientContact", v);
+                    // Straight into the first attempt rather than an empty panel.
+                    if (v === "yes" && !contactAttempts.length) set("contactAttempts", [blankAttempt()]);
+                  }}
                 />
                 {form.needsClientContact === "yes" ? (
-                  <div>
-                    {contactAttempts.length ? (
-                      <div className="list-stack" style={{ marginBottom: 10 }}>
-                        {contactAttempts.map((a, i) => (
-                          <div key={i} className="list-row">
-                            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                              <span className={`status-icon ${a.reached === false ? "failed" : "done"}`}>
-                                <PhoneCall size={14} />
-                              </span>
-                              <div>
-                                <div className="row-title">
-                                  Attempt {i + 1} · {a.method} · {a.reached === false ? "Not reached" : "Reached"}
-                                </div>
-                                <div className="row-meta">
-                                  {formatDate(a.contactedAt)}
-                                  {a.reached === false && a.reason ? ` — ${a.reason}` : ""}
-                                </div>
-                                {a.notes ? <div className="row-meta">{a.notes}</div> : null}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              disabled={disabled}
-                              onClick={() => removeContactAttempt(i)}
-                              aria-label="Remove attempt"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
+                  <div style={{ marginTop: 12 }}>
                     {err("contactAttempts") ? (
                       <p className="field-error" style={{ marginBottom: 8 }}>
                         {err("contactAttempts")}
                       </p>
                     ) : null}
-                    <p className="lede" style={{ marginBottom: 8 }}>
-                      No response yet? Log another attempt — every attempt is kept.
+
+                    {contactAttempts.map((a, i) => (
+                      <div key={i} className="attempt">
+                        <div className="attempt-head">
+                          <span className={`status-icon ${a.reached === false ? "failed" : "done"}`}>
+                            <PhoneCall size={14} />
+                          </span>
+                          <span className="row-title">Attempt {i + 1}</span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={disabled}
+                            onClick={() => removeContactAttempt(i)}
+                            aria-label={`Remove attempt ${i + 1}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="form-grid">
+                          <Field label="How you tried" required>
+                            <input
+                              value={a.method || ""}
+                              disabled={disabled}
+                              placeholder="e.g. Phone call, email"
+                              onChange={(e) => setAttempt(i, "method", e.target.value)}
+                            />
+                          </Field>
+                          <Field label="When" required>
+                            <input
+                              type="date"
+                              value={a.contactedAt || ""}
+                              disabled={disabled}
+                              onChange={(e) => setAttempt(i, "contactedAt", e.target.value)}
+                            />
+                          </Field>
+                        </div>
+                        <label className="check" style={{ marginTop: 10 }}>
+                          <input
+                            type="checkbox"
+                            checked={a.reached !== false}
+                            disabled={disabled}
+                            onChange={(e) => setAttempt(i, "reached", e.target.checked)}
+                          />
+                          Client was reached
+                        </label>
+                        {a.reached === false ? (
+                          <Field label="Reason not reached" required>
+                            <textarea
+                              rows={2}
+                              value={a.reason || ""}
+                              disabled={disabled}
+                              placeholder="e.g. No answer, voicemail left"
+                              onChange={(e) => setAttempt(i, "reason", e.target.value)}
+                            />
+                          </Field>
+                        ) : null}
+                        <Field label="Notes" hint="what was discussed on this attempt">
+                          <textarea
+                            rows={2}
+                            value={a.notes || ""}
+                            disabled={disabled}
+                            onChange={(e) => setAttempt(i, "notes", e.target.value)}
+                          />
+                        </Field>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={disabled}
+                      onClick={addContactAttempt}
+                    >
+                      <Plus size={14} /> Add attempt
+                    </button>
+                    <p className="lede" style={{ margin: "8px 0 0" }}>
+                      No response yet? Add another — every attempt is kept.
                     </p>
-                    <div className="form-grid" style={{ marginBottom: 8 }}>
-                      <Field label="How you tried" hint="required">
-                        <input
-                          value={attemptDraft.method}
-                          disabled={disabled}
-                          onChange={(e) => setAttemptDraft((a) => ({ ...a, method: e.target.value }))}
-                          onKeyDown={attemptKeyDown}
-                          placeholder="e.g. Phone call, email"
-                        />
-                      </Field>
-                      <Field label="When" hint="required">
-                        <input
-                          type="date"
-                          value={attemptDraft.contactedAt}
-                          disabled={disabled}
-                          onChange={(e) => setAttemptDraft((a) => ({ ...a, contactedAt: e.target.value }))}
-                          onKeyDown={attemptKeyDown}
-                        />
-                      </Field>
-                    </div>
-                    <label className="check" style={{ marginBottom: attemptDraft.reached ? 0 : 10 }}>
-                      <input
-                        type="checkbox"
-                        checked={attemptDraft.reached}
-                        disabled={disabled}
-                        onChange={(e) => setAttemptDraft((a) => ({ ...a, reached: e.target.checked }))}
-                      />
-                      Client was reached
-                    </label>
-                    {!attemptDraft.reached ? (
-                      <Field label="Reason not reached">
-                        <textarea
-                          rows={2}
-                          value={attemptDraft.reason}
-                          disabled={disabled}
-                          onChange={(e) => setAttemptDraft((a) => ({ ...a, reason: e.target.value }))}
-                          placeholder="e.g. No answer, voicemail left"
-                        />
-                      </Field>
-                    ) : null}
-                    <Field label="Notes" hint="what was discussed on this attempt">
-                      <textarea
-                        rows={2}
-                        value={attemptDraft.notes}
-                        disabled={disabled}
-                        onChange={(e) => setAttemptDraft((a) => ({ ...a, notes: e.target.value }))}
-                      />
-                    </Field>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={disabled || !attemptDraftValid}
-                        onClick={addContactAttempt}
-                      >
-                        <Plus size={14} /> Add attempt
-                      </button>
-                      {!disabled && !attemptDraftValid ? (
-                        <span className="row-meta">Still needed: {attemptDraftMissing.join(", ")}</span>
-                      ) : null}
-                    </div>
                   </div>
                 ) : null}
               </ChecklistRow>
 
               {/* Name, phone and email are captured once, at the top of the form —
                   this row only confirms them, it never asks again. */}
-              <ChecklistRow done={doneCustomer} label="Customer details">
+              <ChecklistRow done={doneCustomer} label="Customer details" required>
                 <p className="lede" style={{ margin: 0 }}>
                   {business ? "Commercial" : form.leadType ? "Residential" : "Type not set"}
                   {business && form.customerLegalName ? ` · ${form.customerLegalName}` : ""}
@@ -648,7 +625,7 @@ export default function LeadForm({
                 </button>
               </ChecklistRow>
 
-              <ChecklistRow done={doneService} label="Service requirement">
+              <ChecklistRow done={doneService} label="Service requirement" required>
                 <ChoiceGroup
                   name="lf-service"
                   otherLabel="service requirement"
@@ -661,7 +638,7 @@ export default function LeadForm({
               </ChecklistRow>
 
               {/* The site address is captured above — only billing is asked here. */}
-              <ChecklistRow done={doneBilling} label="Billing address">
+              <ChecklistRow done={doneBilling} label="Billing address" required>
                 <p className="lede" style={{ margin: "0 0 10px" }}>
                   Is the site address also the billing address?
                 </p>
@@ -676,7 +653,7 @@ export default function LeadForm({
                 />
                 {form.billingSameAsSite === "no" ? (
                   <div style={{ marginTop: 10 }}>
-                    <Field label="Billing address" error={err("customerBillingAddress")}>
+                    <Field label="Billing address" required error={err("customerBillingAddress")}>
                       {input("customerBillingAddress", { placeholder: "Street, suburb, state and postcode" })}
                     </Field>
                   </div>
@@ -728,13 +705,13 @@ export default function LeadForm({
                 </div>
               </ChecklistRow>
 
-              <ChecklistRow done={doneMeasurements} label="Roof / site measurements">
+              <ChecklistRow done={doneMeasurements} label="Roof / site measurements" required>
               <Field hint="dimensions, usable area, tilt — what estimation sizes the system from">
                 {textarea("roofMeasurements")}
               </Field>
             </ChecklistRow>
 
-            <ChecklistRow done={doneStoreys} label="House type">
+            <ChecklistRow done={doneStoreys} label="House type" required>
                 <ChoiceGroup
                   name="lf-storeys"
                   otherLabel="house type"
@@ -746,7 +723,7 @@ export default function LeadForm({
                 />
               </ChecklistRow>
 
-              <ChecklistRow done={doneRoof} label="Roof type">
+              <ChecklistRow done={doneRoof} label="Roof type" required>
                 <ChoiceGroup
                   name="lf-roof"
                   otherLabel="roof type"
@@ -758,7 +735,7 @@ export default function LeadForm({
                 />
               </ChecklistRow>
 
-              <ChecklistRow done={donePhase} label="Electrical phase">
+              <ChecklistRow done={donePhase} label="Electrical phase" required>
                 <ChoiceGroup
                   name="lf-phase"
                   otherLabel="electrical phase"
@@ -770,7 +747,7 @@ export default function LeadForm({
                 />
               </ChecklistRow>
 
-              <ChecklistRow done={doneBills} label="Electricity bills">
+              <ChecklistRow done={doneBills} label="Electricity bills" required>
                 <label className="check" style={{ marginBottom: 10 }}>
                   <input
                     type="checkbox"
@@ -789,7 +766,7 @@ export default function LeadForm({
                 )}
               </ChecklistRow>
 
-              <ChecklistRow done={doneUsage} label="Annual usage (kWh)">
+              <ChecklistRow done={doneUsage} label="Annual usage (kWh)" required>
                 <Field error={err("energyAnnualKwh")}>
                   <NumberInput
                     value={form.energyAnnualKwh}
@@ -800,7 +777,7 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneFinance} label="Finance assistance">
+              <ChecklistRow done={doneFinance} label="Finance assistance" required>
                 <ChoiceGroup
                   name="lf-finance"
                   otherLabel="finance assistance"
@@ -812,14 +789,14 @@ export default function LeadForm({
                 />
                 {form.financeAssistance === "yes" ? (
                   <div style={{ marginTop: 10 }}>
-                    <Field label="What they need" hint="lender, loan type, deposit" error={err("financeNotes")}>
+                    <Field label="What they need" required hint="lender, loan type, deposit" error={err("financeNotes")}>
                       {textarea("financeNotes", { placeholder: "e.g. zero-interest loan, 24 months" })}
                     </Field>
                   </div>
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneSiteRequirements} label="Site requirements & extra costs">
+              <ChecklistRow done={doneSiteRequirements} label="Site requirements & extra costs" required>
                 <label className="check" style={{ marginBottom: form.siteRequirementsNone ? 0 : 10 }}>
                   <input
                     type="checkbox"
@@ -839,7 +816,7 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneTimeframe} label="Preferred timeframe">
+              <ChecklistRow done={doneTimeframe} label="Preferred timeframe" required>
                 <Field error={err("preferredInstallTimeframe")}>
                   <select
                     value={form.preferredInstallTimeframe}
@@ -856,13 +833,13 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneLocation} label="Preferred location">
+              <ChecklistRow done={doneLocation} label="Preferred location" required>
                 <Field hint="where on site the system goes" error={err("preferredInstallLocation")}>
                   {input("preferredInstallLocation", { placeholder: "e.g. north-facing roof, garage wall for the battery" })}
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneSource} label="Where they got our details">
+              <ChecklistRow done={doneSource} label="Where they got our details" required>
                 <Field hint="feeds the referral reward program" error={err("leadSource")}>
                   {automated ? (
                     <input value={leadSourceLabel(form.leadSource)} disabled />
@@ -890,7 +867,7 @@ export default function LeadForm({
                 ) : null}
                 {form.leadSource === "referrer" ? (
                   <div className="form-grid" style={{ marginTop: 10 }}>
-                    <Field label="Referrer" error={err("referrerId")}>
+                    <Field label="Referrer" required error={err("referrerId")}>
                       <select value={form.referrerId} disabled={disabled} onChange={(e) => set("referrerId", e.target.value)}>
                         <option value="">Select</option>
                         {referrers.map((r) => (
@@ -942,43 +919,9 @@ export default function LeadForm({
                 <ChecklistRow done={!isBlank(form.preSiteInspectionRequired)} label="Pre-site inspection">
                 <Field label="Inspection required">{yesNo("preSiteInspectionRequired")}</Field>
                 {inspectionNeeded ? (
-                  <div style={{ marginTop: 10 }}>
-                    <div className="form-grid">
-                      <Field label="Site crew member" hint="assigned by operations">
-                        <input type="text" value={inspection?.assigneeName || "Not assigned yet"} disabled readOnly />
-                      </Field>
-                      <Field label="Inspection status" hint="tracked from the request">
-                        <input type="text" value={inspectionStatusLabel(inspectionStatus)} disabled readOnly />
-                      </Field>
-                    </div>
-                    {/* Raising another is always allowed: a visit can find more
-                        than it was sent for, or the site can change under it. */}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                      {inspection ? (
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRequestInspection?.(inspection)}>
-                          <ExternalLink size={14} /> Open the pre-site inspection form
-                        </button>
-                      ) : null}
-                      {onRequestInspection ? (
-                        <button
-                          type="button"
-                          className={inspection ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
-                          onClick={() => onRequestInspection(null)}
-                        >
-                          <Send size={14} /> {inspection ? "Request another inspection" : "Request pre-site inspection"}
-                        </button>
-                      ) : null}
-                    </div>
-                    {inspectionCount > 1 ? (
-                      <p className="row-meta" style={{ marginTop: 8 }}>
-                        {inspectionCount} pre-site requests raised on this job — see the Request / Response tab for all
-                        of them.
-                      </p>
-                    ) : null}
-                    <div style={{ marginTop: 10 }}>
-                      {checkbox("siteVisitCompleted", "Site visit completed and findings reviewed")}
-                    </div>
-                  </div>
+                  <p className="lede" style={{ margin: "10px 0 0" }}>
+                    Estimation raises the request and tracks the visit.
+                  </p>
                 ) : null}
               </ChecklistRow>
 

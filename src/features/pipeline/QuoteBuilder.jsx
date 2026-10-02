@@ -212,7 +212,7 @@ function QuotePreviewModal({ opp, quote, unit, source, title, actions, onClose }
   }, []);
 
   return (
-    <Modal title={title} className="document" onClose={onClose} actions={actions}>
+    <Modal confirmClose={false} title={title} className="document" onClose={onClose} actions={actions}>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {!url && !error ? <LoadingState label="Building the PDF…" /> : null}
       {url ? <iframe className="invoice-frame" src={url} title={title} /> : null}
@@ -890,6 +890,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       {deletingItem ? (
         <Modal
           title="Delete item"
+          confirmClose={false}
           body={`Remove ${deletingItem.itemName} (${deletingItem.brand}) from this quote?`}
           onClose={() => setDeleteId(null)}
           actions={

@@ -135,24 +135,30 @@ function ResponseForm({ proposal, token, onAnswered }) {
     <form onSubmit={submit} noValidate>
       <h2 className="proposal-public-h2">Your decision</h2>
       <div className="proposal-public-choices" role="radiogroup" aria-label="Your decision">
-        {CHOICES.map(({ key, label, icon: Icon, blurb }) => (
-          <button
-            key={key}
-            type="button"
-            role="radio"
-            aria-checked={choice === key}
-            className={`proposal-public-choice ${key} ${choice === key ? "selected" : ""}`.trim()}
-            onClick={() => {
-              setChoice(key);
-              setErrors({});
-              setFailure("");
-            }}
-          >
-            <Icon size={18} />
-            <span className="row-title">{label}</span>
-            <span className="row-meta">{blurb}</span>
-          </button>
-        ))}
+        {CHOICES.map((option) => {
+          // Destructured in the body, not the parameter list: no-unused-vars
+          // exempts capitalised *variables* as components, but not parameters,
+          // so a component pulled out of the arguments reads as unused.
+          const { key, label, icon: Icon, blurb } = option;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={choice === key}
+              className={`proposal-public-choice ${key} ${choice === key ? "selected" : ""}`.trim()}
+              onClick={() => {
+                setChoice(key);
+                setErrors({});
+                setFailure("");
+              }}
+            >
+              <Icon size={18} />
+              <span className="row-title">{label}</span>
+              <span className="row-meta">{blurb}</span>
+            </button>
+          );
+        })}
       </div>
 
       {selected ? (

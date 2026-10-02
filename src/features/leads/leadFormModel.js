@@ -208,6 +208,13 @@ export function autosavePayload(form) {
   return payload;
 }
 
+/**
+ * An attempt counts once it says how and when. The form seeds a blank row so
+ * there is something to type into, and a row nobody filled in is not a logged
+ * attempt — it is neither saved nor counted.
+ */
+export const isLoggedAttempt = (a) => !isBlank(a?.method) && !isBlank(a?.contactedAt);
+
 export function formToPayload(form) {
   const business = isBusinessLead(form.leadType);
   const payload = {
@@ -237,7 +244,7 @@ export function formToPayload(form) {
     // null keeps "not answered yet" on the record, so it comes back unanswered.
     needsClientContact: isBlank(form.needsClientContact) ? null : form.needsClientContact === "yes",
     contactAttempts: form.needsClientContact === "yes"
-      ? (form.contactAttempts || []).map((a) => ({
+      ? (form.contactAttempts || []).filter(isLoggedAttempt).map((a) => ({
           method: trim(a.method),
           contactedAt: a.contactedAt || null,
           reached: a.reached !== false,
@@ -313,9 +320,10 @@ export function validateLeadForm(form) {
   if (!form.leadSource) errors.leadSource = "Select a lead source.";
   if (form.leadSource === "referrer" && isBlank(form.referrerId))
     errors.referrerId = "Select the referrer who introduced this lead.";
-  if (form.needsClientContact === "yes" && !(form.contactAttempts || []).length)
-    errors.contactAttempts = "Log at least one contact attempt.";
-  if ((form.contactAttempts || []).some((a) => a.reached === false && isBlank(a.reason)))
+  const logged = (form.contactAttempts || []).filter(isLoggedAttempt);
+  if (form.needsClientContact === "yes" && !logged.length)
+    errors.contactAttempts = "Log at least one contact attempt — how you tried and when.";
+  if (logged.some((a) => a.reached === false && isBlank(a.reason)))
     errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
   if (!isBlank(form.customerBudget) && Number(form.customerBudget) < 0)
     errors.customerBudget = "A budget cannot be negative.";

@@ -24,6 +24,7 @@ import Field from "@/components/Field";
 import LoadingState from "@/components/LoadingState";
 import Modal from "@/components/Modal";
 import ProgressForm from "./ProgressForm";
+import SiteVisitSummary from "./SiteVisitSummary";
 import SiteVisitTaskForm from "./SiteVisitTaskForm";
 import ResponseForm from "./ResponseForm";
 import RequestStatusBadge from "./RequestStatusBadge";
@@ -40,6 +41,7 @@ import {
   REQUEST_KINDS,
   requestCode,
   requestedDocuments,
+  siteVisitTask,
   statusMeta,
   visibleProgress,
 } from "@/constants/collaboration";
@@ -55,7 +57,6 @@ import {
   decideResponse,
   deleteSiteVisitPhoto,
   saveSiteVisitTask,
-  updateRequest,
   fetchRequestHistory,
   fileAttachmentOnOpportunity,
   submitResponse,
@@ -180,12 +181,7 @@ export default function RequestDetail({ request, onClose, timeZone }) {
     if (!body.draft) onClose?.();
   };
 
-  const progressUpdate = async ({ assigneeId, ...body }) => {
-    // Who it is assigned to is a property of the request, not a progress
-    // entry, so it goes through the request update endpoint.
-    if (assigneeId && Number(assigneeId) !== Number(request.assigneeId)) {
-      await dispatch(updateRequest({ id: request.id, body: { assigneeId } })).unwrap();
-    }
+  const progressUpdate = async (body) => {
     await dispatch(addProgress({ id: request.id, body })).unwrap();
     await dispatch(fetchRequestHistory(request.id));
     notify("Update submitted");
@@ -196,7 +192,10 @@ export default function RequestDetail({ request, onClose, timeZone }) {
     notify("Photo deleted");
   };
 
-  const saveSiteVisit = async (body) => {
+  const saveSiteVisit = async ({ scheduledFor, ...body }) => {
+    if (scheduledFor && scheduledFor !== request.scheduledFor) {
+      await dispatch(addProgress({ id: request.id, body: { status: request.status, scheduledFor } })).unwrap();
+    }
     await dispatch(saveSiteVisitTask({ id: request.id, body })).unwrap();
     notify("Site-visit form saved — copy the link and send it over");
   };
@@ -232,6 +231,11 @@ export default function RequestDetail({ request, onClose, timeZone }) {
       setBusy(false);
     }
   };
+
+  // The visit has come back, so there is something to submit rather than
+  // just another note to log.
+  const visit = siteVisitTask(request);
+  const visitGathered = Boolean(visit?.submittedAt || visit?.status === "submitted");
 
   return (
     <Modal
@@ -270,35 +274,63 @@ export default function RequestDetail({ request, onClose, timeZone }) {
       <div className="request-detail">
         <div className="request-detail-head">
           <RequestStatusBadge request={request} />
-          <Badge tone={priorityMeta(request.priority).tone}>{priorityMeta(request.priority).label}</Badge>
           {request.stage ? <Badge tone="neutral">{stageById(request.stage).label}</Badge> : null}
         </div>
 
-        <div className="list-stack">
-          <Fact label="Raised by" value={request.createdByName} />
-          <Fact label="Assigned to" value={request.assigneeName || departmentLabel(request.department)} />
-          <Fact label="Requested" value={formatDate(request.createdAt, { withTime: true, timeZone })} />
-          <Fact
-            label="Due"
-            value={
-              request.dueAt
-                ? formatDate(request.dueAt, { withTime: hasClockTime(request.dueAt), timeZone })
-                : "No date set"
-            }
-          />
+        <dl className="detail-strip">
+          <div>
+            <dt>Priority</dt>
+            <dd>
+              <Badge tone={priorityMeta(request.priority).tone}>{priorityMeta(request.priority).label}</Badge>
+            </dd>
+          </div>
+          <div>
+            <dt>Raised by</dt>
+            <dd>{request.createdByName || "—"}</dd>
+          </div>
+          <div>
+            <dt>Assigned to</dt>
+            <dd>{request.assigneeName || departmentLabel(request.department)}</dd>
+          </div>
+          <div>
+            <dt>Requested</dt>
+            <dd>{formatDate(request.createdAt, { withTime: true, timeZone })}</dd>
+          </div>
+          <div>
+            <dt>Due</dt>
+            <dd>
+              {request.dueAt ? formatDate(request.dueAt, { withTime: hasClockTime(request.dueAt), timeZone }) : "—"}
+            </dd>
+          </div>
           {request.kind === "assignment" ? (
-            <Fact
-              label="Scheduled for"
-              value={request.scheduledFor ? formatDate(request.scheduledFor, { timeZone }) : "Not scheduled yet"}
-            />
+            <div>
+              <dt>Scheduled</dt>
+              <dd>
+                {request.scheduledFor
+                  ? formatDate(request.scheduledFor, { withTime: hasClockTime(request.scheduledFor), timeZone })
+                  : "Not yet"}
+              </dd>
+            </div>
           ) : null}
-        </div>
+        </dl>
 
-        {request.description ? (
+        {request.kind !== "assignment" && request.description ? (
           <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
-            <h3>{request.kind === "assignment" ? "What was asked for" : "Why it was asked for"}</h3>
+            <h3>Why it was asked for</h3>
             <p className="lede">{request.description}</p>
           </div>
+        ) : null}
+
+        {/* The visit itself, where the brief used to be: who is going, when,
+            the link to hand them, and the way into what it has to bring back. */}
+        {canProgress(request, user) && request.kind === "assignment" ? (
+          <SiteVisitTaskForm
+            request={request}
+            people={siteOps.length ? siteOps : active}
+            onSave={saveSiteVisit}
+            onDeletePhoto={removeSiteVisitPhoto}
+            timeZone={timeZone}
+          />
         ) : null}
 
         {/* ---- The response, read-only for everyone but the responder ---- */}
@@ -368,7 +400,7 @@ export default function RequestDetail({ request, onClose, timeZone }) {
 
         {clarifying && canDecide(request, user) ? (
           <div className="decision-card">
-            <Field label="What needs clarifying?">
+            <Field label="What needs clarifying?" required>
               <textarea rows={2} value={clarification} onChange={(e) => setClarification(e.target.value)} />
             </Field>
             <div className="decision-actions" style={{ marginTop: 12 }}>
@@ -384,6 +416,10 @@ export default function RequestDetail({ request, onClose, timeZone }) {
           </div>
         ) : null}
 
+        {request.kind === "assignment" && !canProgress(request, user) ? (
+          <SiteVisitSummary request={request} timeZone={timeZone} />
+        ) : null}
+
         {/* ---- Progress, read-only for the requester ---- */}
         {request.kind === "assignment" && progress.length ? (
           <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
@@ -395,7 +431,7 @@ export default function RequestDetail({ request, onClose, timeZone }) {
                     <span className="status-icon current">
                       <Clock size={14} />
                     </span>
-                    <span>
+                    <span className="row-lines">
                       <span className="row-title">{statusMeta("assignment", entry.status).label}</span>
                       {entry.note ? <span className="row-meta">{entry.note}</span> : null}
                     </span>
@@ -424,24 +460,7 @@ export default function RequestDetail({ request, onClose, timeZone }) {
 
         {canProgress(request, user) ? (
           <div style={{ marginTop: 18 }}>
-            <ProgressForm
-              request={request}
-              people={siteOps.length ? siteOps : active}
-              onSubmit={progressUpdate}
-              onUpload={upload("report")}
-              uploading={uploading}
-            />
-            {/* Handing the visit to whoever is attending, and what they sent
-                back. Only assignments go out to site. */}
-            <div style={{ marginTop: 18 }}>
-              <SiteVisitTaskForm
-                request={request}
-                people={siteOps.length ? siteOps : active}
-                onSave={saveSiteVisit}
-                onDeletePhoto={removeSiteVisitPhoto}
-                timeZone={timeZone}
-              />
-            </div>
+            <ProgressForm request={request} onSubmit={progressUpdate} gathered={visitGathered} />
           </div>
         ) : null}
 
@@ -461,7 +480,7 @@ export default function RequestDetail({ request, onClose, timeZone }) {
             <div className="list-stack">
               {history.map((entry) => (
                 <div key={entry.id} className="list-row">
-                  <span>
+                  <span className="row-lines">
                     <span className="row-title">{entry.action}</span>
                     {entry.detail ? <span className="row-meta">{entry.detail}</span> : null}
                   </span>

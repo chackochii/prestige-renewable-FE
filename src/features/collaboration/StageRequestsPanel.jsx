@@ -32,6 +32,9 @@ export default function StageRequestsPanel({
   // information; the lead stage asks operations. Either way the requester can
   // change it in the form — this only decides what is pre-selected.
   informationDepartment = "sales",
+  // Which template an information request opens on. Estimation asks sales
+  // about the site more than anything else, so it starts there.
+  informationTemplate,
   assignmentDepartment = "operations",
   emptyBody,
 }) {
@@ -130,6 +133,7 @@ export default function StageRequestsPanel({
           stage={stage}
           kind={raising.kind}
           department={raising.department}
+          template={raising.kind === "information" ? informationTemplate : "pre_site_inspection"}
           people={peopleFor(raising.kind, raising.department)}
           onClose={() => setRaising(null)}
           onSubmit={async (body) => {

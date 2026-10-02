@@ -141,9 +141,22 @@ function LockedStep({ title, body }) {
   return <EmptyState icon={<Lock size={24} strokeWidth={1.5} />} title={title} body={body} />;
 }
 
+/**
+ * Sales answers "is a pre-site inspection required?" on the lead checklist, so
+ * estimation starts on that answer rather than asking it again from blank.
+ * The estimator can still change it — their answer, once given, is the one
+ * that counts.
+ */
+const preSiteFromLead = (opp) => {
+  const asked = estimationInputFromOpp(opp).preSiteInspectionRequired;
+  if (asked === "yes") return true;
+  if (asked === "no") return false;
+  return null;
+};
+
 const formFromOpp = (opp) => ({
   checklistValues: opp.estimationChecklistValues || {},
-  preSiteInspectionRequired: opp.estimationPreSiteInspectionRequired ?? null,
+  preSiteInspectionRequired: opp.estimationPreSiteInspectionRequired ?? preSiteFromLead(opp),
 });
 
 // focusHandover: bump it to open the "Send to proposal" tab (the page's
@@ -452,6 +465,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           unit={unit}
           canEdit={canEdit}
           title="Request / Response"
+          informationTemplate="site_details"
         />
       ) : null}
 

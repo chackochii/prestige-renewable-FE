@@ -1,27 +1,30 @@
-// The coordinator's half of a site visit, inside the assignment they are
-// working on.
+// The coordinator's response to a pre-site inspection, over two screens.
 //
-// They say who is going — someone in the directory, or a name typed in for a
-// contractor's electrician who has no account here — and exactly what has to
-// come back: one line per piece of information, one slot per photo. Saving
-// mints a link they hand over; the person attending fills it in at
-// /site-visit/:token with no sign-in.
+//   Visit    — who is going, when, and the link to hand them. The few things
+//              a coordinator does every time, with nothing else in the way.
+//   Details  — what the visit has to bring back: the items the requester
+//              ticked, shown as theirs, plus anything the coordinator wants
+//              on top, plus the photos to take.
 //
-// The task is pending from the moment the link exists until that form is
-// submitted. What comes back — answers and photos — is shown here, which is
-// where the coordinator is already working.
+// Keeping the detail on its own screen is the point: assigning a crew member
+// and sending a link is a ten-second job, and it should not mean scrolling
+// past twenty checklist rows to reach the button.
+//
+// Saving mints the link; the person attending fills it in at
+// /site-visit/:token with no sign-in. The task stays pending until that form
+// comes back, and what comes back is shown here, where the coordinator works.
 
 import { useState } from "react";
-import { Eye, Link2, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, Eye, Link2, ListChecks, Paperclip, Plus, Trash2, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import Field from "@/components/Field";
-import { DOCUMENT_TYPES, documentTypeLabel, siteVisitStatusMeta, siteVisitTask } from "@/constants/collaboration";
-import { SITE_PHOTOS_KEY, inspectionChecklistFrom, inspectionFieldsFor } from "@/constants/inspectionReport";
+import { documentTypeLabel, siteVisitStatusMeta, siteVisitTask } from "@/constants/collaboration";
+import { SITE_PHOTOS_KEY, requesterItems } from "@/constants/inspectionReport";
 import InspectionReportView from "@/features/collaboration/InspectionReportView";
 import { siteVisitLink } from "@/features/collaboration/siteVisitLink";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { formatDate, toDateInput } from "@/helpers/dateTimeHelpers";
 import { isBlank } from "@/utils/validators";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
@@ -43,7 +46,13 @@ const KIND_HINT = {
   checkbox: "tick box",
   signature: "signature",
 };
-const blankDoc = () => ({ label: "", type: "image", comment: "" });
+
+/** The clock time out of a stored date, for the time input. */
+const timeOf = (value) => {
+  if (typeof value !== "string") return "";
+  const time = value.split("T")[1];
+  return time ? time.slice(0, 5) : "";
+};
 
 export default function SiteVisitTaskForm({ request, people = [], onSave, onDeletePhoto, timeZone }) {
   const task = siteVisitTask(request);
@@ -52,29 +61,56 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
   const response = task?.response || null;
   const photos = asList(task?.photos);
 
+  // What the requester ticked on the pre-site inspection checklist. It is
+  // theirs — the coordinator can see it and add to it, but not quietly drop it.
+  const asked = requesterItems(request);
+  const askedKeys = new Set(asked.map((f) => f.key));
+
+  const [screen, setScreen] = useState("visit");
   // "" means nobody yet; "__other" means a name typed in rather than picked.
   const [assigneeId, setAssigneeId] = useState(() => {
     if (task?.assigneeId) return String(task.assigneeId);
     if (task?.assigneeName) return "__other";
-    return request.assigneeId ? String(request.assigneeId) : "";
+    return "";
   });
   const [assigneeName, setAssigneeName] = useState(task?.assigneeName || "");
   const [assigneeEmail, setAssigneeEmail] = useState(task?.assigneeEmail || "");
   const [assigneePhone, setAssigneePhone] = useState(task?.assigneePhone || "");
-  // What the requester ticked on the pre-site inspection checklist. Until the
-  // coordinator has saved a form of their own, that list is the starting point
-  // — they can add to it or drop anything that does not apply.
-  const asked = inspectionFieldsFor(inspectionChecklistFrom(request));
-  const [items, setItems] = useState(() => {
-    const saved = asList(task?.requestedFields);
-    if (saved.length) return saved.map((f) => ({ ...f }));
-    if (asked.length) return asked.map((f) => ({ ...f }));
-    return [blankItem()];
-  });
-  const [documents, setDocuments] = useState(() => asList(task?.requestedDocuments).map((d) => ({ ...d })));
+  const [scheduledDate, setScheduledDate] = useState(toDateInput(request.scheduledFor));
+  const [scheduledTime, setScheduledTime] = useState(timeOf(request.scheduledFor));
+  // Only the coordinator's own additions live in state; the requester's items
+  // are read back from the request every render.
+  const [extras, setExtras] = useState(() =>
+    asList(task?.requestedFields)
+      .filter((f) => !askedKeys.has(f.key))
+      .map((f) => ({ ...f })),
+  );
+  // Photo slots a request asked for. The inspection form captures site photos
+  // on its own, so these are carried through rather than edited here.
+  const documents = asList(task?.requestedDocuments);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(null);
+
+  const answers = task?.response?.fields || {};
+  /** What came back for one item, or "" while the form is still out. */
+  const answerFor = (field) => {
+    const value = answers[field.key];
+    if (value === undefined || value === null || value === "") return "";
+    if (field.kind === "signature") return "Signed";
+    if (field.kind === "checkbox") return value ? "Yes" : "No";
+    return String(value);
+  };
+
+  const typedName = assigneeId === "__other";
+  const link = siteVisitLink(task?.token);
+  const namedExtras = extras.filter((x) => !isBlank(x.label));
+  const namedDocs = documents.filter((d) => !isBlank(d.label));
+  const requestedCount = asked.length + namedExtras.length + namedDocs.length;
+
+  const setExtra = (i, value) => setExtras(extras.map((x, n) => (n === i ? { ...x, label: value } : x)));
+  const addExtra = () => setExtras([...extras, blankItem()]);
+  const removeExtra = (i) => setExtras(extras.filter((_, n) => n !== i));
 
   /** Deleting a photo is not undoable, so it asks once. */
   const remove = async (file) => {
@@ -90,48 +126,37 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
     }
   };
 
-  const typedName = assigneeId === "__other";
-  const link = siteVisitLink(task?.token);
-
-  const setItem = (i, value) => setItems(items.map((x, n) => (n === i ? { ...x, label: value } : x)));
-  const addItem = () => setItems([...items, blankItem()]);
-  const removeItem = (i) => setItems(items.filter((_, n) => n !== i));
-
-  const setDoc = (i, key, value) => setDocuments(documents.map((d, n) => (n === i ? { ...d, [key]: value } : d)));
-  const addDoc = () => setDocuments([...documents, blankDoc()]);
-  const removeDoc = (i) => setDocuments(documents.filter((_, n) => n !== i));
-
   const save = async () => {
     if (!assigneeId) return setError("Say who is attending.");
     if (typedName && isBlank(assigneeName)) return setError("Enter the name of the person attending.");
-    const named = items.filter((x) => !isBlank(x.label));
-    if (!named.length && !documents.some((d) => !isBlank(d.label)))
-      return setError("Ask for at least one piece of information or one photo.");
+    if (!requestedCount) return setError("Ask for at least one piece of information or one photo — see Details.");
 
     setSaving(true);
     setError("");
     try {
       await onSave({
+        // The site member attending. The request itself stays with the
+        // coordinator; this is who they are handing it to.
         assigneeId: typedName ? null : Number(assigneeId),
         assigneeName: typedName ? assigneeName.trim() : "",
         assigneeEmail: typedName ? assigneeEmail.trim() : "",
         assigneePhone: typedName ? assigneePhone.trim() : "",
+        scheduledFor: scheduledDate ? (scheduledTime ? `${scheduledDate}T${scheduledTime}` : scheduledDate) : null,
         // `kind` rides along so the site member gets the right control — a
         // signature pad rather than a text box, and so on.
-        requestedFields: named.map((x, i) => ({
+        requestedFields: [...asked, ...namedExtras].map((x, i) => ({
           key: x.key || slug(x.label, i),
           label: x.label.trim(),
           kind: x.kind || "text",
         })),
-        requestedDocuments: documents
-          .filter((d) => !isBlank(d.label))
-          .map((d, i) => ({
-            key: d.key || slug(d.label, i),
-            label: d.label.trim(),
-            type: d.type || "image",
-            comment: (d.comment || "").trim(),
-          })),
+        requestedDocuments: namedDocs.map((d, i) => ({
+          key: d.key || slug(d.label, i),
+          label: d.label.trim(),
+          type: d.type || "image",
+          comment: (d.comment || "").trim(),
+        })),
       });
+      setScreen("visit");
     } catch (err) {
       setError(errText(err, "Could not save the site-visit form."));
     } finally {
@@ -140,20 +165,109 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
     return undefined;
   };
 
+  // ---- Screen 2: what the visit has to bring back --------------------------
+  if (screen === "details") {
+    return (
+      <div className="section" style={{ marginBottom: 0 }}>
+        <div className="estimation-item-head">
+          <h3>Details Required</h3>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setScreen("visit")}>
+            <ArrowLeft size={14} /> Back
+          </button>
+        </div>
+
+        {asked.length ? (
+          <>
+            <p className="lede" style={{ marginBottom: 10 }}>
+              This fills in on its own once whoever is attending sends the form back.
+            </p>
+            <div className="list-stack">
+              {asked.map((field) => {
+                const answer = answerFor(field);
+                return (
+                  <div className="list-row" key={field.key}>
+                    <span className="row-title">{field.label}</span>
+                    <span className={answer ? "row-title answer-filled" : "row-meta"}>
+                      {answer || `Waiting — ${KIND_HINT[field.kind] || "short answer"}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <p className="lede">The requester did not tick anything — ask for whatever this visit needs below.</p>
+        )}
+
+        <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
+          <h3>Anything else you need</h3>
+          <p className="lede" style={{ marginBottom: 12 }}>
+            One line per extra thing. They get an input for each, alongside the items above.
+          </p>
+          {extras.map((item, i) => (
+            <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
+              <Field
+                label={`Extra ${i + 1}`}
+                hint={answerFor(item) ? `answered: ${answerFor(item)}` : KIND_HINT[item.kind]}
+              >
+                <input
+                  value={item.label}
+                  placeholder="e.g. Gate code for the rear lane"
+                  onChange={(e) => setExtra(i, e.target.value)}
+                />
+              </Field>
+              <div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeExtra(i)} aria-label="Remove">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={addExtra}>
+            <Plus size={14} /> Add an item
+          </button>
+        </div>
+
+        {error ? (
+          <Alert tone="danger" style={{ marginTop: 14, marginBottom: 0 }}>
+            {error}
+          </Alert>
+        ) : null}
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
+            <Link2 size={14} /> {saving ? "Saving…" : task ? "Update the form" : "Create the form link"}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setScreen("visit")}>
+            Back to the visit
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Screen 1: the visit itself -----------------------------------------
   return (
     <div className="section" style={{ marginBottom: 0 }}>
       <div className="estimation-item-head">
-        <h3>Site visit form</h3>
+        <h3>Site visit</h3>
         {task ? <Badge tone={status.tone}>{status.label}</Badge> : null}
       </div>
-      <p className="lede" style={{ marginBottom: 12 }}>
-        {submitted
-          ? "The person attending has sent their report. What came back is below."
-          : "Say who is going and what has to come back, then hand them the link. They need no sign-in, and see nothing else about the job."}
-      </p>
+
+      {/* The brief, on its own screen. This is the one line about it. */}
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm site-visit-details"
+        style={{ marginTop: 0, marginBottom: 14 }}
+        onClick={() => setScreen("details")}
+      >
+        <ListChecks size={14} />
+        Details Required — {requestedCount} item{requestedCount === 1 ? "" : "s"}
+        {asked.length ? ` (${asked.length} from the requester)` : ""}
+      </button>
 
       <div className="form-grid">
-        <Field label="Who is attending" className="span-2">
+        <Field label="Assign to" className="span-2" required hint="the site member attending">
           <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
             <option value="">Choose a person</option>
             {people.map((person) => (
@@ -167,7 +281,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
         </Field>
         {typedName ? (
           <>
-            <Field label="Name" className="span-2" hint="electrician, site member or contractor">
+            <Field label="Name" className="span-2" required hint="electrician, site member or contractor">
               <input value={assigneeName} onChange={(e) => setAssigneeName(e.target.value)} />
             </Field>
             <Field label="Email" hint="optional — where to send the link">
@@ -178,74 +292,19 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
             </Field>
           </>
         ) : null}
+        <Field label="Scheduled date">
+          <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
+        </Field>
+        <Field label="Scheduled time" hint={scheduledDate ? "optional" : "pick a date first"}>
+          <input
+            type="time"
+            value={scheduledTime}
+            disabled={!scheduledDate}
+            onChange={(e) => setScheduledTime(e.target.value)}
+          />
+        </Field>
       </div>
 
-      <div className="section" style={{ marginTop: 16, marginBottom: 0 }}>
-        <h3>Information to bring back</h3>
-        <p className="lede" style={{ marginBottom: 12 }}>
-          {asked.length && !task
-            ? `Started from the ${asked.length} item${asked.length === 1 ? "" : "s"} the requester marked required on the pre-site inspection checklist. Add or remove whatever you need — the person attending gets an input for each.`
-            : "One line per thing you need. They get an input for each."}
-        </p>
-        {items.map((item, i) => (
-          <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
-            <Field label={`Item ${i + 1}`} hint={KIND_HINT[item.kind]}>
-              <input
-                value={item.label}
-                placeholder="e.g. Switchboard make and model"
-                onChange={(e) => setItem(i, e.target.value)}
-              />
-            </Field>
-            <div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeItem(i)} aria-label="Remove item">
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-        <button type="button" className="btn btn-ghost btn-sm" onClick={addItem}>
-          <Plus size={14} /> Add another item
-        </button>
-      </div>
-
-      <div className="section" style={{ marginTop: 16, marginBottom: 0 }}>
-        <h3>Photos to take</h3>
-        <p className="lede" style={{ marginBottom: 12 }}>
-          Name each shot — &ldquo;switchboard with the cover off&rdquo; — and it becomes its own upload slot on their form,
-          with your comment as the instruction.
-        </p>
-        {documents.map((doc, i) => (
-          <div key={i} className="row-grid" style={{ "--row-cols": "1fr 150px 1fr auto" }}>
-            <Field label="What to photograph">
-              <input
-                value={doc.label}
-                placeholder="e.g. Switchboard with the cover off"
-                onChange={(e) => setDoc(i, "label", e.target.value)}
-              />
-            </Field>
-            <Field label="Type">
-              <select value={doc.type} onChange={(e) => setDoc(i, "type", e.target.value)}>
-                {DOCUMENT_TYPES.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Comment" hint="what it has to show">
-              <input value={doc.comment ?? ""} onChange={(e) => setDoc(i, "comment", e.target.value)} />
-            </Field>
-            <div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeDoc(i)} aria-label="Remove">
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-        <button type="button" className="btn btn-ghost btn-sm" onClick={addDoc}>
-          <Plus size={14} /> Add a photo
-        </button>
-      </div>
 
       {error ? (
         <Alert tone="danger" style={{ marginTop: 14, marginBottom: 0 }}>
@@ -258,18 +317,28 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
           <Link2 size={14} /> {saving ? "Saving…" : task ? "Update the form" : "Create the form link"}
         </button>
         {link ? (
-          <CopyLinkButton
-            value={link}
-            label="Copy the site-visit link"
-            copiedLabel="Link copied"
-            toast="Site-visit link copied — send it to whoever is attending"
-          />
+          <>
+            <CopyLinkButton
+              value={link}
+              label="Copy the link"
+              copiedLabel="Link copied"
+              toast="Site-visit link copied — send it to whoever is attending"
+            />
+            {/* An anchor, not a button that routes: the form is a public page
+                outside the app, and the coordinator opening it to check must
+                not lose the request they are working in. */}
+            <a className="btn btn-ghost btn-sm" href={link} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={14} /> Open the form
+            </a>
+          </>
         ) : null}
       </div>
 
       {link ? (
-        <p className="row-meta" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
-          {link}
+        <p className="row-meta site-visit-url" style={{ marginTop: 8 }}>
+          <a href={link} target="_blank" rel="noopener noreferrer">
+            {link}
+          </a>
         </p>
       ) : null}
 
@@ -290,18 +359,19 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
               </div>
             ) : null}
           </div>
-          <InspectionReportView response={response} requestedFields={asList(task?.requestedFields)} submittedAt={task?.submittedAt} timeZone={timeZone} />
-
+          <InspectionReportView
+            response={response}
+            requestedFields={asList(task?.requestedFields)}
+            submittedAt={task?.submittedAt}
+            timeZone={timeZone}
+          />
         </div>
       ) : task ? (
         <Alert tone="info" style={{ marginTop: 14, marginBottom: 0 }}>
-          This visit stays pending until {task.assigneeName || "the person attending"} submits the form.
+          Pending until {task.assigneeName || "the person attending"} submits the form.
         </Alert>
       ) : null}
 
-      {/* Photos land here as the site member uploads them, before they submit
-          as well as after — a coordinator watching a visit go out wants to see
-          them arrive, not wait for the form to be sent. */}
       {task ? (
         <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
           <div className="estimation-item-head">

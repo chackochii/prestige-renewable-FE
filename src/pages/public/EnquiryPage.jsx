@@ -184,10 +184,10 @@ export default function EnquiryPage() {
             <div className="section">
               <h3>Your details</h3>
               <div className="form-grid">
-                <Field className="span-2" label="Full name" hint="required" error={fieldErrors.name} htmlFor="enq-name">
+                <Field className="span-2" label="Full name" required error={fieldErrors.name} htmlFor="enq-name">
                   {input("name", { autoComplete: "name", autoFocus: true, maxLength: LIMITS.name, required: true })}
                 </Field>
-                <Field label="Email" hint="required" error={fieldErrors.email} htmlFor="enq-email">
+                <Field label="Email" required error={fieldErrors.email} htmlFor="enq-email">
                   {input("email", {
                     type: "email",
                     autoComplete: "email",
@@ -196,7 +196,7 @@ export default function EnquiryPage() {
                     required: true,
                   })}
                 </Field>
-                <Field label="Phone" hint="required" error={fieldErrors.phone} htmlFor="enq-phone">
+                <Field label="Phone" required error={fieldErrors.phone} htmlFor="enq-phone">
                   {input("phone", {
                     type: "tel",
                     autoComplete: "tel",

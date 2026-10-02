@@ -184,6 +184,7 @@ export default function UsersPage() {
       {deleting ? (
         <Modal
           title="Delete user"
+          confirmClose={false}
           body={`Remove ${deleting.name} (${deleting.email})? They will no longer be able to sign in. Their history stays on the records they touched.`}
           onClose={() => setDeleting(null)}
           actions={

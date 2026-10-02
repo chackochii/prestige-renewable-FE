@@ -28,6 +28,8 @@ export const STAGE_VIEW_PERMISSION = {
   7: "construction.read",
   8: "invoicing.read",
   9: "warranty.read",
+  10: "leads.read",
+  11: "warranty.read",
 };
 
 /** Stage number → the permission needed to move a record out of it. */
@@ -40,7 +42,9 @@ export const STAGE_ADVANCE_PERMISSION = {
   6: "procurement.update", // purchase orders placed, deliveries confirmed
   7: "construction.update", // site works installed and commissioned
   8: "invoicing.update", // milestone billing reconciled
-  9: "warranty.update", // handover pack completed
+  9: "warranty.update", // warranty certificates issued and logged
+  10: "leads.update", // the client's review and any referral captured
+  11: "warranty.update", // defects liability and maintenance period closed out
 };
 
 /** The permission needed to leave `stage`. */

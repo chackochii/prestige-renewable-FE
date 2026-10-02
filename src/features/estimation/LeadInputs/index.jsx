@@ -14,7 +14,6 @@ import NumberInput from "@/components/NumberInput";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
 import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { countDone, groupOptionalItems, leadMandatoryItems, leadOptionalItems } from "@/helpers/leadChecklist";
-import { oppTitle } from "@/helpers/opportunity";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useAppDispatch } from "@/store";
@@ -28,22 +27,7 @@ const errText = (err, fallback) => (typeof err === "string" ? err : err?.message
  * questions, and files are asked for through the request's own document
  * slots rather than as an answer field.
  */
-const askable = (row) => !["readonly", "files"].includes(row.type);
-
-/**
- * The note sales reads on the request: the job, then exactly the rows that
- * were ticked, so the ask is legible before they open the response form.
- */
-function noteFor(opp, rows) {
-  const lines = rows.map((row) => `• ${row.label}${row.group ? ` (${row.group})` : ""}`);
-  return [
-    `Estimation needs the following lead information for ${opp?.number || "this job"} — ${oppTitle(opp)}:`,
-    "",
-    ...lines,
-    "",
-    "Please confirm each one with the client and answer them on the form below.",
-  ].join("\n");
-}
+const askable = (row) => row.type !== "readonly";
 
 function Tick({ done, label, value }) {
   return (
@@ -357,11 +341,21 @@ export default function LeadInputs({
           stage={stage}
           kind="information"
           department="sales"
+          template="site_details"
           people={sales.length ? sales : active}
           initial={{
             title: `Lead information needed — ${pickedRows.length} item${pickedRows.length === 1 ? "" : "s"}`,
-            description: noteFor(opp, pickedRows),
-            fields: pickedRows.map((row) => ({ key: row.field, label: row.label })),
+            fields: pickedRows
+              .filter((row) => row.type !== "files")
+              .map((row) => ({ key: row.field, label: row.label })),
+            documents: pickedRows
+              .filter((row) => row.type === "files")
+              .map((row) => ({
+                key: row.field,
+                label: row.label,
+                type: row.category === SITE_PHOTO_CATEGORY ? "image" : "document",
+                comment: "",
+              })),
           }}
           onClose={() => setRequesting(false)}
           onSubmit={async (body) => {

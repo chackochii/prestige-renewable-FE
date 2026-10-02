@@ -123,6 +123,7 @@ export default function BusinessUnitsPage() {
       {modal?.delete ? (
         <Modal
           title="Delete business unit"
+          confirmClose={false}
           body={`Delete ${modal.delete.name} (${modal.delete.code})? Only units with no opportunities can be removed — otherwise set the status to inactive.`}
           onClose={() => setModal(null)}
           actions={
