@@ -21,7 +21,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  BadgeDollarSign,
   Calculator,
   Check,
   ClipboardCheck,
@@ -49,9 +48,8 @@ import RequestDetail from "@/features/collaboration/RequestDetail";
 import RequestFormModal from "@/features/collaboration/RequestFormModal";
 import RequestStatusBadge from "@/features/collaboration/RequestStatusBadge";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
-import { inspectionRequests, requestCode } from "@/constants/collaboration";
+import { inspectionApproved, inspectionDelivered, inspectionRequests, requestCode } from "@/constants/collaboration";
 import QuoteBuilder from "@/features/pipeline/QuoteBuilder";
-import VariationCheck from "@/features/pipeline/VariationCheck";
 import ProposalHandover from "@/features/pipeline/ProposalHandover";
 import RequoteSummary from "@/features/proposals/RequoteSummary";
 import { isRequoteOpen } from "@/helpers/proposals";
@@ -290,13 +288,18 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const showClientInfoGate = requirementsChecklistComplete;
   const showEstimatorChecklist = opp.estimationClientInfoNeeded === true;
 
-  // Resolved when no inspection is needed, or when operations has completed
-  // the one that was requested.
+  // Resolved when no inspection is needed, or when the estimator has read the
+  // findings of the one they asked for and approved them. Operations finishing
+  // the visit is not the same thing: the findings are the estimator's to accept.
   const inspections = inspectionRequests(requests);
   const inspection = inspections[0] || null;
-  const inspectionComplete = ["completed", "report_submitted"].includes(inspection?.status);
-  const preSiteResolved = preSiteInspectionRequired === false || inspectionComplete;
-  const showQuoteBuilder = state === "ready" || (showEstimatorChecklist && preSiteResolved);
+  const findingsIn = inspectionDelivered(inspection);
+  const findingsApproved = inspectionApproved(inspection);
+  const preSiteResolved = preSiteInspectionRequired === false || findingsApproved;
+  // The quote waits on the requirements checklist as well, whichever way the
+  // client-input question went.
+  const showQuoteBuilder =
+    requirementsChecklistComplete && (state === "ready" || (showEstimatorChecklist && preSiteResolved));
 
   // One flag per tab, for the tick on the tab and for choosing where to open.
   const requirementsDone = requirementsChecklistComplete && opp.estimationClientInfoNeeded != null;
@@ -326,7 +329,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
     { key: "site-visit", label: "Pre-site visit", icon: tabIcon(siteVisitDone, <HardHat size={14} />) },
     { key: "quote", label: "Quote", icon: tabIcon(quoteDone, <Receipt size={14} />) },
     { key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> },
-    { key: "variations", label: "Variations", icon: <BadgeDollarSign size={14} /> },
     { key: "handover", label: requote ? "Send revised quote" : "Send to proposal", icon: tabIcon(Number(opp.stage) > 2, <Send size={14} />) },
   ];
 
@@ -418,10 +420,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
           <div className="section" style={{ marginTop: 24 }}>
             <SectionHead icon={<Stamp size={13} />} title="Approvals required" />
-            <p className="lede" style={{ marginBottom: 12 }}>
-              What this job has to clear before it can be built. Sales may have ticked some on the lead — confirm
-              the list here; the approvals stage tracks exactly these once the customer accepts.
-            </p>
             <RequiredApprovalsPicker
               unit={unit}
               value={requiredKeysOf(opp)}
@@ -517,9 +515,23 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                           <span className="row-meta">{inspection.latestUpdate.note}</span>
                         </div>
                       ) : null}
+                      {findingsIn && !findingsApproved ? (
+                        <Alert tone="info" style={{ marginTop: 10, marginBottom: 0 }}>
+                          The visit is back. Read the findings and approve them — the quote opens once you do.
+                        </Alert>
+                      ) : null}
+                      {findingsApproved ? (
+                        <Alert tone="success" style={{ marginTop: 10, marginBottom: 0 }}>
+                          Findings approved — the quote is open.
+                        </Alert>
+                      ) : null}
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setViewingInspection(true)}>
-                          Open the request
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${findingsIn && !findingsApproved ? "btn-primary" : "btn-ghost"}`}
+                          onClick={() => setViewingInspection(true)}
+                        >
+                          {findingsIn && !findingsApproved ? "Review findings" : "Open the request"}
                         </button>
                         {canEdit ? (
                           <button
@@ -581,38 +593,28 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           <>
             <QuoteBuilder opp={opp} unit={unit} canEdit={canEdit} />
             {quoteDone ? (
-              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("variations")}>
-                Continue to variation check
+              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("handover")}>
+                Continue to send to proposal
               </button>
             ) : null}
           </>
         ) : (
           <LockedStep
             title="Quote not open yet"
-            body="The quote opens once estimation is ready — requirements confirmed and, if one is needed, the pre-site inspection completed."
-          />
-        )
-      ) : null}
-
-      {tab === "variations" ? (
-        showQuoteBuilder && quoteDone ? (
-          <>
-            <VariationCheck opp={opp} canEdit={canEdit} />
-            <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("handover")}>
-              Continue to send to proposal
-            </button>
-          </>
-        ) : (
-          <LockedStep
-            title="Nothing to check yet"
-            body="The variation check compares the quote with the default price list — create the quote and add items first."
+            body={
+              !requirementsChecklistComplete
+                ? "The quote opens once the requirements checklist on the first tab is complete."
+                : findingsIn && !findingsApproved
+                  ? "The pre-site inspection findings are in — approve them on the pre-site visit tab and the quote opens."
+                  : "The quote opens once estimation is ready — requirements confirmed and, if one is needed, the pre-site inspection approved."
+            }
           />
         )
       ) : null}
 
       {tab === "handover" ? (
         showQuoteBuilder && quoteDone ? (
-          <ProposalHandover opp={opp} unit={unit} requote={requote} onReviewVariations={() => setTab("variations")} onSent={onSent} />
+          <ProposalHandover opp={opp} unit={unit} requote={requote} onSent={onSent} />
         ) : (
           <LockedStep
             title="Nothing to send yet"

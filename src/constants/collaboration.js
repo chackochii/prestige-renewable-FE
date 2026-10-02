@@ -97,7 +97,11 @@ export const ASSIGNMENT_STATUSES = [
   { key: "rescheduled", label: "Rescheduled", tone: "warning", open: true, step: 3 },
   { key: "in_progress", label: "In progress", tone: "info", open: true, step: 4 },
   { key: "completed", label: "Completed", tone: "success", open: true, step: 5 },
-  { key: "report_submitted", label: "Report submitted", tone: "success", open: false, step: 6 },
+  // Still open: the findings are in, but the person who asked for the visit
+  // has yet to approve them.
+  { key: "report_submitted", label: "Report submitted", tone: "success", open: true, step: 6 },
+  { key: "accepted", label: "Findings approved", tone: "success", open: false, step: 7 },
+  { key: "returned", label: "Sent back", tone: "danger", open: true, step: 4 },
   { key: "review_required", label: "Review required", tone: "danger", open: true, step: 5 },
   { key: "cancelled", label: "Cancelled", tone: "neutral", open: false, step: 0 },
 ];
@@ -122,7 +126,7 @@ export function statusMeta(kind, key) {
 /** Statuses an assignee may move an assignment to, from where it is now. */
 export function nextAssignmentStatuses(current) {
   const flow = ["assigned", "scheduled", "rescheduled", "in_progress", "completed", "report_submitted", "review_required"];
-  if (current === "report_submitted" || current === "cancelled") return [];
+  if (["report_submitted", "accepted", "cancelled"].includes(current)) return [];
   return flow.filter((key) => key !== current);
 }
 
@@ -141,16 +145,24 @@ export function canRespond(request, user) {
   return ["pending", "clarification_required", "returned", "draft_saved"].includes(request.status);
 }
 
-/** The requester accepting a response, or sending it back for clarification. */
+/**
+ * The requester deciding on what came back: accepting a response or sending it
+ * back for clarification, and — once a site visit has brought its findings in —
+ * approving those findings or rejecting them for another look.
+ */
 export function canDecide(request, user) {
-  if (request?.kind !== "information" || !isRequester(request, user)) return false;
+  if (!isRequester(request, user)) return false;
+  if (request.kind === "assignment") {
+    return inspectionDelivered(request) && !["accepted", "cancelled"].includes(request.status);
+  }
+  if (request.kind !== "information") return false;
   return ["responded", "under_review"].includes(request.status);
 }
 
 /** The coordinator moving an assignment along. */
 export function canProgress(request, user) {
   if (request?.kind !== "assignment" || !isAssignee(request, user)) return false;
-  return !["cancelled", "report_submitted"].includes(request.status);
+  return !["cancelled", "report_submitted", "accepted"].includes(request.status);
 }
 
 /** Only the requester may cancel, and only while it is still open. */
@@ -175,7 +187,9 @@ export function contextualAction(request, user) {
   if (canRespond(request, user)) return { key: "respond", label: "Respond" };
   if (canProgress(request, user)) return { key: "progress", label: "Update progress" };
   if (canDecide(request, user)) {
-    return request.kind === "information" ? { key: "review", label: "View response" } : { key: "review", label: "Review" };
+    return request.kind === "information"
+      ? { key: "review", label: "View response" }
+      : { key: "review", label: "Review findings" };
   }
   if (request.kind === "assignment") return { key: "view", label: "View visit progress" };
   if (request.department === "procurement") return { key: "view", label: "Review cost changes" };
@@ -202,6 +216,21 @@ export function siteVisitStatusMeta(task) {
   const key = task?.submittedAt || task?.status === "submitted" ? "submitted" : "pending";
   return SITE_VISIT_STATUSES.find((s) => s.key === key) || SITE_VISIT_STATUSES[0];
 }
+
+/**
+ * The visit has brought something back: the person attending submitted the
+ * form, or operations marked the assignment done. That is the point at which
+ * the estimator who asked for it has findings to approve or reject.
+ */
+export function inspectionDelivered(request) {
+  if (request?.kind !== "assignment") return false;
+  const task = siteVisitTask(request);
+  if (task?.submittedAt || task?.status === "submitted") return true;
+  return ["completed", "report_submitted"].includes(request.status);
+}
+
+/** The requester has signed the findings off, so the job may be priced. */
+export const inspectionApproved = (request) => request?.status === "accepted";
 
 /** Every live pre-site inspection on a job, newest first. */
 export function inspectionRequests(requests = []) {

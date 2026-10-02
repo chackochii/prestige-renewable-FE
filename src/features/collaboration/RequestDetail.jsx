@@ -16,6 +16,7 @@ import {
   FolderInput,
   MessageCircleQuestion,
   Paperclip,
+  ThumbsDown,
   X,
 } from "lucide-react";
 import Alert from "@/components/Alert";
@@ -45,12 +46,14 @@ import {
   statusMeta,
   visibleProgress,
 } from "@/constants/collaboration";
+import { estimationInputFromAnswers } from "@/constants/estimationInput";
 import { stageById } from "@/constants/stages";
 import { formatDate, hasClockTime } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAppDispatch, useAppSelector } from "@/store";
+import { collectEstimationInputs } from "@/slices/leadsSlice";
 import {
   addProgress,
   cancelRequest,
@@ -112,6 +115,14 @@ function FileRow({ file, canFile, filing, onFile }) {
   );
 }
 
+/** One answer as it reads: a signature is a data URL, a tick box a yes or no. */
+function answerText(field, value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (field?.kind === "signature") return "Signed";
+  if (field?.kind === "checkbox" || typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
 function Fact({ label, value }) {
   return (
     <div className="list-row">
@@ -145,6 +156,10 @@ export default function RequestDetail({ request, onClose, timeZone }) {
   const response = request.response;
   const progress = visibleProgress(request, user);
   const fields = Array.isArray(request.requestedFields) ? request.requestedFields : [];
+  // A site visit whose findings have come back, seen by the person who asked
+  // for it: they approve them or send them back, the same way a response to an
+  // information request is accepted or queried.
+  const decidingFindings = request.kind === "assignment" && canDecide(request, user);
 
   const upload = (category) => async (files, documentKey) => {
     setUploading(documentKey || (category === "report" ? "report" : "other"));
@@ -200,8 +215,23 @@ export default function RequestDetail({ request, onClose, timeZone }) {
     notify("Site-visit form saved — copy the link and send it over");
   };
 
+  /**
+   * Accepting a response puts what sales sent back on to the job, so the
+   * estimator reads it in their own checklist rather than copying it across
+   * from this modal by hand. Only the answers that map to estimation-input
+   * fields are written; anything else stays on the request.
+   */
+  const fillJobFromResponse = async () => {
+    const input = estimationInputFromAnswers(response?.fields);
+    if (!Object.keys(input).length || !request.opportunityId) return 0;
+    await dispatch(collectEstimationInputs({ id: request.opportunityId, body: { input } })).unwrap();
+    return Object.keys(input).length;
+  };
+
   const decide = async (outcome) => {
-    if (outcome === "clarification_required" && !clarification.trim()) {
+    // Anything other than a straight yes needs a reason: the assignee is being
+    // asked to do more, so they have to be told what.
+    if (outcome !== "accepted" && !clarification.trim()) {
       setClarifying(true);
       return;
     }
@@ -210,7 +240,27 @@ export default function RequestDetail({ request, onClose, timeZone }) {
       await dispatch(
         decideResponse({ id: request.id, body: { outcome, note: clarification.trim() || undefined } }),
       ).unwrap();
-      notify(outcome === "accepted" ? "Response accepted" : "Clarification requested");
+      let filled = 0;
+      if (outcome === "accepted" && request.kind === "information") {
+        try {
+          filled = await fillJobFromResponse();
+        } catch {
+          // The response is accepted either way; the estimator can still read
+          // it here and the checklist can be filled by hand.
+          notifyError("Accepted, but the answers could not be copied on to the job.");
+        }
+      }
+      notify(
+        outcome === "accepted"
+          ? decidingFindings
+            ? "Findings approved"
+            : filled
+              ? `Response accepted — ${filled} item${filled === 1 ? "" : "s"} filled in on the job`
+              : "Response accepted"
+          : decidingFindings
+            ? "Sent back to operations"
+            : "Clarification requested",
+      );
       onClose?.();
     } catch (err) {
       notifyError(errText(err, "Could not record that."));
@@ -248,7 +298,9 @@ export default function RequestDetail({ request, onClose, timeZone }) {
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
-          {canCancel(request, user) ? (
+          {/* Once there is something to decide on, that is the action — a
+              request with its findings in is approved or sent back, not cancelled. */}
+          {canCancel(request, user) && !canDecide(request, user) ? (
             <button type="button" className="btn btn-danger" onClick={cancel} disabled={busy}>
               <X size={14} /> Cancel request
             </button>
@@ -261,10 +313,11 @@ export default function RequestDetail({ request, onClose, timeZone }) {
                 onClick={() => setClarifying((c) => !c)}
                 disabled={busy}
               >
-                <MessageCircleQuestion size={14} /> Request clarification
+                {decidingFindings ? <ThumbsDown size={14} /> : <MessageCircleQuestion size={14} />}{" "}
+                {decidingFindings ? "Reject" : "Request clarification"}
               </button>
               <button type="button" className="btn btn-primary" onClick={() => decide("accepted")} disabled={busy}>
-                <Check size={14} /> Accept response
+                <Check size={14} /> {decidingFindings ? "Approve findings" : "Accept response"}
               </button>
             </>
           ) : null}
@@ -333,25 +386,37 @@ export default function RequestDetail({ request, onClose, timeZone }) {
           />
         ) : null}
 
-        {/* ---- The response, read-only for everyone but the responder ---- */}
-        {response?.submittedAt ? (
+        {/* ---- What was asked for, and what has come back against it ----
+            Shown whether or not there is a response yet: the requester wants
+            to see the items they asked for while they are still waiting, not
+            only once they are answered. */}
+        {request.kind !== "assignment" && !canRespond(request, user) && (fields.length || response?.submittedAt) ? (
           <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
-            <h3>Response</h3>
+            <h3>Information requested</h3>
             <p className="lede" style={{ marginBottom: 10 }}>
-              Submitted by {response.submittedByName || "—"} on{" "}
-              {formatDate(response.submittedAt, { withTime: true, timeZone })}
+              {response?.submittedAt
+                ? `Submitted by ${response.submittedByName || "—"} on ${formatDate(response.submittedAt, { withTime: true, timeZone })}`
+                : `Waiting on ${request.assigneeName || departmentLabel(request.department)}.`}
             </p>
             <div className="list-stack">
-              {fields.map((field) => (
-                <Fact key={field.key} label={field.label} value={response.fields?.[field.key]} />
-              ))}
-              {response.note ? <Fact label="Note" value={response.note} /> : null}
+              {fields.map((field) => {
+                const answer = answerText(field, response?.fields?.[field.key]);
+                return (
+                  <div className="list-row" key={field.key}>
+                    <span className="row-title">{field.label}</span>
+                    <span className={answer ? "row-title answer-filled" : "row-meta"}>
+                      {answer || "Not answered yet"}
+                    </span>
+                  </div>
+                );
+              })}
+              {response?.note ? <Fact label="Note" value={response.note} /> : null}
             </div>
           </div>
         ) : null}
 
         {/* ---- Photos and documents that were asked for ---- */}
-        {requestedDocuments(request).length || response?.attachments?.length ? (
+        {!canRespond(request, user) && (requestedDocuments(request).length || response?.attachments?.length) ? (
           <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
             <h3>Photos &amp; documents</h3>
             {requestedDocuments(request).map((doc) => {
@@ -398,26 +463,39 @@ export default function RequestDetail({ request, onClose, timeZone }) {
           </div>
         ) : null}
 
+        {request.kind === "assignment" && !canProgress(request, user) ? (
+          <SiteVisitSummary request={request} timeZone={timeZone} />
+        ) : null}
+
+        {/* The findings are in and this is the person who asked for them: the
+            job cannot be priced until they say these answer the question. */}
+        {decidingFindings ? (
+          <Alert tone="info" style={{ marginTop: 18, marginBottom: 0 }}>
+            The visit is back. Approve the findings to open the quote, or reject them with a note on what is still
+            needed and operations will send someone again.
+          </Alert>
+        ) : null}
+
         {clarifying && canDecide(request, user) ? (
           <div className="decision-card">
-            <Field label="What needs clarifying?" required>
+            <Field
+              label={decidingFindings ? "Why is it going back?" : "What needs clarifying?"}
+              hint={decidingFindings ? "Operations sees this, so say what is missing or has to be re-checked." : undefined}
+              required
+            >
               <textarea rows={2} value={clarification} onChange={(e) => setClarification(e.target.value)} />
             </Field>
             <div className="decision-actions" style={{ marginTop: 12 }}>
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                onClick={() => decide("clarification_required")}
+                onClick={() => decide(decidingFindings ? "returned" : "clarification_required")}
                 disabled={busy || !clarification.trim()}
               >
-                Send back for clarification
+                {decidingFindings ? "Reject and send back" : "Send back for clarification"}
               </button>
             </div>
           </div>
-        ) : null}
-
-        {request.kind === "assignment" && !canProgress(request, user) ? (
-          <SiteVisitSummary request={request} timeZone={timeZone} />
         ) : null}
 
         {/* ---- Progress, read-only for the requester ---- */}

@@ -235,9 +235,10 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const [modal, setModal] = useState(null); // null closed, { item } open (item null = add, set = edit)
   const [deleteId, setDeleteId] = useState(null);
   const [deletingItemBusy, setDeletingItemBusy] = useState(false);
-  const [downloading, setDownloading] = useState(null); // "draft" | version id
+  const [downloading, setDownloading] = useState(null); // the version id being prepared
   const [savingVersion, setSavingVersion] = useState(false);
-  const [preview, setPreview] = useState(null); // null closed, { version? } open
+  const [preview, setPreview] = useState(null); // null closed, { version } open
+  const [history, setHistory] = useState(false); // the earlier versions, in a modal
   const versions = useAppSelector((s) => s.leads.versions);
   const versionsStatus = useAppSelector((s) => s.leads.versionsStatus);
   const versionsError = useAppSelector((s) => s.leads.versionsError);
@@ -299,6 +300,11 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const nextVersion = (latestVersion || versions.length) + 1;
   const savedMatch = versions.some((version) => matchesSnapshot({ opp, quote }, version));
   const versionLabel = (version) => `Version ${versionOf(version) ?? versions.length - versions.indexOf(version)}`;
+  // The one the buttons act on, and the rest behind the link.
+  const latest = versions.length
+    ? versions.reduce((best, v) => ((versionOf(v) ?? 0) > (versionOf(best) ?? 0) ? v : best), versions[0])
+    : null;
+  const earlier = versions.filter((v) => v.id !== latest?.id);
 
   const items = itemsSubtotal(quote.items);
   const gst = quoteGstBreakdown({
@@ -493,9 +499,9 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     );
   };
 
-  /** Downloads the live quote as a draft, or one of the saved versions. */
+  /** Downloads one saved version as a PDF — there is no PDF of unsaved edits. */
   const handleDownload = async (version) => {
-    setDownloading(version?.id ?? "draft");
+    setDownloading(version.id);
     try {
       await downloadInvoice({ opp, quote, unit, version });
     } catch (err) {
@@ -517,7 +523,6 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         }),
       ).unwrap();
       notify(`Version ${versionOf(saved) ?? nextVersion} saved`);
-      setPreview(null);
     } catch (err) {
       notifyError(errText(err, "Could not save the version."));
     } finally {
@@ -578,39 +583,6 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             onChange={(e) => patchHeaderField("quoteDate", e.target.value)}
           />
         </Field>
-      </div>
-
-      <div style={{ marginBottom: 24 }}>
-        <SectionHead icon={<Receipt size={13} />} title="Tax treatment" />
-        <p className="lede" style={{ marginBottom: 12 }}>
-          Set this before adding items — it decides how every price below is read.
-        </p>
-        <div className="form-grid" style={{ marginBottom: 8 }}>
-          <Field label="Tax treatment">
-            <select
-              value={quote.taxTreatment}
-              disabled={!canEdit}
-              onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
-            >
-              {TAX_TREATMENTS.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="GST rate">
-            <NumberInput
-              value={gstRateDraft}
-              min={0}
-              max={100}
-              disabled={!canEdit || quote.taxTreatment === "no_gst"}
-              onChange={setGstRateDraft}
-              onBlur={blurGstRate}
-            />
-          </Field>
-        </div>
-        <Badge tone="neutral">{TAX_TREATMENT_HINT[quote.taxTreatment]}</Badge>
       </div>
 
       {canEdit ? (
@@ -674,6 +646,44 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       ) : (
         <p className="lede">No items yet — add the first line item.</p>
       )}
+
+      {/* Asked once there is something to apply it to: the treatment decides how
+          the prices on the lines above are read, so it has no meaning on an
+          empty quote. */}
+      {quote.items.length ? (
+        <div style={{ marginTop: 24 }}>
+          <SectionHead icon={<Receipt size={13} />} title="Tax treatment" />
+          <p className="lede" style={{ marginBottom: 12 }}>
+            How the prices on the lines above are read.
+          </p>
+          <div className="form-grid" style={{ marginBottom: 8 }}>
+            <Field label="Tax treatment">
+              <select
+                value={quote.taxTreatment}
+                disabled={!canEdit}
+                onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
+              >
+                {TAX_TREATMENTS.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="GST rate">
+              <NumberInput
+                value={gstRateDraft}
+                min={0}
+                max={100}
+                disabled={!canEdit || quote.taxTreatment === "no_gst"}
+                onChange={setGstRateDraft}
+                onBlur={blurGstRate}
+              />
+            </Field>
+          </div>
+          <Badge tone="neutral">{TAX_TREATMENT_HINT[quote.taxTreatment]}</Badge>
+        </div>
+      ) : null}
 
       {costSection({
         kind: "cost",
@@ -739,112 +749,141 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        {savedMatch ? (
-          <Badge tone="success">Saved as a version</Badge>
-        ) : versions.length ? (
-          <Badge tone="warning">Edited since version {latestVersion || versions.length}</Badge>
-        ) : null}
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPreview({})}>
-          <Eye size={14} /> View current quote
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => handleDownload(null)}
-          disabled={downloading === "draft"}
-        >
-          <Download size={14} /> {downloading === "draft" ? "Preparing…" : "Download draft"}
-        </button>
+      {/* ---- Saving, and the PDFs that come out of it ----
+          A PDF is only ever of a saved version: there is nothing to preview or
+          download until the quote has been saved, and after an edit the buttons
+          stay on the version that was saved until it is saved again. */}
+      {versionsError ? (
+        <Alert tone="warning" style={{ marginTop: 16 }}>
+          Saved versions could not be loaded ({versionsError}).
+        </Alert>
+      ) : null}
+
+      <div className="quote-version-bar">
+        {versionsStatus === "loading" && !versions.length ? <LoadingState label="Loading versions…" /> : null}
+
         {canEdit ? (
           <button
             type="button"
             className="btn btn-primary btn-sm"
             onClick={handleSaveVersion}
-            disabled={savingVersion || savedMatch}
-            title={savedMatch ? "Nothing has changed since the last saved version" : undefined}
+            disabled={savingVersion || savedMatch || !quote.items.length}
+            title={
+              !quote.items.length
+                ? "Add an item before saving the quote"
+                : savedMatch
+                  ? "Nothing has changed since the last saved version"
+                  : undefined
+            }
           >
-            <Save size={14} /> {savingVersion ? "Saving…" : `Save version ${nextVersion}`}
+            <Save size={14} />{" "}
+            {savingVersion ? "Saving…" : versions.length ? `Save version ${nextVersion}` : "Save quote"}
+          </button>
+        ) : null}
+
+        {latest ? (
+          <span className="quote-version-latest">
+            <span className="row-lines">
+              <span className="row-title">{versionLabel(latest)}</span>
+              <span className="row-meta">
+                {formatCurrency(latest.grandTotal ?? latest.snapshot?.grandTotal, { withCents: true })} ·{" "}
+                {savedMatch ? "the quote as it stands" : "edited since"}
+              </span>
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setPreview({ version: latest })}
+              disabled={!latest.snapshot}
+              title={`Preview ${versionLabel(latest)}`}
+              aria-label={`Preview ${versionLabel(latest)}`}
+            >
+              <Eye size={14} />
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => handleDownload(latest)}
+              disabled={!latest.snapshot || downloading === latest.id}
+              title={`Download ${versionLabel(latest)}`}
+              aria-label={`Download ${versionLabel(latest)}`}
+            >
+              <Download size={14} />
+            </button>
+          </span>
+        ) : null}
+
+        {earlier.length ? (
+          <button type="button" className="enquiry-link quote-version-link" onClick={() => setHistory(true)}>
+            <History size={13} /> Previous version{earlier.length === 1 ? "" : "s"} ({earlier.length})
           </button>
         ) : null}
       </div>
 
-      <div style={{ marginTop: 28 }}>
-        <SectionHead icon={<History size={13} />} title="Quote versions" />
-        <p className="lede" style={{ marginBottom: 12 }}>
-          Every saved version keeps the quote exactly as it was — open one to preview it, or download it as a PDF.
-          Editing the quote lets you save the next version.
+      {!versions.length && versionsStatus !== "loading" ? (
+        <p className="lede" style={{ marginTop: 10 }}>
+          {quote.items.length
+            ? "Save the quote to get the PDF — preview and download come from a saved version."
+            : "Add the items, then save the quote to get the PDF."}
         </p>
-        {versionsStatus === "loading" && !versions.length ? (
-          <LoadingState label="Loading versions…" />
-        ) : versionsError ? (
-          <Alert tone="warning">Saved versions could not be loaded ({versionsError}).</Alert>
-        ) : versions.length ? (
-          <div className="table-wrap">
-            <table className="table stack">
-              <thead>
-                <tr>
-                  <th>Version</th>
-                  <th>Saved</th>
-                  <th>Saved by</th>
-                  <th>Total</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {versions.map((version) => (
-                  <tr key={version.id}>
-                    <td data-label="Version">
-                      <button
-                        type="button"
-                        className="enquiry-link quote-version-link"
-                        onClick={() => setPreview({ version })}
-                        disabled={!version.snapshot}
-                      >
-                        {versionLabel(version)}
-                      </button>
-                      <div className="row-meta">
-                        Quote {version.quoteNumber || version.snapshot?.quote?.quoteNumber || "—"}
-                        {version.invoiceNumber ? ` · Invoice ${version.invoiceNumber}` : ""}
-                        {matchesSnapshot({ opp, quote }, version) ? " · matches the quote now" : ""}
-                      </div>
-                    </td>
-                    <td data-label="Saved">{formatDate(version.createdAt, { withTime: true })}</td>
-                    <td data-label="Saved by">{version.createdByName || "—"}</td>
-                    <td data-label="Total">
-                      {formatCurrency(version.grandTotal ?? version.snapshot?.grandTotal, { withCents: true })}
-                    </td>
-                    <td data-label="Actions">
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => setPreview({ version })}
-                          disabled={!version.snapshot}
-                          aria-label={`Preview ${versionLabel(version)}`}
-                        >
-                          <Eye size={14} /> Preview
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => handleDownload(version)}
-                          disabled={!version.snapshot || downloading === version.id}
-                          aria-label={`Download ${versionLabel(version)}`}
-                        >
-                          <Download size={14} /> {downloading === version.id ? "Preparing…" : "Download"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      ) : null}
+
+      {history ? (
+        <Modal
+          title="Saved versions"
+          body={`Every version of ${quote.quoteNumber} that was saved, exactly as it was then.`}
+          confirmClose={false}
+          onClose={() => setHistory(false)}
+          actions={
+            <button type="button" className="btn btn-ghost" onClick={() => setHistory(false)}>
+              Close
+            </button>
+          }
+        >
+          <div className="list-stack">
+            {versions.map((version) => (
+              <div className="list-row" key={version.id}>
+                <span className="row-lines">
+                  <span className="row-title">
+                    {versionLabel(version)}
+                    {version.id === latest?.id ? " · latest" : ""}
+                  </span>
+                  <span className="row-meta">
+                    {formatCurrency(version.grandTotal ?? version.snapshot?.grandTotal, { withCents: true })} ·{" "}
+                    {formatDate(version.createdAt, { withTime: true })}
+                    {version.createdByName ? ` · ${version.createdByName}` : ""}
+                  </span>
+                </span>
+                <span style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setHistory(false);
+                      setPreview({ version });
+                    }}
+                    disabled={!version.snapshot}
+                    title={`Preview ${versionLabel(version)}`}
+                    aria-label={`Preview ${versionLabel(version)}`}
+                  >
+                    <Eye size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => handleDownload(version)}
+                    disabled={!version.snapshot || downloading === version.id}
+                    title={`Download ${versionLabel(version)}`}
+                    aria-label={`Download ${versionLabel(version)}`}
+                  >
+                    <Download size={14} />
+                  </button>
+                </span>
+              </div>
+            ))}
           </div>
-        ) : (
-          <p className="lede">No versions saved yet. Use “Save version 1” to keep a copy of the quote as it stands.</p>
-        )}
-      </div>
+        </Modal>
+      ) : null}
 
       {preview ? (
         <QuotePreviewModal
@@ -852,7 +891,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           quote={quote}
           unit={unit}
           source={preview}
-          title={preview.version ? `${quote.quoteNumber} · ${versionLabel(preview.version)}` : `${quote.quoteNumber} · current quote`}
+          title={`${quote.quoteNumber} · ${versionLabel(preview.version)}`}
           onClose={() => setPreview(null)}
           actions={
             <>
@@ -862,16 +901,11 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => handleDownload(preview.version || null)}
+                onClick={() => handleDownload(preview.version)}
                 disabled={downloading !== null}
               >
                 <Download size={14} /> Download
               </button>
-              {!preview.version && canEdit && !savedMatch ? (
-                <button type="button" className="btn btn-primary" onClick={handleSaveVersion} disabled={savingVersion}>
-                  <Save size={14} /> {savingVersion ? "Saving…" : `Save version ${nextVersion}`}
-                </button>
-              ) : null}
             </>
           }
         />

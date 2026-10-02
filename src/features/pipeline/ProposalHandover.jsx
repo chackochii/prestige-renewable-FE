@@ -50,7 +50,7 @@ function CheckRow({ done, title, detail, warn = false }) {
   );
 }
 
-export default function ProposalHandover({ opp, unit, requote = null, onReviewVariations, onSent }) {
+export default function ProposalHandover({ opp, unit, requote = null, onSent }) {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { notify } = useNotifications();
@@ -167,20 +167,6 @@ export default function ProposalHandover({ opp, unit, requote = null, onReviewVa
               : quoteMissing.length
                 ? null
                 : `It will be saved as version ${latestNumber + 1} when you send it.`
-          }
-        />
-        <CheckRow
-          done
-          title="Variation check"
-          detail={
-            <>
-              Optional — compares the quote with the price list and records the result in the history.{" "}
-              {onReviewVariations ? (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={onReviewVariations} style={{ marginLeft: 4 }}>
-                  Review variations
-                </button>
-              ) : null}
-            </>
           }
         />
       </div>
