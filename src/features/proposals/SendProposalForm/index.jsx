@@ -66,12 +66,14 @@ const versionLabel = (version, sentAs) =>
     .filter(Boolean)
     .join(" · ");
 
-export default function SendProposalForm({ opportunity, versions, proposals = [], unit, onSent, onCancel }) {
+// defaultMessage: the message the form starts with — the revised-proposal
+// wording after a re-quote, the standard one otherwise.
+export default function SendProposalForm({ opportunity, versions, proposals = [], unit, defaultMessage = DEFAULT_MESSAGE, onSent, onCancel }) {
   const [form, setForm] = useState(() => ({
     quoteVersionId: versions[0]?.id ?? "",
     to: opportunity.customerEmail || "",
     subject: "",
-    message: DEFAULT_MESSAGE,
+    message: defaultMessage,
   }));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(null); // "mail" | "gmail" while preparing

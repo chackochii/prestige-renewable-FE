@@ -1,14 +1,15 @@
 // Proposals (stage 3): every job waiting on a customer's answer. Sales emails
 // the customer a link to their proposal; the customer accepts (the job moves
 // straight on to Approvals — there is no separate closure step), asks for
-// changes (sales sends a revised version), or declines.
+// changes (sales sends the job back to the estimator for a re-quote, then
+// sends the revised version), or declines.
 //
-// Lists the active stage-3 jobs in the current business unit, plus proposals
-// answered in the last 30 days, so an acceptance does not vanish the moment
-// the job moves on.
+// Lists the active stage-3 jobs in the current business unit, the ones back
+// with the estimator for a re-quote, plus proposals answered in the last 30
+// days, so an acceptance does not vanish the moment the job moves on.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleCheck, CircleX, FilePen, Hourglass, MessageSquareText, Search, Send } from "lucide-react";
+import { CircleCheck, CircleX, FilePen, Hourglass, MessageSquareText, Search, Send, Undo2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
@@ -22,7 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatDate } from "@/helpers/dateTimeHelpers";
-import { boardBucket, proposalStatus } from "@/helpers/proposals";
+import { boardBucket, boardStatus } from "@/helpers/proposals";
 import { getErrorMessage } from "@/services/api/client";
 import { getProposalBoard } from "@/services/api/proposalsApi";
 import { formatCurrency } from "@/utils/formatCurrency";
@@ -32,6 +33,7 @@ const FILTERS = [
   { key: "draft", label: "Not sent" },
   { key: "waiting", label: "With the customer" },
   { key: "changes", label: "Wants changes" },
+  { key: "requote", label: "With the estimator" },
   { key: "accepted", label: "Accepted" },
   { key: "declined", label: "Declined" },
 ];
@@ -63,7 +65,7 @@ export default function ProposalsPage() {
   }, [load]);
 
   const counts = useMemo(() => {
-    const tally = { draft: 0, waiting: 0, changes: 0, accepted: 0, declined: 0 };
+    const tally = { draft: 0, waiting: 0, changes: 0, requote: 0, accepted: 0, declined: 0 };
     for (const row of rows ?? []) tally[boardBucket(row)] += 1;
     return tally;
   }, [rows]);
@@ -75,13 +77,14 @@ export default function ProposalsPage() {
     <>
       <PageHeader
         title="Proposals"
-        description="Send the customer their proposal from your own email app or Gmail — the email, link and PDF are prepared for you. From the link they can view the PDF and accept it (the job then moves straight on to Approvals), ask for changes, or decline."
+        description="Send the customer their proposal from your own email app or Gmail — the email, link and PDF are prepared for you. From the link they can view the PDF and accept it (the job then moves straight on to Approvals), ask for changes (send the job to the estimator for a re-quote, then send the revised version), or decline."
       />
 
       <div className="stats">
         <StatCard label="Not sent yet" value={counts.draft} icon={<FilePen size={14} />} hint="Quote ready, proposal not out" />
         <StatCard label="With the customer" value={counts.waiting} icon={<Hourglass size={14} />} hint="Sent, waiting for an answer" />
-        <StatCard label="Wants changes" value={counts.changes} icon={<MessageSquareText size={14} />} hint="Revise and send again" />
+        <StatCard label="Wants changes" value={counts.changes} icon={<MessageSquareText size={14} />} hint="Send to the estimator for a re-quote" />
+        <StatCard label="With the estimator" value={counts.requote} icon={<Undo2 size={14} />} hint="Being re-quoted — comes back here" />
         <StatCard label="Accepted" value={counts.accepted} icon={<CircleCheck size={14} />} hint="Last 30 days — moved to Approvals" />
         <StatCard label="Declined" value={counts.declined} icon={<CircleX size={14} />} hint="Last 30 days" />
       </div>
@@ -137,7 +140,7 @@ export default function ProposalsPage() {
               <tbody>
                 {visible.map((row) => {
                   const { opportunity, latestQuoteVersion: quote, proposal } = row;
-                  const status = proposalStatus(proposal && proposal.status !== "withdrawn" ? proposal : null);
+                  const status = boardStatus(row);
                   const isSelected = opportunity.id === selected?.opportunity.id;
                   return (
                     <tr key={opportunity.id} className={isSelected ? "selected" : undefined} aria-selected={isSelected} onClick={() => setSelectedId(opportunity.id)}>

@@ -11,8 +11,8 @@ import { recordProposalOutcome } from "@/services/api/proposalsApi";
 
 const OUTCOMES = [
   { key: "accepted", label: "Accepted", hint: "The job moves on to Approvals." },
-  { key: "renegotiate", label: "Wants changes", hint: "Revise the quote and send a new proposal." },
-  { key: "rejected", label: "Declined", hint: "The job stays here — send a revised proposal or mark it lost." },
+  { key: "renegotiate", label: "Wants changes", hint: "Next: send the job to the estimator for a re-quote, with what they said." },
+  { key: "rejected", label: "Declined", hint: "The job stays here — re-quote, send a revised proposal, or mark it lost." },
 ];
 
 export default function RecordOutcomeModal({ opportunity, proposal, onClose, onRecorded }) {

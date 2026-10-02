@@ -1,23 +1,25 @@
 // One job's proposal: the "Customer accepted the proposal?" gate, sending the
-// proposal from the rep's own email (and a revised one after the customer asks
-// for changes), resending with a new link, recording an answer given by
-// phone, and every proposal sent so far.
+// proposal from the rep's own email, resending with a new link, recording an
+// answer given by phone, sending the job back to the estimator for a re-quote
+// when the customer wants changes (and sending the revised proposal when it
+// comes back), and every proposal and re-quote round so far.
 //
 // Nothing is emailed by the server. Sending creates the customer's link, opens
 // the email app signed in on the device (or Gmail) with the email written, and
 // downloads the quote PDF to attach — an email link cannot carry a file.
 //
 // `opportunity` is a record or a board row's opportunity: { id, number, stage,
-// lifecycle, customerEmail, customerFirstName, ... }. `onChanged(result)` runs
-// after anything is sent or recorded, so the page can refresh its list — and
-// the opportunity, when an acceptance moved it on.
+// lifecycle, customerEmail, customerFirstName, estimatorId, estimator, ... }.
+// `onChanged(result)` runs after anything is sent or recorded, so the page can
+// refresh its list — and the opportunity, when an acceptance moved it on or a
+// re-quote moved it back.
 //
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-3 panel already has a heading of its own.
 
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Download, Mail, PhoneCall, RefreshCw, Send } from "lucide-react";
+import { Download, Mail, PhoneCall, RefreshCw, Send, Undo2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import ApprovalGate from "@/components/ApprovalGate";
 import Badge from "@/components/Badge";
@@ -27,22 +29,44 @@ import LoadingState from "@/components/LoadingState";
 import SectionHead from "@/components/SectionHead";
 import ProposalHistory from "@/features/proposals/ProposalHistory";
 import RecordOutcomeModal from "@/features/proposals/RecordOutcomeModal";
+import RequoteRequestModal from "@/features/proposals/RequoteRequestModal";
+import RequoteSummary from "@/features/proposals/RequoteSummary";
 import SendProposalForm from "@/features/proposals/SendProposalForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { downloadInvoice, invoiceFileName } from "@/helpers/invoice";
-import { PROPOSAL_STAGE_ID, gmailComposeUrl, isLive, isOpen, mailtoUrl, navigateTab, openMailApp, proposalEmailBody, proposalStatus } from "@/helpers/proposals";
+import {
+  DEFAULT_MESSAGE,
+  PROPOSAL_STAGE_ID,
+  REVISED_MESSAGE,
+  gmailComposeUrl,
+  isLive,
+  isOpen,
+  isRequoteOpen,
+  mailtoUrl,
+  navigateTab,
+  openMailApp,
+  proposalEmailBody,
+  proposalStatus,
+  wantsChanges,
+} from "@/helpers/proposals";
 import { getErrorMessage } from "@/services/api/client";
 import { listQuoteVersions } from "@/services/api/leadsApi";
-import { listProposals, resendProposal } from "@/services/api/proposalsApi";
+import { listProposals, listRequotes, resendProposal } from "@/services/api/proposalsApi";
 
 const GATE_OUTCOME = { accepted: "approved", rejected: "rejected" };
 
 /** What the gate says while it waits. */
-function waitingText(latest) {
+function waitingText(latest, requote) {
+  if (isRequoteOpen(requote))
+    return `With ${requote.estimator?.name || "the estimator"} for a re-quote since ${formatDate(requote.requestedAt)} (round ${requote.round}) — the revised quote comes back here.`;
+  if (latest?.status === "re-estimated")
+    return requote?.status === "completed"
+      ? `Revised quote back from ${requote.completedBy?.name || "the estimator"} on ${formatDate(requote.completedAt)} — send it to the customer below.`
+      : "Sent back for a re-quote.";
   if (!latest || latest.status === "withdrawn") return "No proposal with the customer yet — send one below.";
-  if (latest.status === "negotiation") return "The customer asked for changes — send a revised proposal.";
+  if (latest.status === "negotiation") return "The customer asked for changes — send the job to the estimator for a re-quote.";
   if (latest.expired) return `The link expired ${formatDate(latest.expiresAt)} — resend it or send a revised proposal.`;
   if (latest.status === "presented")
     return `Opened ${formatDate(latest.viewedAt, { withTime: true })} (${latest.viewCount} view${latest.viewCount === 1 ? "" : "s"}) — waiting for the customer's answer.`;
@@ -119,10 +143,12 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
   const { user } = useAuth();
   const [proposals, setProposals] = useState(null);
   const [versions, setVersions] = useState([]);
+  const [requotes, setRequotes] = useState([]);
   const [error, setError] = useState("");
   const [composing, setComposing] = useState(false);
   const [prepared, setPrepared] = useState(null); // the last send or resend: { proposal, link, mailUrl, gmailUrl, body, fileName, via, opened }
   const [recording, setRecording] = useState(false);
+  const [requoting, setRequoting] = useState(false);
   const [resending, setResending] = useState(false);
 
   const id = opportunity?.id;
@@ -131,9 +157,10 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
     if (!id) return;
     setError("");
     try {
-      const [list, saved] = await Promise.all([listProposals(id), listQuoteVersions(id)]);
+      const [list, saved, rounds] = await Promise.all([listProposals(id), listQuoteVersions(id), listRequotes(id)]);
       setProposals(list ?? []);
       setVersions(saved ?? []);
+      setRequotes(rounds ?? []);
     } catch (err) {
       setError(getErrorMessage(err, "Proposals could not be loaded."));
       setProposals([]);
@@ -143,6 +170,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
   // A different job starts clean: its own proposals, nothing half-composed.
   useEffect(() => {
     setProposals(null);
+    setRequotes([]);
     setComposing(false);
     setPrepared(null);
     load();
@@ -151,11 +179,25 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
   if (!opportunity) return null;
 
   const latest = proposals?.[0] ?? null;
-  const atStage = Number(opportunity.stage) === PROPOSAL_STAGE_ID && (opportunity.lifecycle ?? "Active") === "Active";
+  const requote = requotes[0] ?? null;
+  const active = (opportunity.lifecycle ?? "Active") === "Active";
+  const atStage = Number(opportunity.stage) === PROPOSAL_STAGE_ID && active;
   const canSend = canEdit && atStage;
-  // With nothing live the form is the next step; with a proposal out, sending again is a deliberate choice.
-  const formOpen = canSend && (composing || !latest || !isLive(latest) || latest.status === "negotiation");
+  // With the estimator: nothing to send until the revised quote is back.
+  const requoteOpen = isRequoteOpen(requote);
+  // Back from the estimator with a revised quote the customer has not seen.
+  const revisedReady = atStage && latest?.status === "re-estimated" && requote?.status === "completed";
+  // A re-quote can be raised on anything the customer has not accepted —
+  // usually after they asked for changes, but also before anything went out.
+  const canRequote = canSend && !requoteOpen && latest?.status !== "accepted";
+  // With nothing live the form is the next step; with a proposal out, or the
+  // customer wanting changes (a re-quote is the usual answer), sending again
+  // is a deliberate choice.
+  const formOpen = canSend && (composing || !latest || (!isLive(latest) && latest.status !== "rejected"));
   const status = proposalStatus(latest);
+  // Every round but the one the notices above already show in full.
+  const shownRound = requoteOpen || revisedReady ? requote?.id : null;
+  const earlierRounds = requotes.filter((round) => round.id !== shownRound);
 
   /** The quote version a proposal was built from, with the snapshot its PDF is drawn from. */
   const versionOf = (proposal) => versions.find((version) => version.id === proposal?.quoteVersion?.id) ?? null;
@@ -204,6 +246,12 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
     }
   };
 
+  const requoteButton = (primary = false) => (
+    <button type="button" className={`btn btn-sm ${primary ? "btn-primary" : "btn-ghost"}`} onClick={() => setRequoting(true)}>
+      <Undo2 size={14} /> Send to estimator for a re-quote
+    </button>
+  );
+
   const body =
     proposals === null ? (
       <LoadingState label="Loading proposals…" />
@@ -220,22 +268,48 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
           outcome={GATE_OUTCOME[latest?.status] ?? "pending"}
           yes={{ title: "Approvals", detail: "The job moves on as soon as the customer accepts" }}
           no={{
-            title: latest?.status === "rejected" ? "Declined by the customer" : "Renegotiate or decline",
+            title: latest?.status === "rejected" ? "Declined by the customer" : "Changes wanted or declined",
             detail:
               latest?.status === "rejected"
-                ? latest.responseNote || "Send a revised proposal or mark the job lost"
-                : "Changes: revise the quote and send a new version",
+                ? latest.responseNote || "Send it for a re-quote, send a revised proposal, or mark the job lost"
+                : "Back to the estimator for a re-quote, then a revised proposal",
           }}
-          waiting={waitingText(latest)}
+          waiting={waitingText(latest, requote)}
         />
 
         {latest?.status === "negotiation" ? (
           <Alert tone="warning" style={{ marginTop: 14 }}>
-            <strong>{latest.responseName || "The customer"} asked for changes</strong> on{" "}
-            {formatDate(latest.respondedAt, { withTime: true })}:
-            <div style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>“{latest.responseNote}”</div>
-            <div className="row-meta" style={{ marginTop: 6, whiteSpace: "normal" }}>
-              Have the quote revised and saved as a new version, then send it below.
+            <strong>{latest.responseName || "The customer"} asked for changes</strong> on {formatDate(latest.respondedAt, { withTime: true })}
+            {latest.responseChannel === "staff" ? ` (recorded by ${latest.recordedBy?.name || "sales"})` : ""}:
+            <blockquote className="requote-quote" style={{ marginTop: 8 }}>
+              {latest.responseNote}
+            </blockquote>
+            {canRequote ? (
+              <>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>{requoteButton(true)}</div>
+                <div className="row-meta" style={{ marginTop: 8, whiteSpace: "normal" }}>
+                  Their message goes to the estimator with your comments, and the revised quote comes back here to send. If no re-pricing is
+                  needed, send a revised proposal below instead.
+                </div>
+              </>
+            ) : null}
+          </Alert>
+        ) : null}
+        {requoteOpen ? (
+          <Alert tone="info" style={{ marginTop: 14 }}>
+            <strong>With {requote.estimator?.name || "the estimator"} for a re-quote.</strong> The job is back at Estimation; once the revised quote
+            is handed back, it is sent to the customer from here.
+            <div style={{ marginTop: 10 }}>
+              <RequoteSummary requote={requote} timeZone={unit?.timezone} />
+            </div>
+          </Alert>
+        ) : null}
+        {revisedReady ? (
+          <Alert tone="success" style={{ marginTop: 14 }}>
+            <strong>Revised quote ready</strong> — {requote.completedBy?.name || "the estimator"} handed it back on{" "}
+            {formatDate(requote.completedAt, { withTime: true })}. Send it to the customer below; the newest version is preselected.
+            <div style={{ marginTop: 10 }}>
+              <RequoteSummary requote={requote} timeZone={unit?.timezone} />
             </div>
           </Alert>
         ) : null}
@@ -249,17 +323,20 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
         <div style={{ marginTop: 18 }}>
           {prepared ? <EmailNotice prepared={prepared} onDownload={() => downloadPdf(prepared.proposal)} onDismiss={() => setPrepared(null)} /> : null}
 
-          {canEdit && isLive(latest) ? (
+          {canSend && latest && latest.status !== "accepted" ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
               {isOpen(latest) || (latest.expired && latest.status !== "negotiation") ? (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={resend} disabled={resending}>
                   <RefreshCw size={14} /> {resending ? "Resending…" : "Resend with a new link"}
                 </button>
               ) : null}
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setRecording(true)}>
-                <PhoneCall size={14} /> Record the customer's answer
-              </button>
-              {canSend && !formOpen ? (
+              {isLive(latest) ? (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setRecording(true)}>
+                  <PhoneCall size={14} /> Record the customer's answer
+                </button>
+              ) : null}
+              {canRequote && latest.status !== "negotiation" ? requoteButton(false) : null}
+              {!formOpen ? (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setComposing(true)}>
                   <Send size={14} /> Send a revised proposal
                 </button>
@@ -277,6 +354,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
                   versions={versions}
                   proposals={proposals}
                   unit={unit}
+                  defaultMessage={(latest && wantsChanges(latest)) || revisedReady ? REVISED_MESSAGE : DEFAULT_MESSAGE}
                   onSent={afterSend}
                   onCancel={composing ? () => setComposing(false) : undefined}
                 />
@@ -292,10 +370,27 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
                   ; it can then be sent from here.
                 </Alert>
               )}
+              {canRequote && !latest ? (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+                  <span className="row-meta">Quote not right yet?</span>
+                  {requoteButton(false)}
+                </div>
+              ) : null}
             </>
           ) : null}
-          {!canEdit && !latest ? <p className="row-meta">Sales sends the proposal from here.</p> : null}
+          {!canEdit && !latest && !requoteOpen ? <p className="row-meta">Sales sends the proposal from here.</p> : null}
         </div>
+
+        {earlierRounds.length ? (
+          <div style={{ marginTop: 18 }}>
+            <SectionHead icon={<Undo2 size={13} />} title={shownRound ? "Earlier re-quote rounds" : "Re-quote rounds"} />
+            <div className="list-stack">
+              {earlierRounds.map((round) => (
+                <RequoteSummary key={round.id} requote={round} timeZone={unit?.timezone} />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div style={{ marginTop: 18 }}>
           <SectionHead icon={<Send size={13} />} title="Proposals sent" />
@@ -314,6 +409,19 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
             }}
           />
         ) : null}
+        {requoting ? (
+          <RequoteRequestModal
+            opportunity={opportunity}
+            proposal={latest}
+            onClose={() => setRequoting(false)}
+            onRequested={async (result) => {
+              setRequoting(false);
+              setComposing(false);
+              await load();
+              onChanged?.(result);
+            }}
+          />
+        ) : null}
       </>
     );
 
@@ -324,7 +432,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
       title={`${opportunity.number} · ${opportunity.customer ?? ""}`}
       icon={<Send size={16} />}
       sub={[opportunity.customerEmail, opportunity.salesperson?.name ? `${opportunity.salesperson.name} (sales)` : null].filter(Boolean).join(" · ")}
-      actions={<Badge tone={status.tone}>{status.label}</Badge>}
+      actions={<Badge tone={requoteOpen ? "warning" : status.tone}>{requoteOpen ? "With the estimator — re-quote" : status.label}</Badge>}
     >
       {body}
     </Card>

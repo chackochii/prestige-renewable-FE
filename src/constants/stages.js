@@ -30,9 +30,10 @@ export const STAGES = [
   {
     id: 3,
     key: "proposal",
-    short: "Proposals",
-    label: "Proposals",
-    description: "The sales rep reviews the final quote, applies any approved discount and emails it to the client, then follows up until the client accepts (on to Approvals) or declines.",
+    short: "Proposal",
+    label: "Proposal & negotiation",
+    description:
+      "The sales rep reviews the final quote, applies any approved discount and emails it to the client, then follows up until the client accepts (on to Approvals), asks for changes (back to Estimation for a re-quote) or declines.",
   },
   {
     id: 5,

@@ -1119,6 +1119,14 @@
 @layer components {
   /* A customer's proposal link, shown once after sending. */
   .proposal-link { font-size: 12px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--line); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all; }
+
+  /* A re-quote round: the customer's message, sales' comments, what changed. */
+  .requote { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface); }
+  .requote-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .requote-section { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .requote-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .requote-quote { margin: 0; padding: 8px 12px; border-left: 3px solid var(--brand); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-2); white-space: pre-wrap; overflow-wrap: anywhere; font-style: italic; }
+  .requote-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 }
 
 /* The pre-site inspection form (/site-visit/:token): public, phone first. */

@@ -9,6 +9,8 @@
 //             but the next move is not: operations has the site visit, or
 //             sales is chasing the client. The badge says so and its tooltip
 //             names who it is with.
+//   Re-quote — back in estimation from proposal because the customer asked
+//             for changes; the estimator's screen has their message.
 //
 // Everything here is derived from fields the opportunity list already returns
 // — same rule as helpers/waitingFor.js — so the board costs no extra request.
@@ -54,6 +56,7 @@ export function blockedOn(opp, userName) {
 export const JOB_STATUS_OPTIONS = [
   { key: "new", label: "New" },
   { key: "blocked", label: "Blocked" },
+  { key: "requote", label: "Re-quote" },
   { key: "variation", label: "Variation" },
   { key: "referral", label: "Referral" },
   { key: "none", label: "No status" },
@@ -76,6 +79,14 @@ export function isNewLead(opp) {
 export function jobStatus(opp, { userName } = {}) {
   const blocked = blockedOn(opp, userName);
   if (blocked) return { key: "blocked", label: "Blocked", tone: "danger", title: blocked };
+
+  if (opp?.requoteRequestedAt && Number(opp.stage) === ESTIMATION_STAGE)
+    return {
+      key: "requote",
+      label: "Re-quote",
+      tone: "warning",
+      title: "Sent back by sales — the customer asked for changes to their proposal",
+    };
 
   if (isNewLead(opp))
     return {
