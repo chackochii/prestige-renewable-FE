@@ -154,6 +154,59 @@ export function estimationInputFromOpp(opp) {
   return merged;
 }
 
+/** A yes/true/1 answer, however the person typing it phrased it. */
+const truthy = (value) =>
+  value === true || ["yes", "true", "1", "y"].includes(String(value).trim().toLowerCase());
+
+/**
+ * Fields whose whole answer is yes or no. On these, "no" is the answer and
+ * the row is settled by it.
+ */
+const YES_NO_FIELDS = new Set(["preSiteInspectionRequired", "isRetrofit", "switchboardUpgrade"]);
+
+/**
+ * A "no" on a field that wanted a description is not a description: sales is
+ * saying there is nothing to give, not supplying it.
+ *
+ * It is still recorded and shown — the estimator wants to read what sales
+ * said — but the row it belongs to does not tick, because the detail is not
+ * in hand. Fields whose whole answer is yes or no are exempt: there, "no" is
+ * the answer and settles the row.
+ */
+const NOTHING_TO_GIVE = ["no", "n", "none", "n/a", "na", "nil", "nothing", "not applicable"];
+
+export function isNothingToGive(field, value) {
+  if (YES_NO_FIELDS.has(field)) return false;
+  return NOTHING_TO_GIVE.includes(String(value ?? "").trim().toLowerCase());
+}
+
+/**
+ * The answers off a sales response, narrowed to the estimation-input fields
+ * they belong to.
+ *
+ * Estimation asks for these rows by their own field names (see the
+ * "Assign to sales" flow), so an accepted response can be written straight on
+ * to the job rather than retyped. Anything the response carries that is not
+ * one of these fields is ignored, and a blank answer never overwrites
+ * something already recorded.
+ */
+export function estimationInputFromAnswers(fields = {}) {
+  const base = emptyEstimationInput();
+  const input = {};
+  for (const [key, value] of Object.entries(fields || {})) {
+    if (!(key in base)) continue;
+    // Arrays (permits) are picked from a list, never answered as text.
+    if (Array.isArray(base[key])) continue;
+    if (value === undefined || value === null || String(value).trim() === "") continue;
+    if (typeof base[key] === "boolean") {
+      input[key] = truthy(value);
+      continue;
+    }
+    input[key] = String(value).trim();
+  }
+  return input;
+}
+
 /** System size in kW from panel count × panel capacity, or null when not entered. */
 export function systemSizeKw(input) {
   const qty = Number(input?.panelQty) || 0;

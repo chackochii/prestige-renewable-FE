@@ -22,15 +22,21 @@ import {
 } from "@/slices/inboxSlice";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useNotifications } from "@/hooks/useNotifications";
+import RequestDetail from "@/features/collaboration/RequestDetail";
+import { fetchOpportunityRequests, fetchRequest } from "@/slices/collaborationSlice";
+import { isAssignee, isRequester, statusMeta } from "@/constants/collaboration";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function NotificationsPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { unit } = useBusinessUnit();
   const { error: notifyError } = useNotifications();
+  const { user } = useAuth();
   const { items, unread, status, error, events } = useAppSelector((s) => s.inbox);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [priority, setPriority] = useState("");
+  const [openRequest, setOpenRequest] = useState(null);
 
   const query = useMemo(
     () => ({ ...(unreadOnly ? { unread: 1 } : {}), ...(priority ? { priority } : {}) }),
@@ -45,8 +51,65 @@ export default function NotificationsPage() {
     if (!events.length) dispatch(fetchNotificationEvents());
   }, [events.length, dispatch]);
 
-  const open = (notification) => {
+  /**
+   * The id of the request a notification is about, when the API names one.
+   * It does not yet, so the lookup below carries the weight — add any of these
+   * to the notification payload and this becomes exact.
+   */
+  const requestIdOf = (n) => n?.requestId ?? n?.collaborationRequestId ?? n?.meta?.requestId ?? null;
+
+  /**
+   * Events that are about the record rather than a request: a stage move, an
+   * SLA, somebody being put on the job. Everything else that lands on a job
+   * where this person has a live request is about that request.
+   */
+  const RECORD_EVENTS = new Set([
+    "assignment.salesperson",
+    "assignment.estimator",
+    "assignment.coordinator",
+    "stage.advanced",
+    "lifecycle.changed",
+    "sla.overdue",
+    "lead.captured",
+  ]);
+
+  /** The live request on this job that this person has to do something about. */
+  const myOpenRequestOn = async (opportunityId) => {
+    const { items } = await dispatch(fetchOpportunityRequests(opportunityId)).unwrap();
+    const mine = (items || [])
+      .filter((r) => isAssignee(r, user) || isRequester(r, user))
+      .filter((r) => statusMeta(r.kind, r.status).open)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return mine[0] || null;
+  };
+
+  /**
+   * A request opens where the work is — the request itself, right here, rather
+   * than dropping someone into the module and leaving them to find it.
+   * Anything genuinely about the record still goes to the record.
+   */
+  const open = async (notification) => {
     if (!notification.read) dispatch(markNotificationRead(notification.id));
+
+    const aboutTheRecord = RECORD_EVENTS.has(String(notification.event || ""));
+    try {
+      const id = requestIdOf(notification);
+      if (id) {
+        setOpenRequest(await dispatch(fetchRequest(id)).unwrap());
+        return;
+      }
+      if (!aboutTheRecord && notification.opportunityId) {
+        const request = await myOpenRequestOn(notification.opportunityId);
+        if (request) {
+          setOpenRequest(request);
+          return;
+        }
+      }
+    } catch {
+      // Fall through to the record: better than a dead click.
+      notifyError("Could not open that request — showing the job instead.");
+    }
+
     if (notification.opportunityId) navigate(`/opportunities/${notification.opportunityId}`);
   };
 
@@ -137,6 +200,10 @@ export default function NotificationsPage() {
           })
         )}
       </div>
+
+      {openRequest ? (
+        <RequestDetail request={openRequest} timeZone={unit?.timezone} onClose={() => setOpenRequest(null)} />
+      ) : null}
     </>
   );
 }

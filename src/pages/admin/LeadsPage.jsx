@@ -10,43 +10,32 @@ import LoadingState from "@/components/LoadingState";
 import LoadMore from "@/components/LoadMore";
 import Alert from "@/components/Alert";
 import OppCell from "@/components/OppCell";
-import { QUALIFICATIONS, qualificationMeta } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
 import { enquiryLink } from "@/features/leads/enquiryLink";
-import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
+import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
-import { useUnitUsers } from "@/hooks/useUnitUsers";
 
-/** Latest contact attempt for the list — method + date, with a count if there's more than one. */
-function contactSummary(o) {
-  const attempts = Array.isArray(o.contactAttempts) ? o.contactAttempts : [];
-  if (!attempts.length) return o.needsClientContact ? "Not yet contacted" : "—";
-  const last = attempts[attempts.length - 1];
-  const suffix = attempts.length > 1 ? ` (${attempts.length} attempts)` : "";
-  return `${last.method} · ${formatDate(last.contactedAt)}${suffix}`;
-}
+/** How to reach the customer — captured on every lead, so always worth showing. */
+const contactSummary = (o) => [o.customerPhone, o.customerEmail].filter(Boolean).join(" · ") || "—";
 
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { unit } = useBusinessUnit();
-  const { userName } = useUnitUsers();
   const [search, setSearch] = useState("");
-  const [qualification, setQualification] = useState("");
   // Only part of the list is loaded now, so searching in the browser would miss
-  // anything further down. Both filters go to the API, which applies them
-  // across every lead and pages the result.
+  // anything further down. The search goes to the API, which applies it across
+  // every lead and pages the result.
   const settledSearch = useDebouncedValue(search.trim(), 300);
 
   const { items, status, error, ready, total, loaded, hasMore, loadingMore, loadMore } = useOpportunities(
     {
       stage: 1,
       ...(settledSearch ? { search: settledSearch } : {}),
-      ...(qualification ? { qualification } : {}),
     },
     { pageSize: 25 },
   );
@@ -88,19 +77,6 @@ export default function LeadsPage() {
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search leads"
         />
-        <select
-          className="select"
-          value={qualification}
-          onChange={(e) => setQualification(e.target.value)}
-          aria-label="Qualification filter"
-        >
-          <option value="">All qualification</option>
-          {QUALIFICATIONS.map((q) => (
-            <option key={q.key} value={q.key}>
-              {q.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -123,10 +99,8 @@ export default function LeadsPage() {
               <thead>
                 <tr>
                   <th>Lead</th>
-                  <th>Qualification</th>
                   <th>Source</th>
                   <th>Contact</th>
-                  <th>Estimator</th>
                   <th>Next action</th>
                   <th>SLA</th>
                 </tr>
@@ -134,18 +108,13 @@ export default function LeadsPage() {
               <tbody>
                 {rows.map((o) => {
                   const sla = slaStatus(o.slaDueAt);
-                  const q = qualificationMeta(o.qualification);
                   return (
                     <tr key={o.id} onClick={() => navigate(`/opportunities/${o.id}`)}>
                       <td data-label="Lead">
                         <OppCell opp={o} />
                       </td>
-                      <td data-label="Qualification">
-                        <Badge tone={q.tone}>{q.label}</Badge>
-                      </td>
                       <td data-label="Source">{leadSourceLabel(o.leadSource)}</td>
                       <td data-label="Contact">{contactSummary(o)}</td>
-                      <td data-label="Estimator">{userName(o.estimatorId) || "—"}</td>
                       <td data-label="Next action">{o.nextAction || "—"}</td>
                       <td data-label="SLA">
                         <Badge tone={sla.tone}>{sla.label}</Badge>

@@ -11,7 +11,6 @@ import { useState } from "react";
 import { Building2, Check, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, Stamp, X } from "lucide-react";
 import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
 import { approvalHints } from "@/helpers/requiredApprovals";
-import { formatDate } from "@/helpers/dateTimeHelpers";
 import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";

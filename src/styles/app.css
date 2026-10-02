@@ -518,8 +518,14 @@
   .modal.wide { width: min(680px, 100%); }
   .modal.document { width: min(960px, 100%); }
   .cost-deduction { margin-left: 8px; }
-  .quote-version-link { background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600; }
+  .quote-version-link { background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
   .quote-version-link:disabled { cursor: not-allowed; opacity: 0.6; }
+  /* Save the quote, then the saved version with its preview and download. */
+  .quote-version-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+  .quote-version-latest {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2);
+  }
   .estimation-item { padding: 18px 0; border-bottom: 1px solid var(--line); }
   .estimation-item:first-of-type { padding-top: 4px; }
   .estimation-item .section-head { margin-bottom: 10px; }

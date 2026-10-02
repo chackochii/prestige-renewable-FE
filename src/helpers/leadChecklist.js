@@ -15,6 +15,7 @@ import {
   SWITCHBOARD_CONDITIONS,
   VPP_OPTIONS,
   estimationInputFromOpp,
+  isNothingToGive,
 } from "@/constants/estimationInput";
 import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementLabel, storeyLabel } from "@/features/leads/propertyOptions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
@@ -408,8 +409,13 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
     .map((row) => ({
       ...row,
       // A row may settle its own done rule (the document rows do); otherwise
-      // it is done once it holds something.
-      done: row.done ?? (row.type === "checkbox" ? Boolean(row.value) : filled(row.value)),
+      // it is done once it holds something — and "none" is not something. The
+      // answer still shows; it just does not tick the row green.
+      done:
+        row.done ??
+        (row.type === "checkbox"
+          ? Boolean(row.value)
+          : filled(row.value) && !isNothingToGive(row.field, row.value)),
       display: row.display ?? String(row.value ?? ""),
     }));
 }

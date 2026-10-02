@@ -19,23 +19,13 @@ import { formatDate, hasClockTime } from "@/helpers/dateTimeHelpers";
 
 const asList = (value) => (Array.isArray(value) ? value : []);
 
-/** What the person attending is given for an item, in plain words. */
-const KIND_HINT = {
-  textarea: "long answer",
-  number: "number",
-  date: "date",
-  checkbox: "tick box",
-  signature: "signature",
-};
-
 export default function SiteVisitSummary({ request, timeZone }) {
   const task = siteVisitTask(request);
-  const asked = requesterItems(request);
-  const askedKeys = new Set(asked.map((f) => f.key));
-  // Once the coordinator has saved a form, that list is what is actually being
-  // asked; before then, the requester's own ticks are.
+  // What is being asked for: the coordinator's list once they have saved one,
+  // otherwise the requester's own ticks. Kept to decide whether there is a
+  // visit worth showing at all, and to label the answers when they come back.
   const saved = asList(task?.requestedFields);
-  const items = saved.length ? saved : asked;
+  const items = saved.length ? saved : requesterItems(request);
   const documents = asList(task?.requestedDocuments);
   const photos = asList(task?.photos);
   const submitted = Boolean(task?.submittedAt || task?.status === "submitted");
@@ -75,22 +65,6 @@ export default function SiteVisitSummary({ request, timeZone }) {
           Operations has not sent the form out yet. These are the items it will ask for.
         </p>
       )}
-
-      {items.length ? (
-        <>
-          <h4 style={{ marginBottom: 8 }}>Information requested</h4>
-          <div className="list-stack">
-            {items.map((field) => (
-              <div className="list-row" key={field.key}>
-                <span className="row-title">{field.label}</span>
-                <span className="row-meta">
-                  {askedKeys.has(field.key) ? "from your checklist" : KIND_HINT[field.kind] || "short answer"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
 
       {documents.length ? (
         <>
