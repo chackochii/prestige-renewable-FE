@@ -147,3 +147,23 @@ export function inspectionFieldsFor(keys = []) {
 
 /** Keys on the inspection form, so a coordinator's extra questions can be told apart. */
 export const FORM_KEYS = new Set(INSPECTION_FIELDS.map((field) => field.key));
+
+/**
+ * Everything the requester asked for: the checklist items they ticked, plus
+ * any they wrote themselves on the request. Theirs either way — the
+ * coordinator adds to this, never quietly drops it.
+ *
+ * Both halves come off the request, so both depend on the API storing and
+ * returning `inspectionChecklist` and `requestedFields`.
+ */
+export function requesterItems(request) {
+  const ticked = inspectionFieldsFor(inspectionChecklistFrom(request));
+  const seen = new Set(ticked.map((f) => f.key));
+  const own = Array.isArray(request?.requestedFields) ? request.requestedFields : [];
+  return [
+    ...ticked,
+    ...own
+      .filter((f) => f?.key && f?.label && !seen.has(f.key))
+      .map((f) => ({ key: f.key, label: f.label, kind: f.kind || "text" })),
+  ];
+}

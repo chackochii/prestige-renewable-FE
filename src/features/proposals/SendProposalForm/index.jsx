@@ -47,7 +47,7 @@ function PreviewModal({ version, unit, onClose }) {
   }, []);
 
   return (
-    <Modal title={`What the customer will see — v${version.version}`} className="document" onClose={onClose}>
+    <Modal confirmClose={false} title={`What the customer will see — v${version.version}`} className="document" onClose={onClose}>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {!url && !error ? <LoadingState label="Building the PDF…" /> : null}
       {url ? <iframe className="invoice-frame" src={url} title="Proposal preview" /> : null}

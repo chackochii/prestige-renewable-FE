@@ -102,6 +102,7 @@ export default function WaitingFor({ groups = [], timeZone, total = 0 }) {
       {detail && !detail.request ? (
         <Modal
           title={`${detail.number} · ${detail.title}`}
+          confirmClose={false}
           body={`${detail.customer}${detail.owner ? ` — with ${detail.owner}` : ""}`}
           className="wide"
           onClose={() => setDetail(null)}

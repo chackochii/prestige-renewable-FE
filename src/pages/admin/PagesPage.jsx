@@ -312,6 +312,7 @@ export default function PagesPage() {
       {modal?.delete ? (
         <Modal
           title="Delete page"
+          confirmClose={false}
           body={`Delete ${modal.delete.label} (${modal.delete.code}) from the registry? Unit toggles for it are removed too.`}
           onClose={() => setModal(null)}
           actions={

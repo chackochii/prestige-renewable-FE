@@ -415,6 +415,7 @@ export default function RolesPage() {
       {modal?.delete ? (
         <Modal
           title="Delete role"
+          confirmClose={false}
           body={`Delete ${modal.delete.name} (${modal.delete.code})? Only roles nobody holds can be removed.`}
           onClose={() => setModal(null)}
           actions={

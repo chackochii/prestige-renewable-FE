@@ -15,7 +15,6 @@ import { oppTitle } from "@/helpers/opportunity";
 import LeadPackPanel from "@/features/leads/LeadPackPanel";
 import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
-import LifecycleModal from "@/features/pipeline/LifecycleModal";
 import ProcurementStagePanel from "@/features/procurement/ProcurementStagePanel";
 import ApprovalsStagePanel from "@/features/approvals/ApprovalsStagePanel";
 import { APPROVALS_STAGE } from "@/lib/mockData/approvals";
@@ -30,7 +29,7 @@ import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { joinAddress } from "@/utils/text";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { advanceStage, clearSelected, deleteLead, fetchOpportunity, fetchOpportunityQuote, updateLead } from "@/slices/leadsSlice";
+import { advanceStage, clearSelected, deleteLead, fetchOpportunity, fetchOpportunityQuote } from "@/slices/leadsSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -39,7 +38,7 @@ export default function OpportunityPage() {
   const { id } = useParams();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, isSuperAdmin } = useAuth();
   const { unit, units, switchUnit } = useBusinessUnit();
   const { notify } = useNotifications();
   const { selected: opp, selectedStatus, selectedError, quote } = useAppSelector((s) => s.leads);
@@ -49,7 +48,6 @@ export default function OpportunityPage() {
   const [advancing, setAdvancing] = useState(false);
   // Bumped by the header's "Send to Proposal" to open estimation's hand-over step.
   const [handoverAsk, setHandoverAsk] = useState(0);
-  const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -98,7 +96,7 @@ export default function OpportunityPage() {
 
   const canEdit = hasPermission(PERMISSIONS.LEADS_UPDATE);
   const canEditEstimation = hasPermission(PERMISSIONS.ESTIMATION_UPDATE);
-  const canDelete = hasPermission(PERMISSIONS.LEADS_DELETE) && Number(opp.stage) === 1;
+  const canDelete = isSuperAdmin && Number(opp.stage) === 1;
   const current = Number(opp.stage);
   const viewing = viewStage ?? current;
   const stage = stageById(current);
@@ -134,11 +132,6 @@ export default function OpportunityPage() {
     }
   };
 
-  const saveLifecycle = async ({ lifecycle, notes }) => {
-    await dispatch(updateLead({ id: opp.id, body: { lifecycle, notes } })).unwrap();
-    notify(`Status set to ${lifecycleMeta(lifecycle).label}`);
-  };
-
   const remove = async () => {
     try {
       await dispatch(deleteLead(opp.id)).unwrap();
@@ -170,11 +163,6 @@ export default function OpportunityPage() {
           </div>
         </div>
         <div className="opp-hero-actions">
-          {canEdit ? (
-            <button type="button" className="btn btn-ghost" onClick={() => setLifecycleOpen(true)}>
-              {opp.lifecycle === "Active" ? "Mark won / lost" : "Change status"}
-            </button>
-          ) : null}
           {canDelete ? (
             <button type="button" className="btn btn-danger" onClick={() => setDeleteOpen(true)}>
               Delete
@@ -193,7 +181,7 @@ export default function OpportunityPage() {
                 disabled={!gate.canAdvance || advancing}
                 title={gate.canAdvance ? undefined : gate.missing.join(", ")}
               >
-                {advancing ? "Moving…" : `Advance to ${stageById(next).short}`} <ArrowRight size={16} />
+                {advancing ? "Moving…" : `Proceed to ${stageById(next).short}`} <ArrowRight size={16} />
               </button>
             )
           ) : null}
@@ -223,7 +211,10 @@ export default function OpportunityPage() {
       ) : null}
 
       {advanceError ? <Alert tone="warning">{advanceError}</Alert> : null}
-      {!gate.canAdvance && opp.lifecycle === "Active" && next !== null && !advanceError ? (
+      {/* The lead panel says this in its own words, against its own checklist,
+          so saying it twice here is noise. The Advance button still carries
+          the detail in its tooltip at every stage. */}
+      {!gate.canAdvance && viewing !== 1 && opp.lifecycle === "Active" && next !== null && !advanceError ? (
         <Alert tone="info">
           To leave {stage.label}: {gate.missing.join(" · ")}
         </Alert>
@@ -267,11 +258,11 @@ export default function OpportunityPage() {
         <HistoryTab opp={opp} timeZone={timeZone} canEdit={canEdit} />
       )}
 
-      {lifecycleOpen ? <LifecycleModal opp={opp} onClose={() => setLifecycleOpen(false)} onSave={saveLifecycle} /> : null}
 
       {deleteOpen ? (
         <Modal
           title="Delete lead"
+          confirmClose={false}
           body={`Remove ${oppTitle(opp)} (${opp.number})? Only records still at lead capture can be deleted.`}
           onClose={() => setDeleteOpen(false)}
           actions={

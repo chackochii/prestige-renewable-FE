@@ -119,7 +119,6 @@ export default function PipelinePage() {
       .map((s) => ({ stage: s, rows: byStage.get(s.id) || [] }));
   }, [rows, stages, stageFilter]);
 
-  const totalValue = rows.reduce((sum, o) => sum + oppValue(o), 0);
   const dragging = draggingId ? items.find((o) => o.id === draggingId) : null;
   const dropTarget = dragging ? nextStageFor(dragging.stage, unit) : null;
 
@@ -152,7 +151,7 @@ export default function PipelinePage() {
         title="Pipeline"
         description={
           ready
-            ? `${rows.length} opportunit${rows.length === 1 ? "y" : "ies"} weighted at ${formatCurrency(totalValue)}.${
+            ? `${rows.length} opportunit${rows.length === 1 ? "y" : "ies"}.${
                 view === "board" && movableStages.length
                   ? ` Drag a card to move it into the next stage — you can move ${movableStages.map((s) => s.short).join(", ")}.`
                   : ""
@@ -286,7 +285,6 @@ export default function PipelinePage() {
                   <th>Job</th>
                   <th>Stage</th>
                   <th>Status</th>
-                  <th>Value</th>
                   <th>Owner</th>
                   <th>Created by</th>
                   <th>SLA</th>
@@ -312,7 +310,6 @@ export default function PipelinePage() {
                           "—"
                         )}
                       </td>
-                      <td data-label="Value">{formatCurrency(oppValue(o))}</td>
                       <td data-label="Owner">{userName(o.salespersonId || o.leadOwnerId) || "—"}</td>
                       <td data-label="Created by">{userName(createdById(o)) || "—"}</td>
                       <td data-label="SLA">

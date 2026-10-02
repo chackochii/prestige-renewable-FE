@@ -1,64 +1,37 @@
-// The assignment screen for the coordinator: confirm or reschedule, move the
-// status on, add notes, and attach reports. A note marked internal stays
-// inside their department and is never shown to the requester.
+// The running note on an assignment: where it is up to and what happened. A
+// note marked internal stays inside their department and is never shown to
+// the requester.
+//
+// Who is attending, when the visit is scheduled and what it has to bring back
+// all live on the site-visit screen above this one.
 
 import { useState } from "react";
-import { CalendarClock, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import Alert from "@/components/Alert";
 import Field from "@/components/Field";
-import FileDropzone from "@/components/FileDropzone";
 import { nextAssignmentStatuses, statusMeta } from "@/constants/collaboration";
-import { toDateInput } from "@/helpers/dateTimeHelpers";
 import { isBlank } from "@/utils/validators";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
-export default function ProgressForm({ request, people = [], onSubmit, onUpload, uploading = false }) {
+export default function ProgressForm({ request, onSubmit, gathered = false }) {
   const [status, setStatus] = useState(request.status);
-  // Who is actually going out. Operations picks the electrician or site member
-  // here; the requester sees the name on the assignment.
-  const [assigneeId, setAssigneeId] = useState(request.assigneeId ? String(request.assigneeId) : "");
-  const [scheduledFor, setScheduledFor] = useState(toDateInput(request.scheduledFor));
   const [note, setNote] = useState("");
   const [internal, setInternal] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   const options = nextAssignmentStatuses(request.status);
-  // The person already on the request stays selectable even when they are not
-  // in the unit directory this screen loaded.
-  const crew = people.some((p) => Number(p.id) === Number(request.assigneeId))
-    ? people
-    : [
-        ...(request.assigneeId
-          ? [{ id: request.assigneeId, name: request.assigneeName || "Currently assigned" }]
-          : []),
-        ...people,
-      ];
-  const assignedName =
-    crew.find((p) => Number(p.id) === Number(assigneeId))?.name || "";
-  const rescheduling = status === "rescheduled" || status === "scheduled";
 
   const submit = async () => {
-    if (rescheduling && isBlank(scheduledFor)) {
-      setError("Pick the date you are scheduling this for.");
-      return;
-    }
-    const reassigned = assigneeId && Number(assigneeId) !== Number(request.assigneeId);
-    if (status === request.status && isBlank(note) && !reassigned) {
-      setError("Add a note, move the status on, or assign someone.");
+    if (status === request.status && isBlank(note)) {
+      setError("Add a note, or move the status on.");
       return;
     }
     setSaving(true);
     setError("");
     try {
-      await onSubmit({
-        status,
-        assigneeId: assigneeId ? Number(assigneeId) : null,
-        scheduledFor: scheduledFor || null,
-        note: note.trim(),
-        internal,
-      });
+      await onSubmit({ status, note: note.trim(), internal });
       setNote("");
       setInternal(false);
     } catch (err) {
@@ -70,7 +43,7 @@ export default function ProgressForm({ request, people = [], onSubmit, onUpload,
 
   return (
     <div className="section" style={{ marginBottom: 0 }}>
-      <h3>Update this assignment</h3>
+      <h3>Progress</h3>
       <div className="form-grid">
         <Field label="Status" hint={`now ${statusMeta("assignment", request.status).label.toLowerCase()}`}>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -78,28 +51,6 @@ export default function ProgressForm({ request, people = [], onSubmit, onUpload,
             {options.map((key) => (
               <option key={key} value={key}>
                 {statusMeta("assignment", key).label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Scheduled for" hint={rescheduling ? "required" : "optional"}>
-          <input type="date" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} />
-        </Field>
-        <Field
-          label="Assign to"
-          className="span-2"
-          hint={
-            assignedName
-              ? `currently ${assignedName}`
-              : "the electrician or site member attending"
-          }
-        >
-          <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
-            <option value="">Nobody assigned yet</option>
-            {crew.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
-                {person.title ? ` · ${person.title}` : ""}
               </option>
             ))}
           </select>
@@ -114,13 +65,6 @@ export default function ProgressForm({ request, people = [], onSubmit, onUpload,
         Keep this note inside our team — don&apos;t show it to the requester
       </label>
 
-      {onUpload ? (
-        <div style={{ marginTop: 14 }}>
-          <h3>Reports & attachments</h3>
-          <FileDropzone files={request.reports || []} onSelect={onUpload} uploading={uploading} />
-        </div>
-      ) : null}
-
       {error ? (
         <Alert tone="danger" style={{ marginTop: 14, marginBottom: 0 }}>
           {error}
@@ -129,13 +73,14 @@ export default function ProgressForm({ request, people = [], onSubmit, onUpload,
 
       <div className="decision-actions" style={{ marginTop: 16 }}>
         <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
-          {rescheduling ? <CalendarClock size={14} /> : <Send size={14} />}
-          {saving ? "Submitting…" : "Submit update"}
+          <Send size={14} />
+          {saving ? "Sending…" : gathered ? "Submit" : "Progress update"}
         </button>
       </div>
       <p className="lede" style={{ marginTop: 10, marginBottom: 0 }}>
-        {request.createdByName || "The requester"} is notified when you reschedule, complete the activity or submit a
-        report.
+        {gathered
+          ? `The site visit is in. Submitting hands it back to ${request.createdByName || "the requester"}.`
+          : `${request.createdByName || "The requester"} is notified as you move this on. Submit once the site visit comes back.`}
       </p>
     </div>
   );

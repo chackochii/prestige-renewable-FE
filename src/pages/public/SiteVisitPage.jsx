@@ -436,10 +436,16 @@ export default function SiteVisitPage() {
                 <span className="site-form-no" aria-hidden="true" />
                 <div className="site-form-body">
                   <div className="form-grid">
-                    <Field className="span-2" label="Your name" error={fieldErrors.name} htmlFor="sv-name">
+                    <Field className="span-2" label="Your name" required error={fieldErrors.name} htmlFor="sv-name">
                       <input id="sv-name" value={form.name} disabled={submitting} maxLength={LIMITS.name} autoComplete="name" onChange={(e) => set("name", e.target.value)} />
                     </Field>
-                    <Field label="Email" hint={task?.contactKnown ? "optional" : "email or phone"} error={fieldErrors.email} htmlFor="sv-email">
+                    <Field
+                      label="Email"
+                      required={!task?.contactKnown}
+                      hint={task?.contactKnown ? "optional" : "email or phone"}
+                      error={fieldErrors.email}
+                      htmlFor="sv-email"
+                    >
                       <input
                         id="sv-email"
                         type="email"
@@ -451,7 +457,13 @@ export default function SiteVisitPage() {
                         onChange={(e) => set("email", e.target.value)}
                       />
                     </Field>
-                    <Field label="Phone" hint={task?.contactKnown ? "optional" : "email or phone"} error={fieldErrors.phone} htmlFor="sv-phone">
+                    <Field
+                      label="Phone"
+                      required={!task?.contactKnown}
+                      hint={task?.contactKnown ? "optional" : "email or phone"}
+                      error={fieldErrors.phone}
+                      htmlFor="sv-phone"
+                    >
                       <input
                         id="sv-phone"
                         type="tel"

@@ -10,7 +10,9 @@ import {
   FileText,
   Handshake,
   HardHat,
+  MessagesSquare,
   PackageSearch,
+  ShieldCheck,
   SquareCheckBig,
 } from "lucide-react";
 import Badge from "@/components/Badge";
@@ -28,7 +30,9 @@ const ICONS = {
   6: PackageSearch,
   7: HardHat,
   8: CircleDollarSign,
-  9: FilePenLine,
+  9: ShieldCheck,
+  10: MessagesSquare,
+  11: FilePenLine,
 };
 
 function Row({ label, value }) {
@@ -117,7 +121,21 @@ function StageFacts({ stageId, opp, unit }) {
       return (
         <>
           <Row label="Warranty contact" value={opp.closureWarrantyContact} />
+          <Row label="Installed equipment" value={opp.systemSummary} />
+        </>
+      );
+    case 10:
+      return (
+        <>
+          <Row label="Client feedback" value={opp.feedback} />
           <Row label="Future engagement" value={opp.closureFutureEngagement} />
+          <Row label="Referrer" value={opp.referrer?.organisation} />
+        </>
+      );
+    case 11:
+      return (
+        <>
+          <Row label="Warranty contact" value={opp.closureWarrantyContact} />
           <Row label="Closed" value={opp.closedAt ? formatDate(opp.closedAt) : null} />
         </>
       );

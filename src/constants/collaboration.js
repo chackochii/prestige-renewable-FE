@@ -40,35 +40,36 @@ export function departmentLabel(key) {
   return DEPARTMENTS.find((d) => d.key === key)?.label || key || "—";
 }
 
+/**
+ * A request's priority says whether the thing has to happen, not how urgent
+ * it is: the team receiving it schedules off necessity. One scale for every
+ * kind of request, so a list of them sorts and reads as one list.
+ */
 export const PRIORITIES = [
+  { key: "required", label: "Required", tone: "danger", order: 0 },
+  { key: "not_required", label: "Not required", tone: "neutral", order: 3 },
+  { key: "preferred", label: "Preferred", tone: "warning", order: 1 },
+];
+
+/**
+ * The urgency scale this field used to carry. Requests raised before the
+ * change still hold these, so they are recognised for display and sorting —
+ * they are just no longer offered when raising anything new.
+ */
+const LEGACY_PRIORITIES = [
   { key: "low", label: "Low", tone: "neutral", order: 3 },
   { key: "medium", label: "Medium", tone: "warning", order: 2 },
   { key: "high", label: "High", tone: "danger", order: 1 },
   { key: "urgent", label: "Urgent", tone: "danger", order: 0 },
 ];
 
-/**
- * An assignment's priority says whether the activity has to happen, not how
- * urgent it is — operations schedules off necessity.
- */
-export const ASSIGNMENT_PRIORITIES = [
-  { key: "required", label: "Required", tone: "danger", order: 0 },
-  { key: "not_required", label: "Not required", tone: "neutral", order: 3 },
-  { key: "preferred", label: "Preferred", tone: "warning", order: 1 },
-];
-
-export function prioritiesFor(kind) {
-  return kind === "assignment" ? ASSIGNMENT_PRIORITIES : PRIORITIES;
-}
-
-/** Never throws on a priority the API added, or one from the other scale. */
+/** Never throws on a priority the API added, or one from the old scale. */
 export function priorityMeta(key) {
-  const found =
-    PRIORITIES.find((p) => p.key === key) || ASSIGNMENT_PRIORITIES.find((p) => p.key === key);
+  const found = PRIORITIES.find((p) => p.key === key) || LEGACY_PRIORITIES.find((p) => p.key === key);
   if (found) return found;
   return {
-    key: key || "medium",
-    label: String(key || "Medium").replace(/_/g, " "),
+    key: key || "required",
+    label: String(key || "Required").replace(/_/g, " "),
     tone: "neutral",
     order: 2,
   };
