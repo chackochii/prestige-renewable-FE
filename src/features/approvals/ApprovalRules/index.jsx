@@ -5,7 +5,7 @@
 import { Workflow } from "lucide-react";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
-import { APPROVAL_RULES, APPROVALS_STAGE, INTEGRATIONS } from "@/lib/mockData/approvals";
+import { APPROVAL_RULES, INTEGRATIONS } from "@/constants/approvals";
 import { firedRules } from "@/helpers/approvals";
 
 export default function ApprovalRules({ job = null }) {
@@ -15,7 +15,7 @@ export default function ApprovalRules({ job = null }) {
     <Card
       title="How this stage works"
       icon={<Workflow size={16} />}
-      sub={`Timeline: same day or +${APPROVALS_STAGE.slaDays} day. These notifications go out on their own.`}
+      sub="These notifications go out on their own as the stage runs."
     >
       <div className="list-stack">
         {APPROVAL_RULES.map((rule) => (

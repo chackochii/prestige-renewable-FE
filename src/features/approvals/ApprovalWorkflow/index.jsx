@@ -1,60 +1,84 @@
-// One job's passage through approvals: the overview (the four tracks and the
-// "All approved?" gate), the Operations Coordinator's checklists — CL-07 DNSP
-// application, CL-08 DA applicability and CL-09 finance application — the
-// notifications raised and the history. Once every approval is through the
-// job goes to procurement, where it is created in Green Deal (CL-10).
+// One job's passage through approvals: the overview (its approvals and the
+// "All approved?" gate, and which approvals it needs), the Operations
+// Coordinator's checklists for the ones that have one — CL-07 DNSP, CL-08 DA,
+// CL-09 finance — the notifications raised and the history. Once every
+// approval is through the job goes to procurement by itself.
 //
-// `job` comes from useApprovalChecklists: its tracks are driven by its
-// checklist answers, and `onChecklistChange(sectionKey, patch)` changes them.
-// `canEdit` — the person may complete the checklists (approvals.update).
+// `job` comes from useApprovalJob (its checklist-driven approvals already read
+// from their answers); `onChecklistChange(sectionKey, patch)`,
+// `onUpdateItem(type, body)` and `onSetRequired(keys)` change it.
+// `canEdit` — the person may work the approvals (approvals.update).
 //
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-5 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { BellRing, Building2, ClipboardCheck, Clock, Landmark, Plug, SquareCheckBig } from "lucide-react";
+import { BellRing, Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
 import ChecklistOverview from "@/components/ChecklistOverview";
+import SectionHead from "@/components/SectionHead";
 import Tabs from "@/components/Tabs";
 import ApprovalBoard from "@/features/approvals/ApprovalBoard";
 import ApprovalChecklist from "@/features/approvals/ApprovalChecklist";
 import ApprovalNotifications from "@/features/approvals/ApprovalNotifications";
+import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
-import { APPROVAL_CHECKLISTS } from "@/constants/approvalChecklists";
-import { approvalContext } from "@/helpers/approvalChecklist";
-import { approvalStatus, isOverdue } from "@/helpers/approvals";
+import { APPROVALS_STAGE } from "@/constants/approvals";
+import { approvalContext, checklistOf, sectionOf } from "@/helpers/approvalChecklist";
+import { approvalItems, approvalStatus, isOverdue } from "@/helpers/approvals";
 import { checklistSummary } from "@/helpers/checklist";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 const CHECKLIST_ICONS = { dnsp: Plug, da: Building2, finance: Landmark };
 
-export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, embedded = false }) {
+export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, onUpdateItem, onSetRequired, embedded = false }) {
   const [tab, setTab] = useState("overview");
+  const [choosing, setChoosing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   // A different job opens on its overview, not wherever the last one was.
   useEffect(() => {
     setTab("overview");
+    setChoosing(false);
   }, [job?.id]);
 
   if (!job) return null;
 
   const status = approvalStatus(job);
-  const checklist = job.checklist ?? {};
+  const checklist = checklistOf(job);
   const ctx = approvalContext(checklist);
-  const checklists = APPROVAL_CHECKLISTS.map((section) => ({ section, summary: checklistSummary(section, checklist[section.key] ?? {}, ctx) }));
+  const movedOn = Number(job.stage) > APPROVALS_STAGE.id;
+  // Only the checklists this job's approvals call for.
+  const checklists = approvalItems(job)
+    .map(sectionOf)
+    .filter(Boolean)
+    .map((section) => ({ section, summary: checklistSummary(section, checklist[section.key] ?? {}, ctx) }));
   const tabs = [
     { key: "overview", label: "Overview", icon: <ClipboardCheck size={14} /> },
     ...checklists.map(({ section, summary }) => {
       const Icon = CHECKLIST_ICONS[section.key] ?? ClipboardCheck;
-      return { key: section.key, label: section.tab, icon: <Icon size={14} />, count: summary.applies ? `${summary.done}/${summary.total}` : undefined };
+      return { key: section.key, label: section.tab, icon: <Icon size={14} />, count: `${summary.done}/${summary.total}` };
     }),
     { key: "notifications", label: "Notifications", icon: <BellRing size={14} />, count: (job.notifications ?? []).length || undefined },
-    { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length },
+    { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length || undefined },
   ];
-  const section = APPROVAL_CHECKLISTS.find((candidate) => candidate.key === tab) ?? null;
+  const section = checklists.find(({ section: candidate }) => candidate.key === tab)?.section ?? null;
+
+  const saveRequired = async (keys) => {
+    setSaving(true);
+    setError("");
+    try {
+      await onSetRequired?.(keys);
+    } catch (err) {
+      setError(typeof err === "string" ? err : err?.message || "The approvals required could not be changed.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const body = (
     <>
@@ -67,16 +91,57 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
       <div className="panel">
         {tab === "overview" ? (
           <>
-            <ApprovalBoard job={job} />
+            <ApprovalBoard job={job} canEdit={canEdit} onOpenChecklist={setTab} onUpdateItem={onUpdateItem} />
+
             <div style={{ marginTop: 20 }}>
-              <div className="row-title" style={{ marginBottom: 8 }}>
-                Checklists
-              </div>
-              <ChecklistOverview rows={checklists} onOpen={setTab} />
+              <SectionHead icon={<ListChecks size={13} />} title="Approvals required" />
+              <p className="row-meta" style={{ whiteSpace: "normal", marginBottom: 8 }}>
+                Ticked by sales on the lead or by estimation — the approvals tracked above.
+                {canEdit && !movedOn ? " Change it here if the job needs another one, or one less." : ""}
+              </p>
+              {choosing ? (
+                <>
+                  <RequiredApprovalsPicker unit={{ approvalTypes: job.catalogue }} value={job.requiredApprovals} onChange={saveRequired} disabled={saving} />
+                  {error ? (
+                    <Alert tone="danger" style={{ marginTop: 10 }}>
+                      {error}
+                    </Alert>
+                  ) : null}
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setChoosing(false)} disabled={saving}>
+                    Done
+                  </button>
+                </>
+              ) : (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {job.requiredApprovals?.length ? (
+                    job.requiredApprovals.map((key) => (
+                      <Badge key={key} tone="neutral">
+                        {job.catalogue?.find((type) => type.key === key)?.label ?? key}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="row-meta">None marked as required.</span>
+                  )}
+                  {canEdit && !movedOn ? (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChoosing(true)}>
+                      Change
+                    </button>
+                  ) : null}
+                </div>
+              )}
             </div>
+
+            {checklists.length ? (
+              <div style={{ marginTop: 20 }}>
+                <div className="row-title" style={{ marginBottom: 8 }}>
+                  Checklists
+                </div>
+                <ChecklistOverview rows={checklists} onOpen={setTab} />
+              </div>
+            ) : null}
           </>
         ) : section ? (
-          <ApprovalChecklist section={section} job={job} canEdit={canEdit} onChange={(patch) => onChecklistChange?.(section.key, patch)} />
+          <ApprovalChecklist section={section} job={job} canEdit={canEdit && !movedOn} onChange={(patch) => onChecklistChange?.(section.key, patch)} />
         ) : tab === "notifications" ? (
           <ApprovalNotifications job={job} />
         ) : (
@@ -91,7 +156,8 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
           <span className="row-meta">
-            {job.number} · {job.customer} · {formatCurrency(job.acceptedValue)} accepted
+            {job.number} · {job.customer}
+            {job.acceptedValue !== null && job.acceptedValue !== undefined ? ` · ${formatCurrency(job.acceptedValue)} accepted` : ""}
           </span>
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
@@ -104,7 +170,9 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
     <Card
       title={`${job.number} · ${job.customer}`}
       icon={<SquareCheckBig size={16} />}
-      sub={`${job.site} · ${formatCurrency(job.acceptedValue)} accepted · ${job.salesperson} (sales)`}
+      sub={[job.site, job.acceptedValue !== null && job.acceptedValue !== undefined ? `${formatCurrency(job.acceptedValue)} accepted` : null, job.salesperson?.name ? `${job.salesperson.name} (sales)` : null]
+        .filter(Boolean)
+        .join(" · ")}
       actions={<Badge tone={status.tone}>{status.label}</Badge>}
     >
       {body}

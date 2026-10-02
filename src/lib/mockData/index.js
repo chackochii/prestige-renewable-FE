@@ -3,7 +3,6 @@
 // of swapping the import for a slice. Nothing in here should outlive its API.
 
 export * from "./adminTeam";
-export * from "./approvals";
 export {
   PROCUREMENT_STAGE,
   VARIATION_THRESHOLD_PCT,

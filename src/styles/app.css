@@ -1027,6 +1027,9 @@
 .approval-track-head { display: flex; gap: 10px; align-items: center; min-width: 0; }
 .approval-track-body { display: flex; flex-direction: column; gap: 4px; }
 .approval-track-note { font-size: 12.5px; color: var(--ink-soft); white-space: normal; }
+/* Recording a plain approval inside its track card. */
+.approval-item-form { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.approval-item-form .form-grid { gap: 10px; }
 .approval-gate { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .approval-gate-diamond {
   width: 104px; height: 104px; transform: rotate(45deg); border: 2px solid var(--accent); border-radius: 14px;

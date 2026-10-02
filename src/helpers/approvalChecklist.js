@@ -3,14 +3,32 @@
 // on, the NMI the finance application reuses, and how the checklists drive the
 // approval tracks and the "All approved?" gate.
 //
-// A job's checklist is { dnsp: {...}, da: {...}, finance: {...} } — one set of
-// answers per section.
+// A job's checklist answers live on its approval items (item.checklist, one
+// set per DNSP / DA / finance item) — checklistOf gathers them as
+// { dnsp: {...}, da: {...}, finance: {...} }, which is what the rules read.
 
 import { APPROVAL_CHECKLISTS, CHECKLIST_OWNER, FINANCE_OPTIONS } from "@/constants/approvalChecklists";
-import { approvalItems, approvalOutcome } from "@/helpers/approvals";
-import { isNmi, normaliseNmi, sectionApplies, statusOf } from "@/helpers/checklist";
+import { hasChecklist } from "@/helpers/approvals";
+import { isNmi, normaliseNmi, statusOf } from "@/helpers/checklist";
+
+/** The checklist answers off the job's items, by section key. */
+export const checklistOf = (job) =>
+  Object.fromEntries((job?.items ?? []).filter(hasChecklist).map((item) => [item.key, item.checklist ?? {}]));
 
 export const answersOf = (checklist, sectionKey) => checklist?.[sectionKey] ?? {};
+
+/**
+ * The section as it applies to a job: whether it is needed is decided by the
+ * job's required approvals now, not by the checklist's own switch — so an
+ * optional section (finance) reads as applying whenever the item is there.
+ */
+export const sectionFor = (section) => (section.optional ? { ...section, optional: false } : section);
+
+/** The checklist section behind an approval item, or null for a plain approval. */
+export const sectionOf = (item) => {
+  const section = hasChecklist(item) ? APPROVAL_CHECKLISTS.find((candidate) => candidate.track === item.key) : null;
+  return section ? sectionFor(section) : null;
+};
 
 /** The NMI recorded on the DNSP application — the finance application reuses it. */
 export const recordedNmi = (checklist) => {
@@ -40,37 +58,39 @@ export function approvalContext(checklist) {
 /** Who each application is with, for the track cards on the overview. */
 function authorityFor(section, answers, job) {
   if (section.key === "dnsp") return answers.network || null;
-  if (section.key === "da") return job.council || null;
+  if (section.key === "da") return job?.council || null;
   if (section.key === "finance") return FINANCE_OPTIONS.find((option) => option.value === answers.financeOption)?.label ?? null;
   return null;
 }
 
 /**
- * The job with its approval tracks driven by the checklists: each checklist's
- * status becomes its track's status, with the reference and dates recorded
- * there. Tracks without a checklist (additional approvals) are left as they are.
+ * What a checklist's answers say about its approval — the status the track
+ * shows and the records to keep with it. Sent to the API with the answers,
+ * and shown straight away.
  */
-export function applyChecklist(job, checklist) {
+export function derivedTrack(section, answers, job) {
+  const status = statusOf(section, answers);
+  return {
+    status: status?.track ?? "not_started",
+    authority: authorityFor(section, answers, job),
+    reference: answers.reference || null,
+    submittedAt: answers.submittedOn || null,
+    decidedAt: answers.decidedOn || null,
+  };
+}
+
+/**
+ * The job with its checklist-driven approvals read from their answers: the
+ * DNSP, DA and finance tracks show what the coordinator has recorded there,
+ * the moment it is typed. Plain approvals are left as the API has them.
+ */
+export function applyChecklist(job) {
   if (!job) return job;
-  const items = approvalItems(job).map((item) => {
-    const section = APPROVAL_CHECKLISTS.find((candidate) => candidate.track === item.key);
+  const items = (job.items ?? []).map((item) => {
+    const section = sectionOf(item);
     if (!section) return item;
-    const answers = answersOf(checklist, section.key);
-    if (!sectionApplies(section, answers)) return { ...item, applicable: false, status: "not_applicable" };
-    const status = statusOf(section, answers);
-    return {
-      ...item,
-      applicable: true,
-      status: status.track,
-      authority: authorityFor(section, answers, job) ?? item.authority,
-      reference: answers.reference || null,
-      owner: item.owner || CHECKLIST_OWNER,
-      submittedAt: answers.submittedOn || null,
-      decidedAt: answers.decidedOn || null,
-    };
+    const answers = item.checklist ?? {};
+    return { ...item, ...derivedTrack(section, answers, job), owner: item.owner || CHECKLIST_OWNER };
   });
   return { ...job, items };
 }
-
-/** Every approval through — the stage's exit gate, which is where procurement starts. */
-export const approvalsThrough = (job) => approvalOutcome(job) === "approved";

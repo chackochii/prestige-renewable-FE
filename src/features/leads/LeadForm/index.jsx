@@ -8,7 +8,9 @@
 // customer before the lead can be marked Potential.
 
 import { useState } from "react";
-import { Building2, Check, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, X } from "lucide-react";
+import { Building2, Check, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, Stamp, X } from "lucide-react";
+import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
+import { approvalHints } from "@/helpers/requiredApprovals";
 import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
@@ -1162,6 +1164,20 @@ export default function LeadForm({
               <button type="button" className="btn btn-ghost btn-sm" onClick={addCustomField} disabled={disabled}>
                 <Plus size={14} /> Add custom field
               </button>
+            </div>
+
+            <div className="decision-card">
+              <SectionHead icon={<Stamp size={13} />} title="Approvals this job will need" />
+              <p className="row-meta" style={{ whiteSpace: "normal", marginBottom: 10 }}>
+                Tick what you already know — estimation confirms the list, and the approvals stage tracks exactly these.
+              </p>
+              <RequiredApprovalsPicker
+                unit={unit}
+                value={form.requiredApprovals}
+                onChange={(keys) => set("requiredApprovals", keys)}
+                disabled={disabled}
+                hints={approvalHints(form)}
+              />
             </div>
 
             <div className="decision-card">

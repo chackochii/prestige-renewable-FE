@@ -3,6 +3,7 @@
 
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import * as api from "@/services/api/leadsApi";
+import { setRequiredApprovals as putRequiredApprovals } from "@/services/api/approvalsApi";
 import { logout } from "./authSlice";
 
 const initialState = {
@@ -286,6 +287,18 @@ export const notifyEstimator = createAsyncThunk(
   },
 );
 
+/** Which approvals the job will need at stage 5 (keys from the unit's catalogue) → the opportunity. */
+export const updateRequiredApprovals = createAsyncThunk(
+  "leads/requiredApprovals",
+  async ({ id, keys }, { rejectWithValue }) => {
+    try {
+      return await putRequiredApprovals(id, keys);
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+);
+
 export const acknowledgeLeadChange = createAsyncThunk(
   "leads/acknowledgeLeadChange",
   async (id, { rejectWithValue }) => {
@@ -562,6 +575,7 @@ const leadsSlice = createSlice({
       .addCase(submitEstimationRequirements.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimationClientInfo.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(acknowledgeLeadChange.fulfilled, (state, action) => upsert(state, action.payload))
+      .addCase(updateRequiredApprovals.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(collectEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(acceptEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimatorChecklist.fulfilled, (state, action) => upsert(state, action.payload))

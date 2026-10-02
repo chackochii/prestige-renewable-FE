@@ -72,8 +72,8 @@ export default function RequoteSummary({ requote, timeZone, title }) {
           </div>
           {requote.estimatorNote ? <div className="requote-text">{requote.estimatorNote}</div> : <div className="row-meta">No note was left.</div>}
           {revised ? (
-            <div className="row-meta" style={{ whiteSpace: "normal", marginTop: 4 }}>
-              Revised quote: {revised}
+            <div className="requote-text" style={{ marginTop: 4 }}>
+              <strong>Revised quote: {revised}</strong>
             </div>
           ) : null}
         </div>

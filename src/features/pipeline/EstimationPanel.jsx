@@ -56,7 +56,9 @@ import ProposalHandover from "@/features/pipeline/ProposalHandover";
 import RequoteSummary from "@/features/proposals/RequoteSummary";
 import { isRequoteOpen } from "@/helpers/proposals";
 import { leadMandatoryItems } from "@/helpers/leadChecklist";
-import { DRAWING_CATEGORY, PERMIT_OPTIONS } from "@/constants/estimationInput";
+import { DRAWING_CATEGORY } from "@/constants/estimationInput";
+import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
+import { approvalHints, requiredKeysOf } from "@/helpers/requiredApprovals";
 import { estimationInputFromOpp } from "@/constants/estimationInput";
 import { estimationState } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
@@ -68,6 +70,7 @@ import {
   fetchOpportunityAttachments,
   submitEstimationClientInfo,
   submitEstimatorChecklist,
+  updateRequiredApprovals,
   uploadOpportunityAttachment,
 } from "@/slices/leadsSlice";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
@@ -257,9 +260,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
       await dispatch(collectEstimationInputs({ id: opp.id, body: { input: { [field]: value } } })).unwrap();
     });
 
-  const savedPermits = estimationInputFromOpp(opp).permits || [];
-  const togglePermit = (key) =>
-    saveInput("permits", savedPermits.includes(key) ? savedPermits.filter((k) => k !== key) : [...savedPermits, key]);
+  // Which approvals the job will need at stage 5 — sales may have ticked
+  // some on the lead; estimation confirms the list. Stage 5 tracks only these.
+  const saveRequiredApprovals = (keys) => run(() => dispatch(updateRequiredApprovals({ id: opp.id, keys })).unwrap());
 
   const answerClientInfo = (needed) => {
     run(() => dispatch(submitEstimationClientInfo({ id: opp.id, body: { needed } })).unwrap());
@@ -362,16 +365,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           <div style={{ marginTop: 10 }}>
             <RequoteSummary requote={requote} timeZone={unit?.timezone} />
           </div>
-          {canEdit ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setTab("quote")}>
-                <Receipt size={14} /> Open the quote
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTab("handover")}>
-                <Send size={14} /> Send the revised quote
-              </button>
-            </div>
-          ) : null}
         </Alert>
       ) : null}
 
@@ -424,24 +417,18 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           </div>
 
           <div className="section" style={{ marginTop: 24 }}>
-            <SectionHead icon={<Stamp size={13} />} title="Permits & approvals" />
+            <SectionHead icon={<Stamp size={13} />} title="Approvals required" />
             <p className="lede" style={{ marginBottom: 12 }}>
-              What this job has to clear before it can be built. Estimation identifies these — they are never
-              asked of sales.
+              What this job has to clear before it can be built. Sales may have ticked some on the lead — confirm
+              the list here; the approvals stage tracks exactly these once the customer accepts.
             </p>
-            <div className="choice-grid">
-              {PERMIT_OPTIONS.map((permit) => (
-                <label key={permit.key} className="choice">
-                  <input
-                    type="checkbox"
-                    checked={savedPermits.includes(permit.key)}
-                    disabled={!canEdit || saving}
-                    onChange={() => togglePermit(permit.key)}
-                  />
-                  <span>{permit.label}</span>
-                </label>
-              ))}
-            </div>
+            <RequiredApprovalsPicker
+              unit={unit}
+              value={requiredKeysOf(opp)}
+              onChange={saveRequiredApprovals}
+              disabled={!canEdit || saving}
+              hints={approvalHints(opp)}
+            />
             <div style={{ marginTop: 12 }}>
               <Field label="Permit / approval notes" hint="reference numbers, who is lodging, what is outstanding">
                 <textarea

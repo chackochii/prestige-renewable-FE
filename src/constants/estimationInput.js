@@ -121,7 +121,6 @@ export function emptyEstimationInput() {
     siteConstraints: "",
     specialRequirements: "",
     // Compliance
-    permits: [],
     vppDiscussed: false,
     vppEligibility: "",
     vppNotes: "",

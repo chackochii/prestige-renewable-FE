@@ -12,6 +12,7 @@ export const PERMISSIONS = {
 
   ESTIMATION_UPDATE: "estimation.update",
 
+  APPROVALS_READ: "approvals.read",
   APPROVALS_UPDATE: "approvals.update",
 
   PROCUREMENT_UPDATE: "procurement.update",

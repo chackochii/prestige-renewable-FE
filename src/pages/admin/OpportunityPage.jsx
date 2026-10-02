@@ -17,7 +17,7 @@ import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
 import ProcurementStagePanel from "@/features/procurement/ProcurementStagePanel";
 import ApprovalsStagePanel from "@/features/approvals/ApprovalsStagePanel";
-import { APPROVALS_STAGE } from "@/lib/mockData/approvals";
+import { APPROVALS_STAGE } from "@/constants/approvals";
 import ProposalStagePanel from "@/features/proposals/ProposalStagePanel";
 import { PROPOSAL_STAGE_ID } from "@/helpers/proposals";
 import { PROCUREMENT_STAGE } from "@/lib/mockData/procurement";

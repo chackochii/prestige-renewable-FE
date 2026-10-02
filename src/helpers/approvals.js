@@ -1,29 +1,37 @@
 // Approvals (stage 5) workflow rules, mirrored from the Sydpro process chart:
-// DA, DNSP, finance (if applicable) and additional approvals (if any) run side
-// by side; once all are in the job goes to procurement, and if any is not
-// given it goes back to its salesperson. Pure functions over a job record, so
-// every panel agrees on where a job is — and so the rules can move to
-// prestige-be unchanged. Until then the jobs come from lib/mockData/approvals.js.
+// the approvals a job needs run side by side; once all are in the job goes to
+// procurement, and if any is not given it goes back to its salesperson. Pure
+// functions over a job record from prestige-be (services/api/approvalsApi.js),
+// so every panel agrees on where a job is.
 
-import { APPROVAL_RULES, APPROVAL_TRACKS, ITEM_STATUSES } from "@/lib/mockData/approvals";
+import { APPROVAL_RULES, CHECKLIST_TYPES, ITEM_STATUSES } from "@/constants/approvals";
 
-export function trackOf(key) {
-  return APPROVAL_TRACKS.find((track) => track.key === key) ?? { key, label: key, short: key };
-}
+/** How an approval reads where there is no room for its full label (the board's status, the gate). */
+const SHORT_LABELS = {
+  dnsp: "DNSP",
+  da: "DA",
+  finance: "Finance",
+  strata: "Strata",
+  heritage: "Heritage",
+  landlord: "Landlord",
+  electrical_safety: "Electrical safety",
+  rebate: "Rebate",
+};
 
-/** Each track with the job's item on it, in chart order. */
+export const shortLabel = (item) => item?.short ?? SHORT_LABELS[item?.key] ?? item?.label ?? item?.key ?? "";
+
+/** The approvals this job needs, in the unit's catalogue order (as the API returns them). */
 export function approvalItems(job) {
-  const items = Array.isArray(job?.items) ? job.items : [];
-  return APPROVAL_TRACKS.map((track) => {
-    const item = items.find((candidate) => candidate.key === track.key) ?? { key: track.key, applicable: false, status: "not_applicable" };
-    return { ...track, ...item, label: item.label || track.label };
-  });
+  return (Array.isArray(job?.items) ? job.items : []).map((item) => ({ ...item, short: shortLabel(item) }));
 }
 
-/** The approvals this job actually needs. */
+/** The ones still counted — everything required that has not been marked not applicable. */
 export function applicableItems(job) {
-  return approvalItems(job).filter((item) => item.applicable);
+  return approvalItems(job).filter((item) => item.applicable !== false && item.status !== "not_applicable");
 }
+
+/** DNSP, DA and finance are worked through a checklist; the rest are recorded directly. */
+export const hasChecklist = (item) => Boolean(item?.hasChecklist ?? CHECKLIST_TYPES.includes(item?.key));
 
 export function itemStatus(item) {
   return ITEM_STATUSES[item?.status] ?? ITEM_STATUSES.not_started;
@@ -50,7 +58,7 @@ export function approvalOutcome(job) {
 }
 
 export function financeRequired(job) {
-  return approvalItems(job).some((item) => item.key === "finance" && item.applicable);
+  return approvalItems(job).some((item) => item.key === "finance");
 }
 
 /** Past the stage's timeline without a decision either way. */
@@ -71,9 +79,11 @@ export function firedRules(job) {
 /** What a person needs to know about a job at a glance: { key, label, tone }. */
 export function approvalStatus(job) {
   const outcome = approvalOutcome(job);
-  if (outcome === "approved") return { key: outcome, label: "Ready for procurement", tone: "success" };
-  if (outcome === "rejected")
-    return { key: outcome, label: `Back with ${job?.assignedBack?.to ?? job?.salesperson ?? "sales"}`, tone: "danger" };
+  // Moved on already: every approval was in.
+  if (outcome === "approved" || (job?.stage && Number(job.stage) > 5 && approvalItems(job).length))
+    return { key: "approved", label: Number(job?.stage) > 5 ? "In procurement" : "Ready for procurement", tone: "success" };
+  if (outcome === "rejected") return { key: outcome, label: `Back with ${job?.salesperson?.name ?? "sales"}`, tone: "danger" };
+  if (!approvalItems(job).length) return { key: "none", label: "No approvals marked as required", tone: "neutral" };
   const waiting = pendingItems(job).map((item) => item.short);
   return { key: outcome, label: waiting.length ? `Awaiting ${waiting.join(" + ")}` : "Not started", tone: "warning" };
 }

@@ -76,6 +76,8 @@ export function emptyLeadForm() {
     salespersonId: "",
     unassignedReason: "",
     customFields: [],
+    // Which approvals the job will need at stage 5 — keys from the unit's catalogue.
+    requiredApprovals: [],
     potential: "",
     notPotentialReason: "",
   };
@@ -166,6 +168,7 @@ export function leadToForm(opp) {
     customFields: Array.isArray(opp.customFields)
       ? opp.customFields.map((f) => ({ label: str(f?.label), value: str(f?.value) }))
       : [],
+    requiredApprovals: Array.isArray(opp.requiredApprovals) ? opp.requiredApprovals.map(String) : [],
     potential: opp.qualification === "qualified" ? "yes" : opp.qualification === "disqualified" ? "no" : "",
     notPotentialReason: str(opp.notPotentialReason),
   };
@@ -277,6 +280,7 @@ export function formToPayload(form) {
     customFields: (form.customFields || [])
       .map((f) => ({ label: trim(f.label), value: trim(f.value) }))
       .filter((f) => f.label || f.value),
+    requiredApprovals: Array.isArray(form.requiredApprovals) ? form.requiredApprovals : [],
     potential: form.potential || null,
     notPotentialReason: form.potential === "no" ? trim(form.notPotentialReason) : "",
     estimationInput: pickEstimationInput(form),
