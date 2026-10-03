@@ -1,8 +1,8 @@
 // One job's passage through approvals: the overview (its approvals and the
 // "All approved?" gate, and which approvals it needs), the Operations
 // Coordinator's checklists for the ones that have one — CL-07 DNSP, CL-08 DA,
-// CL-09 finance — the notifications raised and the history. Once every
-// approval is through the job goes to procurement by itself.
+// CL-09 finance — and the history. Once every approval is through the job
+// goes to procurement by itself.
 //
 // `job` comes from useApprovalJob (its checklist-driven approvals already read
 // from their answers); `onChecklistChange(sectionKey, patch)`,
@@ -13,7 +13,7 @@
 // opportunity page's stage-5 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { BellRing, Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, SquareCheckBig } from "lucide-react";
+import { Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
@@ -22,7 +22,6 @@ import SectionHead from "@/components/SectionHead";
 import Tabs from "@/components/Tabs";
 import ApprovalBoard from "@/features/approvals/ApprovalBoard";
 import ApprovalChecklist from "@/features/approvals/ApprovalChecklist";
-import ApprovalNotifications from "@/features/approvals/ApprovalNotifications";
 import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
 import { APPROVALS_STAGE } from "@/constants/approvals";
@@ -63,7 +62,6 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
       const Icon = CHECKLIST_ICONS[section.key] ?? ClipboardCheck;
       return { key: section.key, label: section.tab, icon: <Icon size={14} />, count: `${summary.done}/${summary.total}` };
     }),
-    { key: "notifications", label: "Notifications", icon: <BellRing size={14} />, count: (job.notifications ?? []).length || undefined },
     { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length || undefined },
   ];
   const section = checklists.find(({ section: candidate }) => candidate.key === tab)?.section ?? null;
@@ -142,8 +140,6 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
           </>
         ) : section ? (
           <ApprovalChecklist section={section} job={job} canEdit={canEdit && !movedOn} onChange={(patch) => onChecklistChange?.(section.key, patch)} />
-        ) : tab === "notifications" ? (
-          <ApprovalNotifications job={job} />
         ) : (
           <ProcurementHistory job={job} />
         )}

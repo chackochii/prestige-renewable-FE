@@ -41,6 +41,39 @@ export function departmentLabel(key) {
 }
 
 /**
+ * Which roles make a person part of a department. The API's people directory
+ * stamps `departments` on every user from the same table (prestige-be
+ * collaborationRequest.js DEPARTMENT_ROLES), and that is what counts; this
+ * copy only stands in when a user arrives without it. Keep the two in step.
+ */
+const DEPARTMENT_ROLE_HINTS = {
+  sales: ["SMM", "SREP"],
+  operations: ["BOM", "OPC", "SITEOM", "CREW", "QSM", "OMM"],
+  procurement: ["PROC"],
+  finance: ["FIN"],
+  admin: ["BO", "SYS", "HRM", "ADM"],
+};
+
+/** Whether a directory user belongs to a department. */
+export function inDepartment(user, department) {
+  if (!department) return true;
+  if (Array.isArray(user?.departments)) return user.departments.includes(department);
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  return (DEPARTMENT_ROLE_HINTS[department] || []).some((code) => roles.includes(code));
+}
+
+/**
+ * The people a request to `department` can go to. When nobody in the unit
+ * belongs to it, everyone is offered rather than an empty list — a unit with
+ * no one in finance yet still has to send its finance request somewhere — and
+ * `exact` says which happened, so the form can say so.
+ */
+export function peopleInDepartment(users = [], department) {
+  const matched = users.filter((u) => inDepartment(u, department));
+  return matched.length ? { people: matched, exact: true } : { people: users, exact: false };
+}
+
+/**
  * A request's priority says whether the thing has to happen, not how urgent
  * it is: the team receiving it schedules off necessity. One scale for every
  * kind of request, so a list of them sorts and reads as one list.

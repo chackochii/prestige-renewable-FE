@@ -1,26 +1,23 @@
 // The approvals this job needs, side by side — each with who it is with, its
-// reference and where it stands — then the "All approved?" gate they feed.
-// DNSP, DA and finance open their checklist; any other approval is recorded
-// right here.
+// reference and where it stands. DNSP, DA and finance open their checklist;
+// any other approval is recorded right here.
 //
 // `onOpenChecklist(sectionKey)` opens a checklist tab; `onUpdateItem(type,
 // body)` saves a plain approval (approvals.update).
 
 import { useState } from "react";
 import { Building2, ClipboardList, Landmark, Pencil, Plug, Plus } from "lucide-react";
-import ApprovalGate from "@/components/ApprovalGate";
 import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import ApprovalItemForm from "@/features/approvals/ApprovalItemForm";
 import { APPROVALS_STAGE } from "@/constants/approvals";
-import { applicableItems, approvalItems, approvalOutcome, hasChecklist, itemStatus } from "@/helpers/approvals";
+import { approvalItems, hasChecklist, itemStatus } from "@/helpers/approvals";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 
 const ICONS = { da: Building2, dnsp: Plug, finance: Landmark };
 
 export default function ApprovalBoard({ job, canEdit = false, onOpenChecklist, onUpdateItem }) {
   const [editing, setEditing] = useState(null); // the key of the plain approval being recorded
-  const outcome = approvalOutcome(job);
   const items = approvalItems(job);
   const movedOn = Number(job?.stage) > APPROVALS_STAGE.id;
 
@@ -88,22 +85,6 @@ export default function ApprovalBoard({ job, canEdit = false, onOpenChecklist, o
           body="Sales or estimation tick the approvals a job needs before it gets here. Add any this job does need below, or move it on to procurement if there are none."
         />
       )}
-
-      <div style={{ marginTop: 20 }}>
-        <ApprovalGate
-          items={applicableItems(job)}
-          outcome={movedOn ? "approved" : outcome}
-          yes={{
-            title: APPROVALS_STAGE.next.label,
-            detail: movedOn ? "Every approval was received — the job has moved on, and procurement was told" : "The job moves on by itself when the last approval is in; procurement is told",
-          }}
-          no={{
-            title: `Back with ${job?.salesperson?.name ?? "the salesperson"}`,
-            detail: "An approval not given tells the salesperson, the sales manager and the owner, and goes in the history",
-          }}
-          waiting={items.length ? undefined : "Nothing to wait on — no approvals were marked as required."}
-        />
-      </div>
     </>
   );
 }

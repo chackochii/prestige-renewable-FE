@@ -171,7 +171,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const quote = useAppSelector((s) => s.leads.quote);
   const { oppId: collabOppId, byOpp } = useAppSelector((s) => s.collaboration);
   const requests = collabOppId === Number(opp.id) ? byOpp : [];
-  const { active, siteOps } = useUnitUsers();
+  const { active } = useUnitUsers();
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadingSketches, setUploadingSketches] = useState(false);
   // Sales edited the lead pack after this reached estimation. Dismissing
@@ -637,7 +637,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           kind="assignment"
           template="pre_site_inspection"
           department="operations"
-          people={siteOps.length ? siteOps : active}
+          people={active}
           onClose={() => setRequestingInspection(false)}
           onSubmit={async (body) => {
             await dispatch(

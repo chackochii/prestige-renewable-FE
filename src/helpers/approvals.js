@@ -66,10 +66,6 @@ export function isOverdue(job, now = new Date()) {
   return approvalOutcome(job) === "pending" && Boolean(job?.slaDueAt) && new Date(job.slaDueAt) < now;
 }
 
-export function ruleOf(key) {
-  return APPROVAL_RULES.find((rule) => rule.key === key) ?? null;
-}
-
 /** Which of the stage's rules have fired on this job. */
 export function firedRules(job) {
   const keys = new Set((job?.notifications ?? []).map((notice) => notice.rule));

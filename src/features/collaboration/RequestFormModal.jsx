@@ -16,8 +16,10 @@ import InspectionChecklist from "./InspectionChecklist";
 import {
   ASSIGNMENT_TEMPLATES,
   DEPARTMENTS,
+  departmentLabel,
   documentTypeLabel,
   INFORMATION_TEMPLATES,
+  peopleInDepartment,
   PRIORITIES,
   REQUEST_KINDS,
 } from "@/constants/collaboration";
@@ -40,6 +42,8 @@ export default function RequestFormModal({
   stage,
   kind = "information",
   department: initialDepartment,
+  // Everyone in the unit. The form narrows the "assign to" list to whichever
+  // department is chosen, and widens it again when the department changes.
   people = [],
   // Which template the modal opens on, by key. Raising a pre-site inspection
   // from a stage panel opens on that one, so its title and description are
@@ -84,6 +88,18 @@ export default function RequestFormModal({
   const removeDocument = (i) => setDocuments(documents.filter((_, n) => n !== i));
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  // The people on the team chosen — or everyone, when the unit has nobody on
+  // that team yet, in which case the field says so.
+  const { people: candidates, exact: teamHasPeople } = peopleInDepartment(people, form.department);
+  const changeDepartment = (department) => {
+    const { people: next } = peopleInDepartment(people, department);
+    setForm((f) => ({
+      ...f,
+      department,
+      // A person picked from the old team is not on the new one.
+      assigneeId: next.some((p) => String(p.id) === String(f.assigneeId)) ? f.assigneeId : "",
+    }));
+  };
   const isInspection = isAssignment && templateKey === "pre_site_inspection";
   // The note can run to a line per item asked for; three rows would hide
   // most of it, so the box grows with what is in it, up to a point.
@@ -256,7 +272,7 @@ export default function RequestFormModal({
         </Field>
 
         <Field label="Department">
-          <select value={form.department} onChange={(e) => set("department", e.target.value)}>
+          <select value={form.department} onChange={(e) => changeDepartment(e.target.value)}>
             {DEPARTMENTS.map((d) => (
               <option key={d.key} value={d.key}>
                 {d.label}
@@ -264,10 +280,14 @@ export default function RequestFormModal({
             ))}
           </select>
         </Field>
-        <Field label="Assign to" required>
+        <Field
+          label="Assign to"
+          required
+          hint={teamHasPeople ? undefined : `nobody in ${departmentLabel(form.department)} yet — showing everyone`}
+        >
           <select value={form.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
-            <option value="">Choose a person</option>
-            {people.map((p) => (
+            <option value="">{candidates.length ? "Choose a person" : "Nobody in this unit yet"}</option>
+            {candidates.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
                 {p.title ? ` · ${p.title}` : ""}

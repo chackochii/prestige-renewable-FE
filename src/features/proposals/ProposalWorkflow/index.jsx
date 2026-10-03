@@ -263,20 +263,6 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
           </Alert>
         ) : null}
 
-        <ApprovalGate
-          question="Customer accepted the proposal?"
-          outcome={GATE_OUTCOME[latest?.status] ?? "pending"}
-          yes={{ title: "Approvals", detail: "The job moves on as soon as the customer accepts" }}
-          no={{
-            title: latest?.status === "rejected" ? "Declined by the customer" : "Changes wanted or declined",
-            detail:
-              latest?.status === "rejected"
-                ? latest.responseNote || "Send it for a re-quote, send a revised proposal, or mark the job lost"
-                : "Back to the estimator for a re-quote, then a revised proposal",
-          }}
-          waiting={waitingText(latest, requote)}
-        />
-
         {latest?.status === "negotiation" ? (
           <Alert tone="warning" style={{ marginTop: 14 }}>
             <strong>{latest.responseName || "The customer"} asked for changes</strong> on {formatDate(latest.respondedAt, { withTime: true })}
@@ -391,6 +377,24 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
             </div>
           </div>
         ) : null}
+
+        {/* Where the job went — or is waiting to go — sits with the record of
+            what was sent, just above it. */}
+        <div style={{ marginTop: 18 }}>
+          <ApprovalGate
+            question="Customer accepted the proposal?"
+            outcome={GATE_OUTCOME[latest?.status] ?? "pending"}
+            yes={{ title: "Approvals", detail: "The job moves on as soon as the customer accepts" }}
+            no={{
+              title: latest?.status === "rejected" ? "Declined by the customer" : "Changes wanted or declined",
+              detail:
+                latest?.status === "rejected"
+                  ? latest.responseNote || "Send it for a re-quote, send a revised proposal, or mark the job lost"
+                  : "Back to the estimator for a re-quote, then a revised proposal",
+            }}
+            waiting={waitingText(latest, requote)}
+          />
+        </div>
 
         <div style={{ marginTop: 18 }}>
           <SectionHead icon={<Send size={13} />} title="Proposals sent" />
