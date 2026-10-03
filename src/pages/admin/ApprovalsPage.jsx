@@ -1,8 +1,7 @@
 // Approvals (stage 5): the jobs waiting on their approvals — only the ones
-// each job needs, as ticked by sales or estimation — the Operations
-// Coordinator's checklists for DNSP, DA and finance, the rules the stage
-// runs on, and each job's way through the "All approved?" gate from the
-// Sydpro process chart. Jobs come from prestige-be (approvalsSlice).
+// each job needs, as ticked by sales or estimation — and the Operations
+// Coordinator's checklists for DNSP, DA and finance. Jobs come from
+// prestige-be (approvalsSlice).
 
 import { useEffect, useMemo, useState } from "react";
 import { AlarmClock, CircleCheck, CornerUpLeft, Hourglass, Search, SquareCheckBig } from "lucide-react";
@@ -13,9 +12,7 @@ import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
-import ApprovalRules from "@/features/approvals/ApprovalRules";
 import ApprovalWorkflow from "@/features/approvals/ApprovalWorkflow";
-import ProcurementTeam from "@/features/procurement/ProcurementTeam";
 import { APPROVALS_STAGE } from "@/constants/approvals";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useApprovalJob } from "@/hooks/useApprovalJob";
@@ -164,11 +161,6 @@ export default function ApprovalsPage() {
           )}
         </div>
       ) : null}
-
-      <div className="grid-2" style={{ marginTop: 20 }}>
-        <ApprovalRules job={selected} />
-        <ProcurementTeam />
-      </div>
     </>
   );
 }

@@ -4,7 +4,7 @@
 // so the flow reads through to where the job goes next.
 
 import { ArrowRight, Check } from "lucide-react";
-import { PROCUREMENT_STAGE, PROCUREMENT_STEPS } from "@/lib/mockData/procurement";
+import { PROCUREMENT_STAGE, PROCUREMENT_STEPS } from "@/constants/procurement";
 import { stepIndex } from "@/helpers/procurement";
 
 export default function WorkflowSteps({ current, viewing, round = 1, onSelect }) {

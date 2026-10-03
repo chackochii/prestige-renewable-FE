@@ -6,7 +6,7 @@ import { PackageCheck } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import SectionHead from "@/components/SectionHead";
-import { PO_STATUSES } from "@/lib/mockData/procurement";
+import { PO_STATUSES } from "@/constants/procurement";
 import { allDelivered, boqLines, deliveredOrders, sentOrders } from "@/helpers/procurement";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 

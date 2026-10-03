@@ -1,73 +1,105 @@
-// Procurement & delivery (stage 6): the jobs in this stage, the team that
-// runs it, and each job's way through the BOQ → quotes → variation →
+// Procurement & delivery (stage 6): the jobs in this stage and each job's
+// way through the BOQ → quotes → variation →
 // approvals → orders and deliveries → Green Deal flow from the Sydpro process
 // chart, with the Operations Coordinator's checklists for each step (CL-11
-// to CL-14, then CL-10 job creation).
-//
-// Reads hardcoded records from lib/mockData/procurement.js until the
-// purchase-order service is connected; the panels take a job record, so the
-// swap is in this file, not in them. Checklist answers are kept in the
-// procurement slice.
+// to CL-14, then CL-10 job creation). Jobs come from prestige-be
+// (procurementSlice): the board brings every job whole, so picking one asks
+// the API for nothing.
 
-import { useMemo, useState } from "react";
-import { BellRing, Leaf, PackageSearch, Send } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BellRing, Leaf, PackageSearch, Search, Send } from "lucide-react";
+import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
+import EmptyState from "@/components/EmptyState";
+import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
-import ProcurementTeam from "@/features/procurement/ProcurementTeam";
 import ProcurementWorkflow from "@/features/procurement/ProcurementWorkflow";
 import { PERMISSIONS } from "@/constants/permissions";
+import { PROCUREMENT_STAGE } from "@/constants/procurement";
 import { useAuth } from "@/hooks/useAuth";
-import { useProcurementChecklists } from "@/hooks/useProcurementChecklists";
-import { PROCUREMENT_JOBS, PROCUREMENT_STAGE } from "@/lib/mockData/procurement";
+import { useBusinessUnit } from "@/hooks/useBusinessUnit";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useProcurementJob } from "@/hooks/useProcurementJob";
 import { currentStep, greenDealCreated, procurementStatus, sentOrders } from "@/helpers/procurement";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
+import { fetchProcurementBoard } from "@/slices/procurementSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 export default function ProcurementPage() {
-  const { hasPermission } = useAuth();
-  const { jobs, update } = useProcurementChecklists(PROCUREMENT_JOBS);
-  const [selectedId, setSelectedId] = useState(jobs[0]?.id ?? null);
-  const selected = jobs.find((job) => job.id === selectedId) ?? jobs[0] ?? null;
+  const dispatch = useAppDispatch();
+  const { unitId } = useBusinessUnit();
+  const { user, hasPermission } = useAuth();
+  const { board: rows, boardStatus, boardError } = useAppSelector((state) => state.procurement);
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+  const term = useDebouncedValue(search.trim(), 300);
 
+  useEffect(() => {
+    if (unitId) dispatch(fetchProcurementBoard({ businessUnitId: unitId, search: term }));
+  }, [dispatch, unitId, term]);
+
+  const atStage = useMemo(() => rows.filter((job) => Number(job.stage) === PROCUREMENT_STAGE.id), [rows]);
   const counts = useMemo(
     () => ({
-      inStage: jobs.length,
-      awaitingApproval: jobs.filter((job) => currentStep(job) === "approvals").length,
-      purchaseOrders: jobs.reduce((sum, job) => sum + sentOrders(job).length, 0),
-      greenDeal: jobs.filter(greenDealCreated).length,
+      inStage: atStage.length,
+      awaitingApproval: atStage.filter((job) => currentStep(job) === "approvals").length,
+      purchaseOrders: rows.reduce((sum, job) => sum + sentOrders(job).length, 0),
+      greenDeal: rows.filter(greenDealCreated).length,
     }),
-    [jobs],
+    [rows, atStage],
   );
+
+  const selectedRow = rows.find((job) => job.id === selectedId) ?? rows[0] ?? null;
+  // The board brought every job whole, so this reads the selected one from the slice.
+  const procurement = useProcurementJob(selectedRow?.id);
 
   return (
     <>
       <PageHeader
         title={PROCUREMENT_STAGE.label}
         description="Check the bill of quantities against the site, confirm the supplier quote, clear any price variation with the right approvers, release the purchase orders and receive the materials, then create the Green Deal job for construction — each step through its checklist."
-        actions={<Badge tone="neutral">Sample data — purchase-order service not connected</Badge>}
       />
 
       <div className="stats">
-        <StatCard label="Jobs in procurement" value={counts.inStage} icon={<PackageSearch size={14} />} hint="Stage 6 of 9" />
-        <StatCard
-          label="Awaiting approval"
-          value={counts.awaitingApproval}
-          icon={<BellRing size={14} />}
-          hint="Price variation needs sign-off"
-        />
-        <StatCard label="Purchase orders sent" value={counts.purchaseOrders} icon={<Send size={14} />} hint="Across all jobs in stage" />
-        <StatCard
-          label="Green Deal jobs"
-          value={counts.greenDeal}
-          icon={<Leaf size={14} />}
-          hint={`Ready for ${PROCUREMENT_STAGE.next.label.toLowerCase()}`}
-        />
+        <StatCard label="Jobs in procurement" value={counts.inStage} icon={<PackageSearch size={14} />} hint="At the stage now" />
+        <StatCard label="Awaiting approval" value={counts.awaitingApproval} icon={<BellRing size={14} />} hint="Price variation needs sign-off" />
+        <StatCard label="Purchase orders sent" value={counts.purchaseOrders} icon={<Send size={14} />} hint="Across the jobs listed" />
+        <StatCard label="Green Deal jobs" value={counts.greenDeal} icon={<Leaf size={14} />} hint={`Ready for ${PROCUREMENT_STAGE.next.label.toLowerCase()}`} />
       </div>
 
-      <div className="grid-2">
-        <Card title="Jobs in procurement" icon={<PackageSearch size={16} />} sub="Pick a job to see where it is in the flow.">
+      <Card
+        title="Jobs in procurement"
+        icon={<PackageSearch size={16} />}
+        sub="Pick a job to see where it is in the flow."
+        actions={
+          <div className="search-wrap" style={{ position: "relative" }}>
+            <Search
+              size={14}
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                opacity: 0.6,
+              }}
+            />
+            <input className="search" style={{ paddingLeft: 30 }} placeholder="Search job, customer, suburb" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        }
+      >
+        {boardError ? <Alert tone="danger">{boardError}</Alert> : null}
+        {boardStatus === "loading" && !rows.length ? (
+          <LoadingState label="Loading procurement…" />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={<PackageSearch size={26} strokeWidth={1.5} />}
+            title={term ? "Nothing matches" : "No jobs in procurement"}
+            body={term ? "Try another search." : "Jobs arrive here when every approval is in; the BOQ comes across from the accepted quote."}
+          />
+        ) : (
           <div className="table-wrap">
             <table className="table clickable">
               <thead>
@@ -80,28 +112,28 @@ export default function ProcurementPage() {
                 </tr>
               </thead>
               <tbody>
-                {jobs.map((job) => {
+                {rows.map((job) => {
                   const status = procurementStatus(job);
-                  const sla = slaStatus(job.slaDueAt);
-                  const isSelected = job.id === selected?.id;
+                  const atThisStage = Number(job.stage) === PROCUREMENT_STAGE.id;
+                  const sla = atThisStage ? slaStatus(job.slaDueAt) : null;
+                  const isSelected = job.id === selectedRow?.id;
                   return (
-                    <tr
-                      key={job.id}
-                      className={isSelected ? "selected" : undefined}
-                      aria-selected={isSelected}
-                      onClick={() => setSelectedId(job.id)}
-                    >
+                    <tr key={job.id} className={isSelected ? "selected" : undefined} aria-selected={isSelected} onClick={() => setSelectedId(job.id)}>
                       <td>
                         <div className="row-title">{job.number}</div>
                         <div className="row-meta">{job.customer}</div>
                       </td>
-                      <td>{formatDate(job.enteredAt)}</td>
+                      <td>{job.enteredAt ? formatDate(job.enteredAt) : "—"}</td>
                       <td>
-                        <Badge tone={sla.tone} title={job.slaDueAt ? `Due ${formatDate(job.slaDueAt)}` : undefined}>
-                          {sla.label}
-                        </Badge>
+                        {sla ? (
+                          <Badge tone={sla.tone} title={job.slaDueAt ? `Due ${formatDate(job.slaDueAt)}` : undefined}>
+                            {sla.label}
+                          </Badge>
+                        ) : (
+                          <span className="row-meta">Moved on</span>
+                        )}
                       </td>
-                      <td>{formatCurrency(job.acceptedValue)}</td>
+                      <td>{job.acceptedValue !== null && job.acceptedValue !== undefined ? formatCurrency(job.acceptedValue) : "—"}</td>
                       <td>
                         <Badge tone={status.tone}>{status.label}</Badge>
                       </td>
@@ -111,19 +143,36 @@ export default function ProcurementPage() {
               </tbody>
             </table>
           </div>
-        </Card>
+        )}
+      </Card>
 
-        <ProcurementTeam />
-      </div>
-
-      <div style={{ marginTop: 20 }}>
-        <ProcurementWorkflow
-          job={selected}
-          canEdit={hasPermission(PERMISSIONS.PROCUREMENT_UPDATE)}
-          canApprove={hasPermission(PERMISSIONS.PROCUREMENT_APPROVE)}
-          onChecklistChange={(sectionKey, patch) => update(selected, sectionKey, patch)}
-        />
-      </div>
+      {selectedRow ? (
+        <div style={{ marginTop: 20 }}>
+          {procurement.status === "failed" && !procurement.job ? (
+            <Alert tone="danger">{procurement.error || "The job's procurement record could not be loaded."}</Alert>
+          ) : procurement.job ? (
+            <ProcurementWorkflow
+              job={procurement.job}
+              canEdit={hasPermission(PERMISSIONS.PROCUREMENT_UPDATE)}
+              canApprove={hasPermission(PERMISSIONS.PROCUREMENT_APPROVE)}
+              user={user}
+              error={procurement.error}
+              onClearError={procurement.clearError}
+              onChecklistChange={procurement.updateChecklist}
+              onUpload={procurement.upload}
+              onSaveBoq={procurement.saveBoq}
+              onAddQuote={procurement.addQuote}
+              onRemoveQuote={procurement.removeQuote}
+              onCreatePurchaseOrder={procurement.createPurchaseOrder}
+              onUpdatePurchaseOrder={procurement.updatePurchaseOrder}
+              onDeletePurchaseOrder={procurement.deletePurchaseOrder}
+              onDecide={procurement.decide}
+            />
+          ) : (
+            <LoadingState label="Loading the job…" />
+          )}
+        </div>
+      ) : null}
     </>
   );
 }
