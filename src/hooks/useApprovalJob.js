@@ -1,4 +1,5 @@
-// One job's approvals, from the approvals slice: fetched on first use,
+// One job's approvals, from the approvals slice: fetched on first use —
+// unless the board already brought it, as it does on the approvals page —
 // shared by the approvals page and the opportunity page's stage-5 panel, and
 // changed through the API.
 //
@@ -72,15 +73,8 @@ export function useApprovalJob(opportunityId) {
   /** A plain approval recorded directly: { status?, authority?, reference?, submittedAt?, decidedAt?, note? }. */
   const updateItem = useCallback((type, body) => dispatch(updateApproval({ id, type, body })).unwrap(), [id, dispatch]);
 
-  /** Which approvals the job needs; the job is reread so new rows show. */
-  const setRequired = useCallback(
-    async (keys) => {
-      const opportunity = await dispatch(setRequiredApprovals({ id, keys })).unwrap();
-      await dispatch(fetchJobApprovals(id));
-      return opportunity;
-    },
-    [id, dispatch],
-  );
+  /** Which approvals the job needs; the job comes back with its new rows in the same call. */
+  const setRequired = useCallback((keys) => dispatch(setRequiredApprovals({ id, keys })).unwrap(), [id, dispatch]);
 
   return { job, status, error, reload, updateChecklist, updateItem, setRequired };
 }

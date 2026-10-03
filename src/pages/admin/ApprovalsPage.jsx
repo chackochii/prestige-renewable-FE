@@ -54,12 +54,11 @@ export default function ApprovalsPage() {
   );
 
   const selectedRow = rows.find((job) => job.id === selectedId) ?? rows[0] ?? null;
+  // The board brought every job whole, so the selected one is already here:
+  // this reads it from the slice and asks the API for nothing. A change comes
+  // back as the whole job and lands on its board row too, so the last
+  // approval moving the job on reads as "ready for procurement" at once.
   const { job: selected, status: jobStatus, error: jobError, updateChecklist, updateItem, setRequired } = useApprovalJob(selectedRow?.id);
-  // The last approval moves the job on; the board is reread so it reads as in procurement.
-  const afterItem = async (type, body) => {
-    const next = await updateItem(type, body);
-    if (next && Number(next.stage) !== Number(selectedRow?.stage)) dispatch(fetchApprovalsBoard({ businessUnitId: unitId, search: term }));
-  };
 
   return (
     <>
@@ -159,7 +158,7 @@ export default function ApprovalsPage() {
           {jobStatus === "failed" ? (
             <Alert tone="danger">{jobError || "The job's approvals could not be loaded."}</Alert>
           ) : selected ? (
-            <ApprovalWorkflow job={selected} canEdit={canEdit} onChecklistChange={updateChecklist} onUpdateItem={afterItem} onSetRequired={setRequired} />
+            <ApprovalWorkflow job={selected} canEdit={canEdit} onChecklistChange={updateChecklist} onUpdateItem={updateItem} onSetRequired={setRequired} />
           ) : (
             <LoadingState label="Loading the job…" />
           )}
