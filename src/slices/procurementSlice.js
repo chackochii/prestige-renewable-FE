@@ -12,7 +12,9 @@ import * as api from "@/services/api/procurementApi";
 import { logout } from "./authSlice";
 
 const initialState = {
-  board: [],
+  board: [], // the page of jobs on screen
+  boardTotal: 0, // every job on the board, across all its pages
+  boardCounts: null, // the stat cards, across the whole board
   boardStatus: "idle",
   boardError: null,
   boardQuery: null,
@@ -22,7 +24,7 @@ const initialState = {
 };
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
-const boardQueryOf = (params = {}) => `${params.businessUnitId ?? ""}|${params.search ?? ""}`;
+const boardQueryOf = (params = {}) => JSON.stringify(params);
 
 export const fetchProcurementBoard = createAsyncThunk(
   "procurement/board",
@@ -116,7 +118,9 @@ const procurementSlice = createSlice({
       })
       .addCase(fetchProcurementBoard.fulfilled, (state, action) => {
         state.boardStatus = "succeeded";
-        state.board = action.payload || [];
+        state.board = action.payload?.items ?? [];
+        state.boardTotal = action.payload?.total ?? state.board.length;
+        state.boardCounts = action.payload?.counts ?? null;
         for (const row of state.board) {
           if (!row?.id) continue;
           state.jobs[row.id] = keepLocalAnswers(state.jobs[row.id], row);

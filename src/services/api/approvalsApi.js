@@ -15,11 +15,12 @@
 //     owner, submittedAt, decidedAt, note, documentName, checklist: {...} }
 // status: not_started | submitted | approved | rejected | not_applicable
 
-import { apiClient, unwrap } from "./client";
+import { apiClient, unwrap, unwrapList } from "./client";
 
 /** Stage-5 jobs (whole, as above) plus ones that moved on in the last 30 days. */
-export async function getApprovalsBoard({ businessUnitId, search } = {}) {
-  return unwrap(await apiClient.get("/opportunities/approvals", { params: { businessUnitId, search: search || undefined } }));
+export async function getApprovalsBoard(params = {}) {
+  // params: { businessUnitId, search?, page, pageSize } → { items, total, page, pageSize, counts: { all, pending, approved, rejected, overdue } }
+  return unwrapList(await apiClient.get("/opportunities/approvals", { params }));
 }
 
 /** One job's approvals — the opportunity page's stage-5 panel, which has no board to read from. */

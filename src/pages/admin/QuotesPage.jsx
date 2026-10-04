@@ -1,4 +1,7 @@
-// Quotes: every opportunity at or past the proposal stage, with its value.
+// Quotes: every opportunity at or past the proposal stage, with its value —
+// 12 to a page with numbered pages below, newest first. The figures on the
+// cards are worked out by the API across every quote, not just the page on
+// screen; the page is kept in the URL.
 
 import { useNavigate } from "react-router-dom";
 import { CircleCheck, Receipt } from "lucide-react";
@@ -7,38 +10,54 @@ import StatCard from "@/components/StatCard";
 import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
+import Pagination from "@/components/Pagination";
 import Alert from "@/components/Alert";
 import OppCell from "@/components/OppCell";
 import { lifecycleMeta, stageById } from "@/constants/stages";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { formatDate } from "@/helpers/dateTimeHelpers";
+import { PAGE_SIZE } from "@/helpers/pagination";
 import { useOpportunities } from "@/hooks/useOpportunities";
+import { usePageParam } from "@/hooks/usePageParam";
+
+/** A quote exists from the proposal stage on. */
+const PROPOSAL_STAGE = 3;
 
 export default function QuotesPage() {
   const navigate = useNavigate();
-  const { items, status, error, ready } = useOpportunities({});
-  const rows = items
-    .filter((o) => Number(o.stage) >= 3)
-    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  const quoted = rows.reduce((s, o) => s + (Number(o.acceptedValue) || Number(o.estimatedValue) || 0), 0);
-  const accepted = rows.filter((o) => Number(o.stage) >= 5 || ["Won", "Closed"].includes(o.lifecycle));
-  const acceptedValue = accepted.reduce((s, o) => s + (Number(o.acceptedValue) || 0), 0);
+  const [page, setPage] = usePageParam();
+  const { items: rows, error, ready, loading, total, totals } = useOpportunities(
+    { minStage: PROPOSAL_STAGE, totals: 1 },
+    { page, pageSize: PAGE_SIZE },
+  );
 
   return (
     <>
-      <PageHeader title="Quotes" description="Every opportunity that has reached proposal, one row per job. Open a record to see its stage work." />
+      <PageHeader title="Quotes" description="Every opportunity that has reached proposal, one row per job, newest first. Open a record to see its stage work." />
       <div className="stats">
-        <StatCard icon={<Receipt size={17} />} label="Quoted (ex GST)" value={formatCurrency(quoted)} hint={`${rows.length} live quotes`} style={{ "--i": 0 }} />
-        <StatCard icon={<CircleCheck size={17} />} label="Accepted" value={formatCurrency(acceptedValue)} hint={`${accepted.length} accepted`} style={{ "--i": 1 }} />
+        <StatCard
+          icon={<Receipt size={17} />}
+          label="Quoted (ex GST)"
+          value={formatCurrency(totals?.value ?? 0)}
+          hint={`${totals?.count ?? 0} live quote${totals?.count === 1 ? "" : "s"}`}
+          style={{ "--i": 0 }}
+        />
+        <StatCard
+          icon={<CircleCheck size={17} />}
+          label="Accepted"
+          value={formatCurrency(totals?.acceptedValue ?? 0)}
+          hint={`${totals?.acceptedCount ?? 0} accepted`}
+          style={{ "--i": 1 }}
+        />
       </div>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <div className="card card-pad">
-        {status === "loading" && !ready ? (
+        {loading && !rows.length ? (
           <LoadingState label="Loading quotes…" />
-        ) : rows.length === 0 ? (
+        ) : ready && rows.length === 0 ? (
           <EmptyState title="No quotes yet" body="Quotes appear once an opportunity reaches the proposal stage." />
         ) : (
-          <div className="table-wrap">
+          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
             <table className="table clickable stack">
               <thead>
                 <tr>
@@ -70,6 +89,7 @@ export default function QuotesPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} total={total} onPageChange={setPage} noun="quotes" loading={loading} />
       </div>
     </>
   );

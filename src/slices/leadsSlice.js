@@ -9,8 +9,11 @@ import { logout } from "./authSlice";
 const initialState = {
   items: [],
   total: 0,
-  page: 1, // highest page loaded, for "load more"
+  page: 1, // the page held
+  pageSize: 200,
+  totals: null, // figures across every matching record, when asked for (the Quotes page)
   query: null,
+  requested: null, // the list and page last asked for — see useOpportunities
   status: "idle",
   error: null,
   selected: null,
@@ -58,7 +61,7 @@ export const fetchOpportunities = createAsyncThunk("leads/fetchAll", async (para
   try {
     const { page = 1, pageSize = 200, append = false } = params;
     const result = await api.listOpportunities({ ...listIdentity(params), page, pageSize });
-    return { ...result, query: listIdentity(params), page, append };
+    return { ...result, query: listIdentity(params), page, pageSize, append };
   } catch (err) {
     return reject(err, rejectWithValue);
   }
@@ -487,10 +490,15 @@ const leadsSlice = createSlice({
         // Loading a further page keeps the current query and the rows already
         // on screen; only a genuinely new list replaces them.
         if (!action.meta.arg?.append) state.query = listIdentity(action.meta.arg);
+        // Exactly what was asked for — list and page — so a failure is not
+        // asked for again on its own, only on reload (useOpportunities).
+        state.requested = { ...listIdentity(action.meta.arg), page: action.meta.arg?.page ?? 1, pageSize: action.meta.arg?.pageSize ?? 200 };
       })
       .addCase(fetchOpportunities.fulfilled, (state, action) => {
-        const { items, total, page, append, query } = action.payload;
+        const { items, total, page, pageSize, totals, append, query } = action.payload;
         state.status = "succeeded";
+        state.pageSize = pageSize ?? state.pageSize;
+        state.totals = totals ?? null;
         // The list is ordered by updatedAt, so a record edited between two
         // requests can arrive on a second page as well — drop the duplicate
         // rather than rendering it twice.

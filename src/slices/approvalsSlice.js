@@ -12,7 +12,9 @@ import * as api from "@/services/api/approvalsApi";
 import { logout } from "./authSlice";
 
 const initialState = {
-  board: [],
+  board: [], // the page of jobs on screen
+  boardTotal: 0, // every job on the board, across all its pages
+  boardCounts: null, // the stat cards, across the whole board
   boardStatus: "idle",
   boardError: null,
   boardQuery: null, // what the board on screen (or on its way) was asked for
@@ -23,7 +25,7 @@ const initialState = {
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
 
-const boardQueryOf = (params = {}) => `${params.businessUnitId ?? ""}|${params.search ?? ""}`;
+const boardQueryOf = (params = {}) => JSON.stringify(params);
 
 export const fetchApprovalsBoard = createAsyncThunk(
   "approvals/board",
@@ -115,7 +117,9 @@ const approvalsSlice = createSlice({
       })
       .addCase(fetchApprovalsBoard.fulfilled, (state, action) => {
         state.boardStatus = "succeeded";
-        state.board = action.payload || [];
+        state.board = action.payload?.items ?? [];
+        state.boardTotal = action.payload?.total ?? state.board.length;
+        state.boardCounts = action.payload?.counts ?? null;
         // Every row is a whole job: it is the job entry too, so nothing is
         // asked for again when one is picked.
         for (const row of state.board) {

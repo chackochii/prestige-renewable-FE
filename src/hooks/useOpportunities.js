@@ -1,13 +1,15 @@
-// Opportunities in the current business unit, refetched when the unit or the
-// requested filters change. Pass { enabled: false } to skip the request (for
-// example when the person cannot read leads) — the hook then reports an
-// empty, ready list without hitting the API.
+// Opportunities in the current business unit, one page at a time, refetched
+// when the unit, the filters or the page change. Pass { enabled: false } to
+// skip the request (for example when the person cannot read leads) — the hook
+// then reports an empty, ready list without hitting the API.
 //
-// Pass { pageSize } to load the list a page at a time and use `loadMore`. The
-// default stays high on purpose: screens like Home and Quotes derive totals by
-// filtering the whole array, and a smaller page would quietly make those
-// figures wrong. Opting in is per screen, and only the screens that render a
-// "load more" control should do it.
+// { page, pageSize } pick the page; filters and search go in `filters` and
+// are applied by the API across every record, newest first. The default page
+// size stays high on purpose: Home and the other summary screens derive their
+// figures from the whole list.
+//
+// While a different page of the same list is on its way, the rows already on
+// screen stay put (`loading` says so) rather than flashing a loading state.
 
 import { useCallback, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -16,50 +18,44 @@ import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 
 const sameQuery = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
 
-export function useOpportunities(filters = {}, { enabled = true, pageSize = 200 } = {}) {
+export function useOpportunities(filters = {}, { enabled = true, page = 1, pageSize = 200 } = {}) {
   const dispatch = useAppDispatch();
   const { unitId } = useBusinessUnit();
-  const { items, total, page, status, error, query } = useAppSelector((s) => s.leads);
+  const held = useAppSelector((s) => s.leads);
   const wanted = enabled && unitId ? { businessUnitId: unitId, ...filters } : null;
   const wantedKey = JSON.stringify(wanted);
 
+  const sameList = sameQuery(held.query, wanted);
+  const current = sameList && held.page === page && held.pageSize === pageSize;
+  // Already asked for this very page — answered, on its way, or failed. A
+  // failure is not asked for again on its own (that would loop); reload() does.
+  const asked = wanted ? sameQuery(held.requested, { ...wanted, page, pageSize }) : true;
+
   useEffect(() => {
     if (!wanted) return;
-    if (status === "loading") return;
-    if (status === "idle" || !sameQuery(query, wanted)) dispatch(fetchOpportunities({ ...wanted, page: 1, pageSize }));
+    if (held.status === "loading") return;
+    if (held.status === "idle" || !asked) dispatch(fetchOpportunities({ ...wanted, page, pageSize }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantedKey, status, pageSize, dispatch]);
+  }, [wantedKey, held.status, asked, page, pageSize, dispatch]);
 
   const reload = useCallback(() => {
-    if (wanted) dispatch(fetchOpportunities({ ...wanted, page: 1, pageSize }));
+    if (wanted) dispatch(fetchOpportunities({ ...wanted, page, pageSize }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantedKey, pageSize, dispatch]);
+  }, [wantedKey, page, pageSize, dispatch]);
 
-  const ready = status === "succeeded" && sameQuery(query, wanted);
-  const loaded = ready ? items.length : 0;
-  const hasMore = ready && loaded < total;
+  if (!enabled) return { items: [], total: 0, totals: null, status: "succeeded", error: null, ready: true, loading: false, reload };
 
-  const loadMore = useCallback(() => {
-    if (!wanted || !hasMore || status === "loading") return;
-    dispatch(fetchOpportunities({ ...wanted, page: page + 1, pageSize, append: true }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantedKey, hasMore, status, page, pageSize, dispatch]);
-
-  if (!enabled)
-    return { items: [], total: 0, loaded: 0, status: "succeeded", error: null, ready: true, hasMore: false, reload, loadMore };
-
+  const ready = held.status === "succeeded" && current;
+  // Another page of the same list: keep showing what is there until it lands.
+  const showing = ready || (sameList && held.status === "loading");
   return {
-    items: ready ? items : [],
-    total,
-    loaded,
-    status,
-    error: sameQuery(query, wanted) ? error : null,
+    items: showing ? held.items : [],
+    total: sameList ? held.total : 0,
+    totals: sameList ? held.totals : null,
+    status: held.status,
+    error: sameList ? held.error : null,
     ready,
-    hasMore,
-    // True only while a *further* page is on its way, so the list stays put
-    // instead of flashing its loading state.
-    loadingMore: status === "loading" && loaded > 0,
+    loading: held.status === "loading",
     reload,
-    loadMore,
   };
 }

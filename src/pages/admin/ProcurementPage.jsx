@@ -3,10 +3,11 @@
 // approvals → orders and deliveries → Green Deal flow from the Sydpro process
 // chart, with the Operations Coordinator's checklists for each step (CL-11
 // to CL-14, then CL-10 job creation). Jobs come from prestige-be
-// (procurementSlice): the board brings every job whole, so picking one asks
-// the API for nothing.
+// (procurementSlice), 12 to a page with numbered pages below, the job that
+// reached procurement most recently first. Each job comes whole, so picking one
+// asks the API for nothing; the stat cards count the whole board.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { BellRing, Leaf, PackageSearch, Search, Send } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -14,6 +15,7 @@ import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
 import StatCard from "@/components/StatCard";
 import ProcurementWorkflow from "@/features/procurement/ProcurementWorkflow";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -21,8 +23,10 @@ import { PROCUREMENT_STAGE } from "@/constants/procurement";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePageParam } from "@/hooks/usePageParam";
+import { PAGE_SIZE } from "@/helpers/pagination";
 import { useProcurementJob } from "@/hooks/useProcurementJob";
-import { currentStep, greenDealCreated, procurementStatus, sentOrders } from "@/helpers/procurement";
+import { procurementStatus } from "@/helpers/procurement";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { fetchProcurementBoard } from "@/slices/procurementSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -32,25 +36,21 @@ export default function ProcurementPage() {
   const dispatch = useAppDispatch();
   const { unitId } = useBusinessUnit();
   const { user, hasPermission } = useAuth();
-  const { board: rows, boardStatus, boardError } = useAppSelector((state) => state.procurement);
+  const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.procurement);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const term = useDebouncedValue(search.trim(), 300);
+  const [page, setPage] = usePageParam(term);
+  const boardKey = JSON.stringify(unitId ? { businessUnitId: unitId, search: term || undefined, page, pageSize: PAGE_SIZE } : null);
+  const loading = boardStatus === "loading";
 
   useEffect(() => {
-    if (unitId) dispatch(fetchProcurementBoard({ businessUnitId: unitId, search: term }));
-  }, [dispatch, unitId, term]);
+    const params = JSON.parse(boardKey);
+    if (params) dispatch(fetchProcurementBoard(params));
+  }, [dispatch, boardKey]);
 
-  const atStage = useMemo(() => rows.filter((job) => Number(job.stage) === PROCUREMENT_STAGE.id), [rows]);
-  const counts = useMemo(
-    () => ({
-      inStage: atStage.length,
-      awaitingApproval: atStage.filter((job) => currentStep(job) === "approvals").length,
-      purchaseOrders: rows.reduce((sum, job) => sum + sentOrders(job).length, 0),
-      greenDeal: rows.filter(greenDealCreated).length,
-    }),
-    [rows, atStage],
-  );
+  // Counted by the API across the whole board, not just the page on screen.
+  const counts = boardCounts ?? { inStage: 0, awaitingApproval: 0, purchaseOrders: 0, greenDeal: 0 };
 
   const selectedRow = rows.find((job) => job.id === selectedId) ?? rows[0] ?? null;
   // The board brought every job whole, so this reads the selected one from the slice.
@@ -66,7 +66,7 @@ export default function ProcurementPage() {
       <div className="stats">
         <StatCard label="Jobs in procurement" value={counts.inStage} icon={<PackageSearch size={14} />} hint="At the stage now" />
         <StatCard label="Awaiting approval" value={counts.awaitingApproval} icon={<BellRing size={14} />} hint="Price variation needs sign-off" />
-        <StatCard label="Purchase orders sent" value={counts.purchaseOrders} icon={<Send size={14} />} hint="Across the jobs listed" />
+        <StatCard label="Purchase orders sent" value={counts.purchaseOrders} icon={<Send size={14} />} hint="Across every job on the board" />
         <StatCard label="Green Deal jobs" value={counts.greenDeal} icon={<Leaf size={14} />} hint={`Ready for ${PROCUREMENT_STAGE.next.label.toLowerCase()}`} />
       </div>
 
@@ -91,7 +91,7 @@ export default function ProcurementPage() {
         }
       >
         {boardError ? <Alert tone="danger">{boardError}</Alert> : null}
-        {boardStatus === "loading" && !rows.length ? (
+        {loading && !rows.length ? (
           <LoadingState label="Loading procurement…" />
         ) : rows.length === 0 ? (
           <EmptyState
@@ -100,7 +100,7 @@ export default function ProcurementPage() {
             body={term ? "Try another search." : "Jobs arrive here when every approval is in; the BOQ comes across from the accepted quote."}
           />
         ) : (
-          <div className="table-wrap">
+          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
             <table className="table clickable">
               <thead>
                 <tr>
@@ -144,6 +144,7 @@ export default function ProcurementPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} total={boardTotal} onPageChange={setPage} noun="jobs" loading={loading} />
       </Card>
 
       {selectedRow ? (

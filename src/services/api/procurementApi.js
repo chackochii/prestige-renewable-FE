@@ -19,11 +19,12 @@
 // The board and the single job return the same shape, so the procurement page
 // is one request and opening a job on it is none. Every write returns the job.
 
-import { apiClient, unwrap } from "./client";
+import { apiClient, unwrap, unwrapList } from "./client";
 
 /** Stage-6 jobs (whole) plus ones that moved on in the last 30 days. */
-export async function getProcurementBoard({ businessUnitId, search } = {}) {
-  return unwrap(await apiClient.get("/opportunities/procurement", { params: { businessUnitId, search: search || undefined } }));
+export async function getProcurementBoard(params = {}) {
+  // params: { businessUnitId, search?, page, pageSize } → { items, total, page, pageSize, counts: { all, inStage, awaitingApproval, purchaseOrders, greenDeal } }
+  return unwrapList(await apiClient.get("/opportunities/procurement", { params }));
 }
 
 /** One job's procurement record — the opportunity page's stage-6 panel, which has no board to read from. */

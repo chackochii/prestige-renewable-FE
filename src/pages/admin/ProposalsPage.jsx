@@ -6,9 +6,12 @@
 //
 // Lists the active stage-3 jobs in the current business unit, the ones back
 // with the estimator for a re-quote, plus proposals answered in the last 30
-// days, so an acceptance does not vanish the moment the job moves on.
+// days, so an acceptance does not vanish the moment the job moves on — 12 to a
+// page with numbered pages below, the most recently active first. The search
+// and the filter chips are applied by the API; the counts on the cards and
+// chips cover the whole board, not just the page.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CircleCheck, CircleX, FilePen, Hourglass, MessageSquareText, Search, Send, Undo2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -16,14 +19,17 @@ import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
 import StatCard from "@/components/StatCard";
 import ProposalWorkflow from "@/features/proposals/ProposalWorkflow";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePageParam } from "@/hooks/usePageParam";
+import { PAGE_SIZE } from "@/helpers/pagination";
 import { formatDate } from "@/helpers/dateTimeHelpers";
-import { boardBucket, boardStatus } from "@/helpers/proposals";
+import { boardStatus } from "@/helpers/proposals";
 import { getErrorMessage } from "@/services/api/client";
 import { getProposalBoard } from "@/services/api/proposalsApi";
 import { formatCurrency } from "@/utils/formatCurrency";
@@ -42,35 +48,49 @@ export default function ProposalsPage() {
   const { unitId } = useBusinessUnit();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission(PERMISSIONS.LEADS_UPDATE);
-  const [rows, setRows] = useState(null);
+  const [board, setBoard] = useState(null); // { items, total, counts } — the page on screen
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
   const term = useDebouncedValue(search.trim(), 300);
+  const [page, setPage] = usePageParam(`${term}|${filter}`);
+  // Only the newest request may land: an older answer arriving late (a fast
+  // typist, a quick page change) is dropped.
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
     if (!unitId) return;
+    const ticket = ++latest.current;
+    setLoading(true);
     try {
-      setRows((await getProposalBoard({ businessUnitId: unitId, search: term })) ?? []);
+      const result = await getProposalBoard({
+        businessUnitId: unitId,
+        search: term || undefined,
+        bucket: filter === "all" ? undefined : filter,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      if (ticket !== latest.current) return;
+      setBoard(result);
       setError("");
     } catch (err) {
+      if (ticket !== latest.current) return;
       setError(getErrorMessage(err, "Proposals could not be loaded."));
-      setRows([]);
+      setBoard((held) => held ?? { items: [], total: 0, counts: null });
+    } finally {
+      if (ticket === latest.current) setLoading(false);
     }
-  }, [unitId, term]);
+  }, [unitId, term, filter, page]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const counts = useMemo(() => {
-    const tally = { draft: 0, waiting: 0, changes: 0, requote: 0, accepted: 0, declined: 0 };
-    for (const row of rows ?? []) tally[boardBucket(row)] += 1;
-    return tally;
-  }, [rows]);
-
-  const visible = useMemo(() => (rows ?? []).filter((row) => filter === "all" || boardBucket(row) === filter), [rows, filter]);
+  const rows = board?.items ?? null;
+  const counts = board?.counts ?? { all: 0, draft: 0, waiting: 0, changes: 0, requote: 0, accepted: 0, declined: 0 };
+  const visible = rows ?? [];
   const selected = visible.find((row) => row.opportunity.id === selectedId) ?? visible[0] ?? null;
 
   return (
@@ -111,7 +131,7 @@ export default function ProposalsPage() {
               onClick={() => setFilter(option.key)}
             >
               {option.label}
-              {option.key !== "all" ? ` · ${counts[option.key]}` : ""}
+              {` · ${counts[option.key] ?? 0}`}
             </button>
           ))}
         </div>
@@ -122,11 +142,11 @@ export default function ProposalsPage() {
         ) : visible.length === 0 ? (
           <EmptyState
             icon={<Send size={26} strokeWidth={1.5} />}
-            title={rows.length ? "Nothing in this filter" : "No jobs at the proposal stage"}
-            body={rows.length ? "Pick another filter above." : "Jobs arrive here when estimation hands over a priced quote."}
+            title={counts.all ? "Nothing in this filter" : term ? "Nothing matches" : "No jobs at the proposal stage"}
+            body={counts.all ? "Pick another filter above." : term ? "Try another search." : "Jobs arrive here when estimation hands over a priced quote."}
           />
         ) : (
-          <div className="table-wrap">
+          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
             <table className="table clickable">
               <thead>
                 <tr>
@@ -185,6 +205,7 @@ export default function ProposalsPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} total={board?.total ?? 0} onPageChange={setPage} noun="jobs" loading={loading} />
       </Card>
 
       {selected ? (

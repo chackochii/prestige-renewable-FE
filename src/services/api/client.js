@@ -99,8 +99,13 @@ export function getErrorMessage(error, fallback = "Something went wrong.") {
 /** Unwraps { success, data } → data. */
 export const unwrap = (response) => response.data?.data;
 
-/** Unwraps a paginated list { success, data, total, page, pageSize }. */
+/**
+ * Unwraps a paginated list { success, data, total, page, pageSize, ...extra }
+ * → { items, total, page, pageSize, ...extra }. `extra` is whatever the
+ * endpoint adds across the whole list — counts for stat cards, totals.
+ */
 export const unwrapList = (response) => {
-  const { data = [], total = 0, page = 1, pageSize = data.length } = response.data || {};
-  return { items: data, total, page, pageSize };
+  // eslint-disable-next-line no-unused-vars
+  const { success, message, data = [], total = 0, page = 1, pageSize = data.length, ...extra } = response.data || {};
+  return { items: data, total, page, pageSize, ...extra };
 };

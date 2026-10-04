@@ -258,8 +258,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
       await dispatch(collectEstimationInputs({ id: opp.id, body: { input: { [field]: value } } })).unwrap();
     });
 
-  // Which approvals the job will need at stage 5 — sales may have ticked
-  // some on the lead; estimation confirms the list. Stage 5 tracks only these.
+  // Which approvals the job will need at stage 5 — estimation marks the list
+  // (the lead form no longer asks sales). Stage 5 tracks only these.
   const saveRequiredApprovals = (keys) => run(() => dispatch(updateRequiredApprovals({ id: opp.id, keys })).unwrap());
 
   const answerClientInfo = (needed) => {
