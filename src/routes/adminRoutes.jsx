@@ -44,13 +44,19 @@ const UnitSettingsPage = lazy(() => import("@/pages/admin/UnitSettingsPage"));
 
 const page = (code, element) => <RequirePage code={code}>{element}</RequirePage>;
 const permission = (code, element) => <RequirePermission permission={code}>{element}</RequirePermission>;
+const anyPermission = (codes, element) => <RequirePermission anyOf={codes}>{element}</RequirePermission>;
+// What the API itself asks to read a record and to work requests: leads.read
+// or estimation.read (prestige-be opportunityRoutes readAny, collaborationRoutes
+// read). Asking for leads.read alone sent procurement and operations staff —
+// who hold estimation.read — to "Forbidden" from their own notifications.
+const RECORD_READERS = [PERMISSIONS.LEADS_READ, PERMISSIONS.ESTIMATION_READ];
 
 export const workspaceRoutes = [
   { index: true, element: <HomePage /> },
   { path: "leads", element: page(PAGE_CODES.LEADS, <LeadsPage />) },
   { path: "leads/new", element: permission(PERMISSIONS.LEADS_CREATE, <NewLeadPage />) },
   { path: "opportunities", element: <Navigate to="/pipeline" replace /> },
-  { path: "opportunities/:id", element: permission(PERMISSIONS.LEADS_READ, <OpportunityPage />) },
+  { path: "opportunities/:id", element: anyPermission(RECORD_READERS, <OpportunityPage />) },
   { path: "pipeline", element: page(PAGE_CODES.PIPELINE, <PipelinePage />) },
   { path: "proposals", element: page(PAGE_CODES.PROPOSALS, <ProposalsPage />) },
   { path: "marketing", element: page(PAGE_CODES.MARKETING, <MarketingPage />) },
@@ -67,7 +73,7 @@ export const workspaceRoutes = [
   // Cross-department requests. Guarded by leads.read rather than a registry
   // page so it works before the page catalog has a "requests" entry; add one
   // to put it in the sidebar.
-  { path: "requests", element: permission(PERMISSIONS.LEADS_READ, <RequestsPage />) },
+  { path: "requests", element: anyPermission(RECORD_READERS, <RequestsPage />) },
   { path: "admin", element: page(PAGE_CODES.ADMIN, <UsersPage />) },
   { path: "admin/users", element: <Navigate to="/admin" replace /> },
   { path: "admin/roles", element: page(PAGE_CODES.ADMIN, <RolesPage />) },

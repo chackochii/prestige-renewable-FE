@@ -70,61 +70,28 @@ const CONTACT_OPTIONS = [
 ];
 
 /**
- * Radio group for a short set of answers (storeys, roof, phase, …), always
- * ending in "Other". An "Other" answer is stored as the text the user types,
- * so it reads naturally everywhere the value is shown; until something is
- * typed the question counts as unanswered.
+ * Radio group for a short set of answers (storeys, roof, phase, …). Only the
+ * listed answers: every question asked this way is a fixed choice the API
+ * checks against its own list (prestige-be opportunity model, isIn), so a
+ * typed "Other" could never be saved — it failed the whole save while the
+ * checklist showed the row as done, and on "had to contact the client?" it
+ * quietly turned into "No" and dropped the logged attempts. Anything that
+ * does not fit belongs in the comments.
  */
-function ChoiceGroup({ name, options, value, otherLabel = "answer", disabled, error, onChange }) {
-  const known = options.some((o) => o.key === value);
-  const [otherPicked, setOtherPicked] = useState(false);
-  const isOther = otherPicked || (!isBlank(value) && !known);
-
+function ChoiceGroup({ name, options, value, disabled, error, onChange }) {
   return (
     <Field error={error}>
       <div className="choice-grid">
         {options.map((o) => (
           <label key={o.key} className="choice">
-            <input
-              type="radio"
-              name={name}
-              checked={!isOther && value === o.key}
-              disabled={disabled}
-              onChange={() => {
-                setOtherPicked(false);
-                onChange(o.key);
-              }}
-            />
+            <input type="radio" name={name} checked={value === o.key} disabled={disabled} onChange={() => onChange(o.key)} />
             <span>
               {o.label}
               {o.hint ? <small>{o.hint}</small> : null}
             </span>
           </label>
         ))}
-        <label className="choice">
-          <input
-            type="radio"
-            name={name}
-            checked={isOther}
-            disabled={disabled}
-            onChange={() => {
-              setOtherPicked(true);
-              if (known) onChange("");
-            }}
-          />
-          <span>Other</span>
-        </label>
       </div>
-      {isOther ? (
-        <input
-          style={{ marginTop: 8 }}
-          value={known ? "" : value}
-          disabled={disabled}
-          autoFocus={otherPicked && isBlank(value)}
-          placeholder={`Type ${otherLabel}`}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      ) : null}
     </Field>
   );
 }
@@ -500,7 +467,6 @@ export default function LeadForm({
                 </p>
                 <ChoiceGroup
                   name="lf-contact"
-                  otherLabel="answer"
                   options={CONTACT_OPTIONS}
                   value={form.needsClientContact}
                   disabled={disabled}
@@ -628,7 +594,6 @@ export default function LeadForm({
               <ChecklistRow done={doneService} label="Service requirement" required>
                 <ChoiceGroup
                   name="lf-service"
-                  otherLabel="service requirement"
                   options={SERVICE_REQUIREMENTS}
                   value={form.serviceRequirement}
                   disabled={disabled}
@@ -644,7 +609,6 @@ export default function LeadForm({
                 </p>
                 <ChoiceGroup
                   name="lf-billing"
-                  otherLabel="billing address"
                   options={BILLING_OPTIONS}
                   value={form.billingSameAsSite}
                   disabled={disabled}
@@ -714,7 +678,6 @@ export default function LeadForm({
             <ChecklistRow done={doneStoreys} label="House type" required>
                 <ChoiceGroup
                   name="lf-storeys"
-                  otherLabel="house type"
                   options={STOREY_OPTIONS}
                   value={form.propertyStoreys}
                   disabled={disabled}
@@ -726,7 +689,6 @@ export default function LeadForm({
               <ChecklistRow done={doneRoof} label="Roof type" required>
                 <ChoiceGroup
                   name="lf-roof"
-                  otherLabel="roof type"
                   options={ROOF_TYPES}
                   value={form.roofType}
                   disabled={disabled}
@@ -738,7 +700,6 @@ export default function LeadForm({
               <ChecklistRow done={donePhase} label="Electrical phase" required>
                 <ChoiceGroup
                   name="lf-phase"
-                  otherLabel="electrical phase"
                   options={ELECTRICAL_PHASES}
                   value={form.electricalPhase}
                   disabled={disabled}
@@ -780,7 +741,6 @@ export default function LeadForm({
               <ChecklistRow done={doneFinance} label="Finance assistance" required>
                 <ChoiceGroup
                   name="lf-finance"
-                  otherLabel="finance assistance"
                   options={FINANCE_OPTIONS}
                   value={form.financeAssistance}
                   disabled={disabled}

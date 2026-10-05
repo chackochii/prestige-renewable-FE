@@ -50,7 +50,12 @@ function CheckRow({ done, title, detail, warn = false }) {
   );
 }
 
-export default function ProposalHandover({ opp, unit, requote = null, onSent }) {
+/**
+ * `inspectionMissing` comes from EstimationPanel, which holds the job's
+ * requests: what the pre-site inspection still needs before the API lets the
+ * job leave estimation (empty when none is needed or its findings are approved).
+ */
+export default function ProposalHandover({ opp, unit, requote = null, onSent, inspectionMissing = [] }) {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { notify } = useNotifications();
@@ -86,7 +91,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent }) 
   const totals = quote?.items?.length ? invoiceTotals(quote) : null;
   // On a re-quote the note says what changed, and sales needs it.
   const noteMissing = Boolean(requote) && !note.trim();
-  const ready = !estimationMissing.length && !quoteMissing.length && !denied && opp.lifecycle === "Active";
+  const ready = !estimationMissing.length && !inspectionMissing.length && !quoteMissing.length && !denied && opp.lifecycle === "Active";
   // The quote as it stands is the very version the customer asked to change.
   const unchanged = Boolean(requote?.quoteVersion && matching && matching.id === requote.quoteVersion.id);
 
@@ -147,6 +152,11 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent }) 
           done={!estimationMissing.length}
           title="Estimation complete"
           detail={estimationMissing.length ? estimationMissing.join(" · ") : "Requirements confirmed and client input answered."}
+        />
+        <CheckRow
+          done={!inspectionMissing.length}
+          title="Pre-site inspection"
+          detail={inspectionMissing.length ? inspectionMissing.join(" · ") : "Not needed, or its findings are approved."}
         />
         <CheckRow
           done={!quoteMissing.length}

@@ -24,7 +24,7 @@ import { documentTypeLabel, siteVisitStatusMeta, siteVisitTask } from "@/constan
 import { SITE_PHOTOS_KEY, requesterItems } from "@/constants/inspectionReport";
 import InspectionReportView from "@/features/collaboration/InspectionReportView";
 import { siteVisitLink } from "@/features/collaboration/siteVisitLink";
-import { formatDate, toDateInput } from "@/helpers/dateTimeHelpers";
+import { formatDate, fromDateTimeInputs, toDateTimeInputs } from "@/helpers/dateTimeHelpers";
 import { isBlank } from "@/utils/validators";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
@@ -45,13 +45,6 @@ const KIND_HINT = {
   date: "date",
   checkbox: "tick box",
   signature: "signature",
-};
-
-/** The clock time out of a stored date, for the time input. */
-const timeOf = (value) => {
-  if (typeof value !== "string") return "";
-  const time = value.split("T")[1];
-  return time ? time.slice(0, 5) : "";
 };
 
 export default function SiteVisitTaskForm({ request, people = [], onSave, onDeletePhoto, timeZone }) {
@@ -76,8 +69,10 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
   const [assigneeName, setAssigneeName] = useState(task?.assigneeName || "");
   const [assigneeEmail, setAssigneeEmail] = useState(task?.assigneeEmail || "");
   const [assigneePhone, setAssigneePhone] = useState(task?.assigneePhone || "");
-  const [scheduledDate, setScheduledDate] = useState(toDateInput(request.scheduledFor));
-  const [scheduledTime, setScheduledTime] = useState(timeOf(request.scheduledFor));
+  // The visit's day and time as the unit's calendar has them (a date set
+  // without a time comes back with the time box empty, not "00:00").
+  const [scheduledDate, setScheduledDate] = useState(() => toDateTimeInputs(request.scheduledFor, timeZone).date);
+  const [scheduledTime, setScheduledTime] = useState(() => toDateTimeInputs(request.scheduledFor, timeZone).time);
   // Only the coordinator's own additions live in state; the requester's items
   // are read back from the request every render.
   const [extras, setExtras] = useState(() =>
@@ -141,7 +136,9 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
         assigneeName: typedName ? assigneeName.trim() : "",
         assigneeEmail: typedName ? assigneeEmail.trim() : "",
         assigneePhone: typedName ? assigneePhone.trim() : "",
-        scheduledFor: scheduledDate ? (scheduledTime ? `${scheduledDate}T${scheduledTime}` : scheduledDate) : null,
+        // The time is the unit's wall clock, sent as the instant it is — not
+        // a bare "…T09:00" the server would read in its own zone.
+        scheduledFor: fromDateTimeInputs(scheduledDate, scheduledTime, timeZone),
         // `kind` rides along so the site member gets the right control — a
         // signature pad rather than a text box, and so on.
         requestedFields: [...asked, ...namedExtras].map((x, i) => ({

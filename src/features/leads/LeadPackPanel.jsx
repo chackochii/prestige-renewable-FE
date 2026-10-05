@@ -7,8 +7,10 @@ import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import {
+  LOCAL_UNTIL_SAVED,
   autosavePayload,
-  formToPayload,
+  changedPayload,
+  hasChanges,
   idOrNull,
   isLoggedAttempt,
   leadToForm,
@@ -76,6 +78,10 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const attachments = useAppSelector((s) => s.leads.attachments);
   const { notify, error: notifyError } = useNotifications();
   const [form, setForm] = useState(() => readDraft(opp) ?? leadToForm(opp));
+  // The record the form was built from. Saves send only what differs from it,
+  // so a field nobody touched on this screen is never written back over what
+  // estimation (or anyone else) saved since.
+  const [base, setBase] = useState(opp);
   const [errors, setErrors] = useState({});
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -107,6 +113,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     // — autosave's own response comes back through here too.
     if (changedRecord || !dirtyRef.current) {
       setForm(leadToForm(opp));
+      setBase(opp);
       setErrors({});
     }
   }, [opp]);
@@ -125,8 +132,8 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
 
   // The checklist lives in local state until it is saved, so anything that
   // takes the person off this screen has to know there is unsaved work.
-  const savedForm = useMemo(() => leadToForm(opp), [opp]);
-  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
+  // Measured the way a save would see it, so a successful save clears it.
+  const dirty = useMemo(() => hasChanges(form, base), [form, base]);
   dirtyRef.current = dirty;
 
   useEffect(() => {
@@ -142,9 +149,28 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   // Typing is kept locally and written to the record when a tab is done with,
   // rather than a PATCH every second: the checklist runs to a hundred-odd
   // fields and a request per keystroke is a lot of traffic for no benefit.
+  // Stamped with the version the form was built from: a draft is only
+  // restored against that version, never over a newer one.
   useEffect(() => {
-    if (dirty) writeDraft(opp, form);
-  }, [form, opp, dirty]);
+    if (dirty) writeDraft(base, form);
+  }, [form, base, dirty]);
+
+  /**
+   * After a save, the record as the API now holds it becomes the baseline and
+   * the form takes its values — except anything typed while the save was on
+   * its way (still to be sent) and the fields the PATCH does not carry.
+   */
+  const adoptSaved = (saved, sent) => {
+    if (!saved?.id) return;
+    const fresh = leadToForm(saved);
+    setForm((current) => {
+      const next = { ...fresh };
+      for (const key of Object.keys(current))
+        if (current[key] !== sent[key] || LOCAL_UNTIL_SAVED.includes(key)) next[key] = current[key];
+      return next;
+    });
+    setBase(saved);
+  };
 
   /**
    * Writes what is on screen without validating any of it. Half a checklist is
@@ -152,10 +178,17 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
    * validates, and only when someone presses it.
    */
   const persist = async () => {
+    const body = autosavePayload(form, base);
+    if (!Object.keys(body).length) {
+      setAutosaveState("saved");
+      return true;
+    }
+    const sent = form;
     const previousAttemptCount = (opp.contactAttempts || []).length;
     setAutosaveState("saving");
     try {
-      await dispatch(updateLead({ id: opp.id, body: autosavePayload(form) })).unwrap();
+      const saved = await dispatch(updateLead({ id: opp.id, body })).unwrap();
+      adoptSaved(saved, sent);
       await logNewFailedAttempts(previousAttemptCount);
       clearDraft(opp.id);
       setAutosaveState("saved");
@@ -241,19 +274,24 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     // Baseline before this save — used to work out what's actually new,
     // so re-saving never re-writes the same job-history entry twice.
     const previousAttemptCount = (opp.contactAttempts || []).length;
+    const changes = changedPayload(form, base);
+    const sent = form;
     setSaving(true);
     setSaveError("");
     try {
-      await dispatch(
-        updateLead({
-          id: opp.id,
-          // The stamp is what the estimation screen reads to know the pack
-          // moved under it; it is cleared when the estimator acknowledges.
-          body: handedOver
-            ? { ...formToPayload(form), leadEditedAt: new Date().toISOString() }
-            : formToPayload(form),
-        }),
-      ).unwrap();
+      // Only what changed here; nothing changed, nothing sent (the assignments
+      // below still go through their own calls).
+      if (Object.keys(changes).length) {
+        const saved = await dispatch(
+          updateLead({
+            id: opp.id,
+            // The stamp is what the estimation screen reads to know the pack
+            // moved under it; it is cleared when the estimator acknowledges.
+            body: handedOver ? { ...changes, leadEditedAt: new Date().toISOString() } : changes,
+          }),
+        ).unwrap();
+        adoptSaved(saved, sent);
+      }
 
       // Every attempt where the client wasn't reached must have its reason
       // recorded in Job History — write one entry per new attempt only.
@@ -329,6 +367,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const startEditing = () => (handedOver ? setConfirmEdit(true) : setEditing(true));
   const cancelEditing = () => {
     setForm(leadToForm(opp));
+    setBase(opp);
     setErrors({});
     setEditing(false);
   };

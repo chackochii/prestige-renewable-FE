@@ -10,6 +10,7 @@ export const PERMISSIONS = {
   LEADS_DELETE: "leads.delete",
   LEADS_APPROVE: "leads.approve",
 
+  ESTIMATION_READ: "estimation.read",
   ESTIMATION_UPDATE: "estimation.update",
 
   APPROVALS_READ: "approvals.read",

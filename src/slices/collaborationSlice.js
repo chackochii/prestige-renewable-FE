@@ -24,6 +24,11 @@ const initialState = {
   selected: null,
   selectedStatus: "idle",
   selectedError: null,
+  // The request on screen in RequestDetail. Every action's response replaces
+  // it (upsert), so the modal shows what the API now holds — the link a
+  // site-visit form just got, an upload, a progress update — instead of the
+  // row it was opened from.
+  open: null,
   history: [],
   historyStatus: "idle",
 };
@@ -187,6 +192,7 @@ const upsert = (state, request) => {
     if (idx !== -1) state[key][idx] = request;
   }
   if (state.selected?.id === request.id) state.selected = request;
+  if (state.open?.id === request.id) state.open = request;
 };
 
 const collaborationSlice = createSlice({
@@ -198,6 +204,14 @@ const collaborationSlice = createSlice({
       state.selectedStatus = action.payload ? "succeeded" : "idle";
       state.history = [];
       state.historyStatus = "idle";
+    },
+    /** RequestDetail opening a request: from here on it reads this copy, kept fresh by upsert. */
+    openRequest(state, action) {
+      state.open = action.payload ?? null;
+    },
+    /** RequestDetail closing — only if the one open is still this one. */
+    closeRequest(state, action) {
+      if (state.open?.id === action.payload) state.open = null;
     },
     clearSelectedRequest(state) {
       state.selected = null;
@@ -290,7 +304,7 @@ const collaborationSlice = createSlice({
   },
 });
 
-export const { selectRequest, clearSelectedRequest } = collaborationSlice.actions;
+export const { selectRequest, clearSelectedRequest, openRequest, closeRequest } = collaborationSlice.actions;
 
 /** Requests on one job, only when the store holds that job's list. */
 export const selectOpportunityRequests = (state, opportunityId) =>

@@ -33,7 +33,12 @@ import { formatCurrency } from "@/utils/formatCurrency";
 
 const CHECKLIST_ICONS = { dnsp: Plug, da: Building2, finance: Landmark };
 
-export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, onUpdateItem, onSetRequired, embedded = false }) {
+/**
+ * `saveError` is why the last checklist save was refused (useApprovalJob);
+ * the answers on screen have already gone back to what the API holds, so the
+ * reason has to stay up until it is dismissed or the next save goes through.
+ */
+export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, onUpdateItem, onSetRequired, saveError = null, onDismissSaveError, embedded = false }) {
   const [tab, setTab] = useState("overview");
   const [choosing, setChoosing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,6 +85,19 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
 
   const body = (
     <>
+      {saveError ? (
+        <Alert tone="danger" style={{ marginBottom: 14, display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
+          <span>
+            <strong>Your last checklist answers were not saved.</strong> {saveError} The checklist now shows what is on record — enter
+            the answers again.
+          </span>
+          {onDismissSaveError ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onDismissSaveError}>
+              Dismiss
+            </button>
+          ) : null}
+        </Alert>
+      ) : null}
       {isOverdue(job) ? (
         <Alert tone="danger" style={{ marginBottom: 14 }}>
           Past the approvals timeline — due {formatDate(job.slaDueAt, { withTime: true })} ({slaStatus(job.slaDueAt).label}).

@@ -54,13 +54,16 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // A different job, or a save that came back: start from what the record says.
+  // A different job: start from what its record says. Not on every copy of the
+  // job that comes back — any save returns the whole job (ticking a checklist
+  // item below this table included), and resetting then threw away quoted
+  // costs typed here but not yet saved. Drafts are cleared when they are sent.
   useEffect(() => {
     setDrafts({});
     setRevising(false);
     setReason("");
     setError("");
-  }, [job?.id, job?.boq]);
+  }, [job?.id]);
 
   const edit = (key, field, value) => setDrafts((d) => ({ ...d, [key]: { ...(d[key] ?? {}), [field]: value } }));
   const valueOf = (line, field) => (drafts[line.key]?.[field] !== undefined ? drafts[line.key][field] : (line[field] ?? ""));
@@ -81,17 +84,33 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
       setBusy(false);
     }
   };
-  const save = () => submit({ lines: changed });
-  const revise = () => submit({ lines: changed, revise: true, reason: reason.trim() }, () => setRevising(false));
+  // What was typed went with the save, so the table reads the record again.
+  const sent = () => setDrafts({});
+  const save = () => submit({ lines: changed }, sent);
+  const revise = () =>
+    submit({ lines: changed, revise: true, reason: reason.trim() }, () => {
+      sent();
+      setRevising(false);
+      setReason("");
+    });
   const addLine = () =>
     submit(
       { lines: changed, add: [{ ...added, siteQty: Number(added.siteQty) || 0, quotedUnitCost: added.quotedUnitCost === "" ? null : Number(added.quotedUnitCost) }] },
       () => {
+        sent();
         setAdding(false);
         setAdded(blankLine());
       },
     );
-  const removeLine = (key) => submit({ remove: [key] });
+  // Only that line goes; anything typed on the others stays, still to be saved.
+  const removeLine = (key) =>
+    submit({ remove: [key] }, () =>
+      setDrafts((d) => {
+        const next = { ...d };
+        delete next[key];
+        return next;
+      }),
+    );
   const fromQuote = new Set(originalLines(job).filter((line) => qty(line.proposalQty) > 0).map((line) => line.key));
 
   return (

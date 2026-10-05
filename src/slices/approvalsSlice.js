@@ -21,6 +21,10 @@ const initialState = {
   jobs: {}, // opportunityId → job
   jobStatus: {}, // opportunityId → idle | loading | succeeded | failed
   jobError: {},
+  // opportunityId → why the last checklist save was refused. Kept apart from
+  // jobError: the job is reloaded after a refusal, and that reload must not
+  // wipe the reason off the screen.
+  saveError: {},
 };
 
 const reject = (err, rejectWithValue) => rejectWithValue(err.message);
@@ -79,6 +83,7 @@ const keepLocalAnswers = (held, incoming) =>
       }
     : incoming;
 
+/** { id, type, body, fromChecklist? } — fromChecklist marks the debounced checklist saves, whose refusals go to saveError. */
 export const updateApproval = createAsyncThunk("approvals/update", async ({ id, type, body }, { rejectWithValue }) => {
   try {
     return await api.updateApproval(id, type, body);
@@ -106,6 +111,9 @@ const approvalsSlice = createSlice({
       const { id, type, patch } = action.payload;
       const item = state.jobs[id]?.items?.find((candidate) => candidate.key === type);
       if (item) item.checklist = { ...(item.checklist ?? {}), ...patch };
+    },
+    clearSaveError(state, action) {
+      state.saveError[action.payload] = null;
     },
   },
   extraReducers: (builder) => {
@@ -142,8 +150,17 @@ const approvalsSlice = createSlice({
         state.jobStatus[action.meta.arg] = "failed";
         state.jobError[action.meta.arg] = action.payload;
       })
+      .addCase(updateApproval.pending, (state, action) => {
+        if (action.meta.arg?.fromChecklist) state.saveError[action.meta.arg.id] = null;
+      })
       .addCase(updateApproval.fulfilled, (state, action) => {
         putJob(state, keepLocalAnswers(state.jobs[action.payload?.id], action.payload));
+      })
+      .addCase(updateApproval.rejected, (state, action) => {
+        // The plain approval buttons show their own refusal; a checklist save
+        // has nobody waiting on it, so its reason is kept here for the screen.
+        const { id, fromChecklist } = action.meta.arg ?? {};
+        if (id && fromChecklist) state.saveError[id] = action.payload || "Your last checklist answers could not be saved.";
       })
       .addCase(setRequiredApprovals.fulfilled, (state, action) => {
         putJob(state, keepLocalAnswers(state.jobs[action.payload?.id], action.payload));
@@ -152,5 +169,5 @@ const approvalsSlice = createSlice({
   },
 });
 
-export const { patchChecklistLocally } = approvalsSlice.actions;
+export const { patchChecklistLocally, clearSaveError } = approvalsSlice.actions;
 export default approvalsSlice.reducer;

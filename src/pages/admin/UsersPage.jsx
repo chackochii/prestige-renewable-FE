@@ -107,7 +107,16 @@ export default function UsersPage() {
         )}
       </div>
 
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {error ? (
+        <Alert tone="danger" style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <span>{error}</span>
+          {status === "failed" ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => dispatch(fetchUsers(wanted))}>
+              Try again
+            </button>
+          ) : null}
+        </Alert>
+      ) : null}
 
       <div className="card card-pad">
         {status === "loading" && !loaded ? (

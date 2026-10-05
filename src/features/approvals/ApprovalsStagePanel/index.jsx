@@ -24,7 +24,7 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
   const { hasPermission } = useAuth();
   const canApprove = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
   const [tab, setTab] = useState("approvals");
-  const { job, status, error, updateChecklist, updateItem, setRequired } = useApprovalJob(opp?.id);
+  const { job, status, error, saveError, dismissSaveError, updateChecklist, updateItem, setRequired } = useApprovalJob(opp?.id);
   const notThereYet = Number(opp?.stage) < APPROVALS_STAGE.id;
 
   return (
@@ -72,6 +72,8 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
             if (next && Number(next.stage) !== Number(opp.stage)) onMoved?.();
           }}
           onSetRequired={setRequired}
+          saveError={saveError}
+          onDismissSaveError={dismissSaveError}
         />
       )}
     </div>

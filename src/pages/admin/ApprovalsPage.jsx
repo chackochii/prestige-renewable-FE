@@ -56,7 +56,7 @@ export default function ApprovalsPage() {
   // this reads it from the slice and asks the API for nothing. A change comes
   // back as the whole job and lands on its board row too, so the last
   // approval moving the job on reads as "ready for procurement" at once.
-  const { job: selected, status: jobStatus, error: jobError, updateChecklist, updateItem, setRequired } = useApprovalJob(selectedRow?.id);
+  const { job: selected, status: jobStatus, error: jobError, saveError, dismissSaveError, updateChecklist, updateItem, setRequired } = useApprovalJob(selectedRow?.id);
   // The last approval moves the job on and the counts on the cards with it, so
   // the board is asked again — only then.
   const afterItem = async (type, body) => {
@@ -164,7 +164,15 @@ export default function ApprovalsPage() {
           {jobStatus === "failed" ? (
             <Alert tone="danger">{jobError || "The job's approvals could not be loaded."}</Alert>
           ) : selected ? (
-            <ApprovalWorkflow job={selected} canEdit={canEdit} onChecklistChange={updateChecklist} onUpdateItem={afterItem} onSetRequired={setRequired} />
+            <ApprovalWorkflow
+              job={selected}
+              canEdit={canEdit}
+              onChecklistChange={updateChecklist}
+              onUpdateItem={afterItem}
+              onSetRequired={setRequired}
+              saveError={saveError}
+              onDismissSaveError={dismissSaveError}
+            />
           ) : (
             <LoadingState label="Loading the job…" />
           )}
