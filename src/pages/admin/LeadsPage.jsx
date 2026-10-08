@@ -1,13 +1,15 @@
-// Leads: opportunities still at stage 1 in the current business unit.
+// Leads: opportunities still at stage 1 in the current business unit, 12 to
+// a page with numbered pages below, newest first. The search runs on the API
+// across every lead; the page is kept in the URL.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
-import LoadMore from "@/components/LoadMore";
+import Pagination from "@/components/Pagination";
 import Alert from "@/components/Alert";
 import OppCell from "@/components/OppCell";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -18,6 +20,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
+import { usePageParam } from "@/hooks/usePageParam";
+import { PAGE_SIZE } from "@/helpers/pagination";
 
 /** How to reach the customer — captured on every lead, so always worth showing. */
 const contactSummary = (o) => [o.customerPhone, o.customerEmail].filter(Boolean).join(" · ") || "—";
@@ -32,17 +36,16 @@ export default function LeadsPage() {
   // every lead and pages the result.
   const settledSearch = useDebouncedValue(search.trim(), 300);
 
-  const { items, status, error, ready, total, loaded, hasMore, loadingMore, loadMore } = useOpportunities(
+  const [page, setPage] = usePageParam(settledSearch);
+
+  // The API returns them newest first, a page at a time.
+  const { items: rows, error, ready, loading, total } = useOpportunities(
     {
       stage: 1,
       ...(settledSearch ? { search: settledSearch } : {}),
     },
-    { pageSize: 25 },
+    { page, pageSize: PAGE_SIZE },
   );
-
-  // The API returns newest first; this only guards against a page arriving out
-  // of order after a "load more".
-  const rows = useMemo(() => [...items].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)), [items]);
 
   return (
     <>
@@ -72,7 +75,7 @@ export default function LeadsPage() {
       <div className="toolbar">
         <input
           className="search"
-          placeholder="Search name or number"
+          placeholder="Search name, number, email or phone"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search leads"
@@ -82,19 +85,19 @@ export default function LeadsPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <div className="card card-pad">
-        {status === "loading" && !ready ? (
+        {loading && !rows.length ? (
           <LoadingState label="Loading leads…" />
-        ) : rows.length === 0 ? (
+        ) : ready && rows.length === 0 ? (
           <EmptyState
-            title="No leads waiting"
+            title={settledSearch ? "No leads match" : "No leads waiting"}
             body={
-              items.length
-                ? "No leads match the current filter."
+              settledSearch
+                ? "No lead matches that search."
                 : "Every lead has been qualified or moved out. Capture a new one to get started."
             }
           />
         ) : (
-          <div className="table-wrap">
+          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
             <table className="table clickable stack">
               <thead>
                 <tr>
@@ -124,14 +127,7 @@ export default function LeadsPage() {
                 })}
               </tbody>
             </table>
-            <LoadMore
-              loaded={loaded}
-              total={total}
-              hasMore={hasMore}
-              loading={loadingMore}
-              onMore={loadMore}
-              noun="leads"
-            />
+            <Pagination page={page} total={total} onPageChange={setPage} noun="leads" loading={loading} />
           </div>
         )}
       </div>

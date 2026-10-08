@@ -41,7 +41,7 @@ export default function StageRequestsPanel({
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { notify, error: notifyError } = useNotifications();
-  const { active, sales, siteOps } = useUnitUsers();
+  const { active } = useUnitUsers();
   const { oppId, byOpp, byOppStatus, byOppError } = useAppSelector((s) => s.collaboration);
   const [raising, setRaising] = useState(null); // { kind, department }
   const [open, setOpen] = useState(null);
@@ -56,12 +56,6 @@ export default function StageRequestsPanel({
   const submitNew = async (body) => {
     await dispatch(createRequest({ opportunityId: opp.id, body })).unwrap();
     notify(body.kind === "assignment" ? "Assignment sent" : "Request sent");
-  };
-
-  const peopleFor = (kind, department) => {
-    if (department === "operations") return siteOps.length ? siteOps : active;
-    if (department === "sales") return sales.length ? sales : active;
-    return active;
   };
 
   return (
@@ -134,7 +128,7 @@ export default function StageRequestsPanel({
           kind={raising.kind}
           department={raising.department}
           template={raising.kind === "information" ? informationTemplate : "pre_site_inspection"}
-          people={peopleFor(raising.kind, raising.department)}
+          people={active}
           onClose={() => setRaising(null)}
           onSubmit={async (body) => {
             try {

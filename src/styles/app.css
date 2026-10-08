@@ -1181,3 +1181,31 @@
   .inspection-report-section h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; }
   .inspection-signature { max-width: 220px; max-height: 90px; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 }
+
+@layer components {
+  /* The foot of a paged list (components/Pagination): the summary on the
+     left, numbered pages on the right; on a phone the numbers give way to
+     "Page 2 of 4" between Previous and Next. */
+  .pagination {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap;
+    padding: 14px 2px 2px; margin-top: 8px; border-top: 1px solid var(--line);
+  }
+  .pagination.is-loading { opacity: 0.6; pointer-events: none; }
+  .pagination-summary { white-space: nowrap; }
+  .pagination-pages { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .pagination-page { min-width: 34px; justify-content: center; padding-inline: 8px; }
+  .pagination-page.is-current { background: var(--brand); color: #fff; }
+  .pagination-gap { padding: 0 4px; color: var(--muted); }
+  .pagination-step { display: inline-flex; align-items: center; gap: 4px; }
+  .pagination-compact { display: none; padding: 0 6px; white-space: nowrap; }
+  /* A list changing page stays readable but shows it is busy. */
+  .is-refreshing { opacity: 0.6; transition: opacity var(--fast); }
+
+  @media (max-width: 640px) {
+    .pagination { justify-content: center; }
+    .pagination-summary { flex: 1 1 100%; text-align: center; }
+    .pagination-page, .pagination-gap { display: none; }
+    .pagination-compact { display: inline; }
+    .pagination-step-label { display: none; }
+  }
+}

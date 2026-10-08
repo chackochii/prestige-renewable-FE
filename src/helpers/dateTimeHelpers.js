@@ -68,6 +68,91 @@ export function toDateInput(value) {
   return String(value).slice(0, 10);
 }
 
+// ---- Date and time inputs in the unit's timezone ---------------------------------
+// A time someone types is a wall-clock time where the business unit works.
+// Sent as a bare "2026-10-07T09:00" it was read in the *server's* zone (and
+// shown back hours out); read back by cutting the ISO string it showed the UTC
+// clock. These convert both ways through the unit's timezone instead.
+
+const zoneOr = (timeZone) => {
+  try {
+    new Intl.DateTimeFormat("en-AU", { timeZone: timeZone || DEFAULT_TZ });
+    return timeZone || DEFAULT_TZ;
+  } catch {
+    return DEFAULT_TZ;
+  }
+};
+
+const wallParts = (instant, timeZone) =>
+  Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(instant)
+      .map((part) => [part.type, part.value]),
+  );
+
+/** How far `timeZone`'s clock is ahead of UTC at `instant`, in ms. */
+const offsetAt = (instant, timeZone) => {
+  const p = wallParts(instant, timeZone);
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - instant.getTime();
+};
+
+/** "2026-10-07" + "09:00" in `timeZone` → the ISO instant it is. */
+export function zonedTimeToIso(date, time, timeZone) {
+  const zone = zoneOr(timeZone);
+  const [y, m, d] = String(date).split("-").map(Number);
+  const [h, mi] = String(time).split(":").map(Number);
+  const wall = Date.UTC(y, m - 1, d, h, mi);
+  // The offset at a first guess can differ from the offset at the answer
+  // across a daylight-saving change; a second pass settles it.
+  let instant = wall - offsetAt(new Date(wall), zone);
+  instant = wall - offsetAt(new Date(instant), zone);
+  return new Date(instant).toISOString();
+}
+
+/**
+ * A stored date/time as the date and time inputs show it, in the unit's
+ * timezone: { date: "yyyy-mm-dd", time: "HH:MM" | "" }. A date stored without
+ * a clock time (UTC midnight — see hasClockTime) is that calendar day with no
+ * time, never shifted and never given a made-up "00:00".
+ */
+export function toDateTimeInputs(value, timeZone) {
+  if (!value) return { date: "", time: "" };
+  if (!hasClockTime(value)) return { date: toDateInput(value), time: "" };
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return { date: "", time: "" };
+  const p = wallParts(instant, zoneOr(timeZone));
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}
+
+/**
+ * Date and time inputs → the value to store: a date alone stays a date
+ * ("yyyy-mm-dd", kept as that day); with a time it is that wall-clock time in
+ * the unit's timezone, as an ISO instant. A time landing exactly on UTC
+ * midnight (11 am in Sydney's summer) would read back as "no time", so it is
+ * stored one second later — shown to the minute, nobody sees the second.
+ */
+export function fromDateTimeInputs(date, time, timeZone) {
+  if (!date) return null;
+  if (!time) return date;
+  const iso = zonedTimeToIso(date, time, timeZone);
+  return iso.endsWith("T00:00:00.000Z") ? iso.replace("T00:00:00.000Z", "T00:00:01.000Z") : iso;
+}
+
+/** Whether two stored date/times are the same moment ("2026-10-07" and "2026-10-07T00:00:00.000Z" are). */
+export function sameInstant(a, b) {
+  if (!a || !b) return !a && !b;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
 /** Start of the current week / month / quarter. */
 export function periodStart(period) {
   const d = new Date();

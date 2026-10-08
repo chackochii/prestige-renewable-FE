@@ -1,8 +1,8 @@
 // One job's passage through approvals: the overview (its approvals and the
 // "All approved?" gate, and which approvals it needs), the Operations
 // Coordinator's checklists for the ones that have one — CL-07 DNSP, CL-08 DA,
-// CL-09 finance — the notifications raised and the history. Once every
-// approval is through the job goes to procurement by itself.
+// CL-09 finance — and the history. Once every approval is through the job
+// goes to procurement by itself.
 //
 // `job` comes from useApprovalJob (its checklist-driven approvals already read
 // from their answers); `onChecklistChange(sectionKey, patch)`,
@@ -13,7 +13,7 @@
 // opportunity page's stage-5 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { BellRing, Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, SquareCheckBig } from "lucide-react";
+import { Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
@@ -22,7 +22,6 @@ import SectionHead from "@/components/SectionHead";
 import Tabs from "@/components/Tabs";
 import ApprovalBoard from "@/features/approvals/ApprovalBoard";
 import ApprovalChecklist from "@/features/approvals/ApprovalChecklist";
-import ApprovalNotifications from "@/features/approvals/ApprovalNotifications";
 import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
 import { APPROVALS_STAGE } from "@/constants/approvals";
@@ -34,7 +33,12 @@ import { formatCurrency } from "@/utils/formatCurrency";
 
 const CHECKLIST_ICONS = { dnsp: Plug, da: Building2, finance: Landmark };
 
-export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, onUpdateItem, onSetRequired, embedded = false }) {
+/**
+ * `saveError` is why the last checklist save was refused (useApprovalJob);
+ * the answers on screen have already gone back to what the API holds, so the
+ * reason has to stay up until it is dismissed or the next save goes through.
+ */
+export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, onUpdateItem, onSetRequired, saveError = null, onDismissSaveError, embedded = false }) {
   const [tab, setTab] = useState("overview");
   const [choosing, setChoosing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -63,7 +67,6 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
       const Icon = CHECKLIST_ICONS[section.key] ?? ClipboardCheck;
       return { key: section.key, label: section.tab, icon: <Icon size={14} />, count: `${summary.done}/${summary.total}` };
     }),
-    { key: "notifications", label: "Notifications", icon: <BellRing size={14} />, count: (job.notifications ?? []).length || undefined },
     { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length || undefined },
   ];
   const section = checklists.find(({ section: candidate }) => candidate.key === tab)?.section ?? null;
@@ -82,6 +85,19 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
 
   const body = (
     <>
+      {saveError ? (
+        <Alert tone="danger" style={{ marginBottom: 14, display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
+          <span>
+            <strong>Your last checklist answers were not saved.</strong> {saveError} The checklist now shows what is on record — enter
+            the answers again.
+          </span>
+          {onDismissSaveError ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onDismissSaveError}>
+              Dismiss
+            </button>
+          ) : null}
+        </Alert>
+      ) : null}
       {isOverdue(job) ? (
         <Alert tone="danger" style={{ marginBottom: 14 }}>
           Past the approvals timeline — due {formatDate(job.slaDueAt, { withTime: true })} ({slaStatus(job.slaDueAt).label}).
@@ -142,8 +158,6 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
           </>
         ) : section ? (
           <ApprovalChecklist section={section} job={job} canEdit={canEdit && !movedOn} onChange={(patch) => onChecklistChange?.(section.key, patch)} />
-        ) : tab === "notifications" ? (
-          <ApprovalNotifications job={job} />
         ) : (
           <ProcurementHistory job={job} />
         )}

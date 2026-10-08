@@ -3,9 +3,9 @@
 // the BOQ where they differ), check the price variation, gather whichever
 // approvals that variation calls for, send purchase orders and receive the
 // deliveries, then create the Green Deal job. Pure functions over a job
-// record, so the panels and the page agree on where a job is — and so the
-// rules can move to prestige-be unchanged when the procurement API arrives.
-// Until then the job records come from lib/mockData/procurement.js.
+// record (services/api/procurementApi.js has the shape), so the panels and
+// the page agree on where a job is. prestige-be procurementService.js runs
+// the same rules and is the one that enforces them.
 
 import {
   APPROVAL_TIERS,
@@ -13,7 +13,7 @@ import {
   AVAILABILITY,
   PROCUREMENT_STEPS,
   VARIATION_THRESHOLD_PCT,
-} from "@/lib/mockData/procurement";
+} from "@/constants/procurement";
 
 const qty = (value) => Number(value) || 0;
 const isQuoted = (line) => line.quotedUnitCost !== null && line.quotedUnitCost !== undefined;

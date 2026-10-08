@@ -4,10 +4,11 @@
 // comes from the job record: the rows the auto-filled items show, the
 // conditions the rules need, and whether job creation is open yet.
 //
-// `job` comes from useProcurementChecklists (it carries `checklist`);
-// `onChange(patch)` merges answers into this section. `canEdit` — may
-// complete the coordinator's items (procurement.update); `canApprove` — may
-// sign the Procurement Manager's (procurement.approve).
+// `job` comes from useProcurementJob (it carries `checklist`); `onChange(patch)`
+// merges answers into this section and `upload(itemKey, files)` files the
+// documents an item attaches on the job. `canEdit` — may complete the
+// coordinator's items (procurement.update); `canApprove` — may sign the
+// Procurement Manager's (procurement.approve).
 
 import ChecklistForm from "@/components/ChecklistForm";
 import { FULFILMENT_OPTIONS } from "@/constants/procurementChecklists";
@@ -105,7 +106,7 @@ function procurementAutoRows(source, job, checklist) {
   }
 }
 
-export default function ProcurementChecklist({ section, job, canEdit = false, canApprove = false, onChange }) {
+export default function ProcurementChecklist({ section, job, canEdit = false, canApprove = false, onChange, upload = null }) {
   const checklist = job.checklist ?? {};
   return (
     <ChecklistForm
@@ -117,6 +118,7 @@ export default function ProcurementChecklist({ section, job, canEdit = false, ca
       locked={section.afterMaterials ? jobCreationBlocker(job, checklist) : null}
       autoRows={(source) => procurementAutoRows(source, job, checklist)}
       onChange={onChange}
+      upload={upload}
     />
   );
 }

@@ -48,7 +48,7 @@ import {
 } from "@/constants/collaboration";
 import { estimationInputFromAnswers } from "@/constants/estimationInput";
 import { stageById } from "@/constants/stages";
-import { formatDate, hasClockTime } from "@/helpers/dateTimeHelpers";
+import { formatDate, hasClockTime, sameInstant } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -57,8 +57,10 @@ import { collectEstimationInputs } from "@/slices/leadsSlice";
 import {
   addProgress,
   cancelRequest,
+  closeRequest,
   decideResponse,
   deleteSiteVisitPhoto,
+  openRequest,
   saveSiteVisitTask,
   fetchRequestHistory,
   fileAttachmentOnOpportunity,
@@ -134,12 +136,29 @@ function Fact({ label, value }) {
   );
 }
 
-export default function RequestDetail({ request, onClose, timeZone }) {
+/**
+ * `request` is the row it was opened from. What is shown is the store's copy
+ * of it (collaborationSlice `open`), which every action here replaces with the
+ * API's answer — so a form link just created, a file just uploaded, a progress
+ * update or a deleted photo shows at once, instead of the modal still showing
+ * the row as it was when clicked (and people doing it again).
+ */
+export default function RequestDetail({ request: opened, onClose, timeZone }) {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { active, siteOps } = useUnitUsers();
   const { notify, error: notifyError } = useNotifications();
   const { history, historyStatus } = useAppSelector((s) => s.collaboration);
+  const held = useAppSelector((s) => (opened?.id && s.collaboration.open?.id === opened.id ? s.collaboration.open : null));
+  const request = held ?? opened;
+
+  useEffect(() => {
+    if (!opened?.id) return undefined;
+    dispatch(openRequest(opened));
+    return () => dispatch(closeRequest(opened.id));
+    // Only when a different request opens: the store's copy is fresher than the row passed in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened?.id, dispatch]);
   const [uploading, setUploading] = useState(null);
   const [filing, setFiling] = useState(null);
   const [clarifying, setClarifying] = useState(false);
@@ -208,7 +227,11 @@ export default function RequestDetail({ request, onClose, timeZone }) {
   };
 
   const saveSiteVisit = async ({ scheduledFor, ...body }) => {
-    if (scheduledFor && scheduledFor !== request.scheduledFor) {
+    // Compared as moments, not strings: the form's "2026-10-07" and the stored
+    // "2026-10-07T00:00:00.000Z" are the same day, and treating them as a
+    // change sent a progress update the API refused ("add a note, move the
+    // status on…") — so the form could not be re-saved at all.
+    if (scheduledFor && !sameInstant(scheduledFor, request.scheduledFor)) {
       await dispatch(addProgress({ id: request.id, body: { status: request.status, scheduledFor } })).unwrap();
     }
     await dispatch(saveSiteVisitTask({ id: request.id, body })).unwrap();

@@ -143,6 +143,38 @@
     }
   }
 
+  /*
+   * Switching theme (hooks/useTheme.js animateThemeChange): a soft crossfade
+   * of the whole page. With View Transitions it is the browser's own
+   * crossfade of the two snapshots — its blending keeps the brightness even
+   * all the way through, so there is no dip halfway — given the app's easing
+   * and a calm 0.3s. Keep the 0.3s in step with SWITCH_MS in useTheme.js.
+   */
+  :root.theme-crossfade::view-transition-old(root),
+  :root.theme-crossfade::view-transition-new(root) {
+    animation-duration: 0.3s;
+    animation-timing-function: var(--ease);
+  }
+
+  /*
+   * Without View Transitions, every colour fades across for the length of the
+   * switch (the class is on <html> for ~300 ms only), overriding each
+   * component's own quicker transitions for that moment.
+   */
+  :root.theme-fading,
+  :root.theme-fading *,
+  :root.theme-fading *::before,
+  :root.theme-fading *::after {
+    transition:
+      background-color 0.3s var(--ease),
+      color 0.3s var(--ease),
+      border-color 0.3s var(--ease),
+      outline-color 0.3s var(--ease),
+      fill 0.3s var(--ease),
+      stroke 0.3s var(--ease),
+      box-shadow 0.3s var(--ease) !important;
+  }
+
   html,
   body,
   #root {

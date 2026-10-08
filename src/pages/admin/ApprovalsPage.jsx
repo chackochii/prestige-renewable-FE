@@ -1,10 +1,11 @@
 // Approvals (stage 5): the jobs waiting on their approvals — only the ones
-// each job needs, as ticked by sales or estimation — the Operations
-// Coordinator's checklists for DNSP, DA and finance, the rules the stage
-// runs on, and each job's way through the "All approved?" gate from the
-// Sydpro process chart. Jobs come from prestige-be (approvalsSlice).
+// each job needs, as ticked by sales or estimation — and the Operations
+// Coordinator's checklists for DNSP, DA and finance. Jobs come from
+// prestige-be (approvalsSlice), 12 to a page with numbered pages below, the
+// job that reached approvals most recently first; the stat cards count the
+// whole board.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlarmClock, CircleCheck, CornerUpLeft, Hourglass, Search, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -12,17 +13,18 @@ import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
 import StatCard from "@/components/StatCard";
-import ApprovalRules from "@/features/approvals/ApprovalRules";
 import ApprovalWorkflow from "@/features/approvals/ApprovalWorkflow";
-import ProcurementTeam from "@/features/procurement/ProcurementTeam";
 import { APPROVALS_STAGE } from "@/constants/approvals";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useApprovalJob } from "@/hooks/useApprovalJob";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { approvalItems, approvalOutcome, approvalStatus, isOverdue, itemStatus } from "@/helpers/approvals";
+import { usePageParam } from "@/hooks/usePageParam";
+import { PAGE_SIZE } from "@/helpers/pagination";
+import { approvalItems, approvalOutcome, approvalStatus, itemStatus } from "@/helpers/approvals";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { fetchApprovalsBoard } from "@/slices/approvalsSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -33,32 +35,34 @@ export default function ApprovalsPage() {
   const { unitId } = useBusinessUnit();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
-  const { board: rows, boardStatus, boardError } = useAppSelector((state) => state.approvals);
+  const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.approvals);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const term = useDebouncedValue(search.trim(), 300);
+  const [page, setPage] = usePageParam(term);
+  const boardKey = JSON.stringify(unitId ? { businessUnitId: unitId, search: term || undefined, page, pageSize: PAGE_SIZE } : null);
+  const loading = boardStatus === "loading";
 
   useEffect(() => {
-    if (unitId) dispatch(fetchApprovalsBoard({ businessUnitId: unitId, search: term }));
-  }, [dispatch, unitId, term]);
+    const params = JSON.parse(boardKey);
+    if (params) dispatch(fetchApprovalsBoard(params));
+  }, [dispatch, boardKey]);
 
-  const atStage = useMemo(() => rows.filter((job) => Number(job.stage) === APPROVALS_STAGE.id), [rows]);
-  const counts = useMemo(
-    () => ({
-      pending: atStage.filter((job) => approvalOutcome(job) === "pending").length,
-      approved: rows.filter((job) => approvalOutcome(job) === "approved" || Number(job.stage) > APPROVALS_STAGE.id).length,
-      rejected: atStage.filter((job) => approvalOutcome(job) === "rejected").length,
-      overdue: atStage.filter((job) => isOverdue(job)).length,
-    }),
-    [rows, atStage],
-  );
+  // Counted by the API across the whole board, not just the page on screen.
+  const counts = boardCounts ?? { pending: 0, approved: 0, rejected: 0, overdue: 0 };
 
   const selectedRow = rows.find((job) => job.id === selectedId) ?? rows[0] ?? null;
-  const { job: selected, status: jobStatus, error: jobError, updateChecklist, updateItem, setRequired } = useApprovalJob(selectedRow?.id);
-  // The last approval moves the job on; the board is reread so it reads as in procurement.
+  // The board brought every job whole, so the selected one is already here:
+  // this reads it from the slice and asks the API for nothing. A change comes
+  // back as the whole job and lands on its board row too, so the last
+  // approval moving the job on reads as "ready for procurement" at once.
+  const { job: selected, status: jobStatus, error: jobError, saveError, dismissSaveError, updateChecklist, updateItem, setRequired } = useApprovalJob(selectedRow?.id);
+  // The last approval moves the job on and the counts on the cards with it, so
+  // the board is asked again — only then.
   const afterItem = async (type, body) => {
     const next = await updateItem(type, body);
-    if (next && Number(next.stage) !== Number(selectedRow?.stage)) dispatch(fetchApprovalsBoard({ businessUnitId: unitId, search: term }));
+    if (next && Number(next.stage) !== Number(selectedRow?.stage)) dispatch(fetchApprovalsBoard(JSON.parse(boardKey)));
+    return next;
   };
 
   return (
@@ -87,7 +91,7 @@ export default function ApprovalsPage() {
         }
       >
         {boardError ? <Alert tone="danger">{boardError}</Alert> : null}
-        {boardStatus === "loading" && !rows.length ? (
+        {loading && !rows.length ? (
           <LoadingState label="Loading approvals…" />
         ) : rows.length === 0 ? (
           <EmptyState
@@ -96,7 +100,7 @@ export default function ApprovalsPage() {
             body={term ? "Try another search." : "Jobs arrive here when the customer accepts their proposal."}
           />
         ) : (
-          <div className="table-wrap">
+          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
             <table className="table clickable">
               <thead>
                 <tr>
@@ -152,6 +156,7 @@ export default function ApprovalsPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} total={boardTotal} onPageChange={setPage} noun="jobs" loading={loading} />
       </Card>
 
       {selectedRow ? (
@@ -159,17 +164,20 @@ export default function ApprovalsPage() {
           {jobStatus === "failed" ? (
             <Alert tone="danger">{jobError || "The job's approvals could not be loaded."}</Alert>
           ) : selected ? (
-            <ApprovalWorkflow job={selected} canEdit={canEdit} onChecklistChange={updateChecklist} onUpdateItem={afterItem} onSetRequired={setRequired} />
+            <ApprovalWorkflow
+              job={selected}
+              canEdit={canEdit}
+              onChecklistChange={updateChecklist}
+              onUpdateItem={afterItem}
+              onSetRequired={setRequired}
+              saveError={saveError}
+              onDismissSaveError={dismissSaveError}
+            />
           ) : (
             <LoadingState label="Loading the job…" />
           )}
         </div>
       ) : null}
-
-      <div className="grid-2" style={{ marginTop: 20 }}>
-        <ApprovalRules job={selected} />
-        <ProcurementTeam />
-      </div>
     </>
   );
 }

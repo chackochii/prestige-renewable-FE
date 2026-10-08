@@ -9,7 +9,7 @@ import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import SectionHead from "@/components/SectionHead";
 import StatCard from "@/components/StatCard";
-import { APPROVAL_TIERS } from "@/lib/mockData/procurement";
+import { APPROVAL_TIERS } from "@/constants/procurement";
 import {
   boqLines,
   currentRound,

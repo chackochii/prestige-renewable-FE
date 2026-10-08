@@ -5,8 +5,10 @@
 // for the work the list is bad at: seeing where everything sits, and dragging
 // a job into the next stage.
 //
-// The view, the stage filter and the lifecycle all live in the URL, so a
-// filtered board or list is a link somebody can send.
+// The view, the stage filter, the lifecycle and the page all live in the URL,
+// so a filtered board or list is a link somebody can send. The list shows 12
+// jobs a page with numbered pages below, newest first; every filter is applied
+// by the API across the whole pipeline. The board shows the newest 200.
 
 import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -18,18 +20,23 @@ import LoadingState from "@/components/LoadingState";
 import Alert from "@/components/Alert";
 import JobCard from "@/components/JobCard";
 import OppCell from "@/components/OppCell";
-import LoadMore from "@/components/LoadMore";
+import Pagination from "@/components/Pagination";
 import { oppTitle, oppValue } from "@/helpers/opportunity";
 import { enabledStagesFor, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { advanceableStages, canAdvanceFrom, canViewStage, viewableStages } from "@/helpers/stageAccess";
 import { createdById, jobStatus, JOB_STATUS_OPTIONS } from "@/helpers/jobStatus";
+
+/** The board has no pages: it shows this many of the newest jobs, every column at once. */
+const BOARD_LIMIT = 200;
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
+import { usePageParam } from "@/hooks/usePageParam";
+import { PAGE_SIZE } from "@/helpers/pagination";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAppDispatch } from "@/store";
@@ -63,19 +70,22 @@ export default function PipelinePage() {
   const stageFilter = requestedStage && canViewStage(user, requestedStage) ? requestedStage : "";
   const lifecycle = params.get("life") || "Active";
   const view = params.get("view") === "board" ? "board" : "list";
-  // Lifecycle, search, owner and stage are applied by the API, not in the
-  // browser: with only part of the pipeline loaded, filtering here would
-  // silently miss everything not yet fetched.
+  // Every filter is applied by the API, not in the browser: with only one page
+  // of the pipeline loaded, filtering here would silently miss the rest.
   const settledSearch = useDebouncedValue(search.trim(), 300);
-  const { items, status, error, ready, reload, total, loaded, hasMore, loadingMore, loadMore } = useOpportunities(
-    {
-      ...(lifecycle === "all" ? {} : { lifecycle }),
-      ...(settledSearch ? { search: settledSearch } : {}),
-      ...(ownerId ? { ownerId } : {}),
-      ...(stageFilter ? { stage: stageFilter } : {}),
-    },
-    { pageSize: 50 },
-  );
+  const filters = {
+    ...(lifecycle === "all" ? {} : { lifecycle }),
+    ...(settledSearch ? { search: settledSearch } : {}),
+    ...(ownerId ? { ownerId } : {}),
+    ...(authorId ? { authorId } : {}),
+    ...(statusKey ? { status: statusKey } : {}),
+    ...(stageFilter ? { stage: stageFilter } : {}),
+  };
+  const [page, setPage] = usePageParam(JSON.stringify(filters));
+  const { items, error, ready, loading, reload, total } = useOpportunities(filters, {
+    page: view === "board" ? 1 : page,
+    pageSize: view === "board" ? BOARD_LIMIT : PAGE_SIZE,
+  });
 
   /** Keeps the other URL filters when one of them changes. */
   const setParam = (key, value) => {
@@ -95,17 +105,8 @@ export default function PipelinePage() {
   const canMoveFrom = useCallback((stage) => canAdvanceFrom(user, stage), [user]);
   const movableStages = useMemo(() => advanceableStages(user, stages), [user, stages]);
 
-  // Status and Created by are worked out here rather than by the API — one is
-  // derived from several fields, the other from whichever author field the
-  // record carries — so they narrow what has been loaded, not the whole set.
-  const rows = useMemo(
-    () =>
-      items
-        .filter((o) => (authorId ? String(createdById(o)) === authorId : true))
-        .filter((o) => (statusKey ? (jobStatus(o, { userName })?.key || "none") === statusKey : true))
-        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
-    [items, authorId, statusKey, userName],
-  );
+  // The API filters and orders them, newest first.
+  const rows = items;
 
   const columns = useMemo(() => {
     const byStage = new Map();
@@ -151,7 +152,7 @@ export default function PipelinePage() {
         title="Pipeline"
         description={
           ready
-            ? `${rows.length} opportunit${rows.length === 1 ? "y" : "ies"}.${
+            ? `${total} opportunit${total === 1 ? "y" : "ies"}.${
                 view === "board" && movableStages.length
                   ? ` Drag a card to move it into the next stage — you can move ${movableStages.map((s) => s.short).join(", ")}.`
                   : ""
@@ -265,11 +266,11 @@ export default function PipelinePage() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      {status === "loading" && !ready ? (
+      {loading && !rows.length ? (
         <div className="card card-pad">
           <LoadingState label="Loading pipeline…" />
         </div>
-      ) : rows.length === 0 ? (
+      ) : ready && rows.length === 0 ? (
         <div className="card card-pad">
           <EmptyState
             title="Nothing to show"
@@ -278,7 +279,7 @@ export default function PipelinePage() {
         </div>
       ) : view === "list" ? (
         <div className="card card-pad">
-          <div className="table-wrap">
+          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
             <table className="table clickable stack">
               <thead>
                 <tr>
@@ -322,6 +323,7 @@ export default function PipelinePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} total={total} onPageChange={setPage} noun="opportunities" loading={loading} />
         </div>
       ) : (
         <div className="kanban">
@@ -369,16 +371,11 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* One control for the whole board: a card's column depends on its stage,
-          so the next page feeds every column at once rather than one of them. */}
-      <LoadMore
-        loaded={loaded}
-        total={total}
-        hasMore={hasMore}
-        loading={loadingMore}
-        onMore={loadMore}
-        noun="opportunities"
-      />
+      {view === "board" && total > rows.length ? (
+        <p className="row-meta" style={{ marginTop: 10 }}>
+          Showing the newest {rows.length} of {total} opportunities. Narrow the filters, or use the list to page through them all.
+        </p>
+      ) : null}
     </>
   );
 }

@@ -102,6 +102,14 @@ const employeeSlice = createSlice({
       .addCase(fetchUsers.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload;
+        // Recorded as asked, so the page does not ask again on its own: it
+        // compares this with what it wants, and a failure left unrecorded
+        // made it refetch in a loop (loading → failed → loading…). Trying
+        // again is the "Try again" button's job. The list held is another
+        // query's, so it goes.
+        state.query = action.meta.arg ?? {};
+        state.items = [];
+        state.total = 0;
       })
       .addCase(fetchDirectory.pending, (state, action) => {
         state.directory.status = "loading";

@@ -20,7 +20,7 @@ import ApprovalsStagePanel from "@/features/approvals/ApprovalsStagePanel";
 import { APPROVALS_STAGE } from "@/constants/approvals";
 import ProposalStagePanel from "@/features/proposals/ProposalStagePanel";
 import { PROPOSAL_STAGE_ID } from "@/helpers/proposals";
-import { PROCUREMENT_STAGE } from "@/lib/mockData/procurement";
+import { PROCUREMENT_STAGE } from "@/constants/procurement";
 import { enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { canAdvanceFrom, stageHiddenReason, viewableStages } from "@/helpers/stageAccess";

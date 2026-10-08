@@ -201,7 +201,7 @@ export default function LeadInputs({
 }) {
   const dispatch = useAppDispatch();
   const { notify, error: notifyError } = useNotifications();
-  const { active, sales } = useUnitUsers();
+  const { active } = useUnitUsers();
   const [saving, setSaving] = useState(false);
   // Assigning the blanks back to sales: tick the rows, then raise one
   // information request for all of them. Starts on whatever sales left out,
@@ -342,7 +342,7 @@ export default function LeadInputs({
           kind="information"
           department="sales"
           template="site_details"
-          people={sales.length ? sales : active}
+          people={active}
           initial={{
             title: `Lead information needed — ${pickedRows.length} item${pickedRows.length === 1 ? "" : "s"}`,
             fields: pickedRows

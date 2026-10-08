@@ -6,17 +6,18 @@
 // receipt with the deliveries, and CL-10 job creation in Green Deal, which
 // opens once the variation approval and the material receipt are complete.
 //
-// `job` comes from useProcurementChecklists (it carries `checklist`, and its
-// Green Deal record follows CL-10); `onChecklistChange(sectionKey, patch)`
-// changes the answers. `canEdit` — may complete the coordinator's items
-// (procurement.update); `canApprove` — may sign the Procurement Manager's
-// (procurement.approve).
+// `job` comes from useProcurementJob (it carries `checklist`, and what the
+// answers settle is already applied); the `on…` handlers are that hook's
+// writes. `canEdit` — may work the stage (procurement.update); `canApprove` —
+// may sign the Procurement Manager's items (procurement.approve); `user` —
+// whose roles decide whether the approval buttons show.
 //
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-6 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
 import { BellRing, ClipboardCheck, Clock, FileText, Leaf, PackageCheck, PackageSearch, Percent, Truck } from "lucide-react";
+import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
 import Tabs from "@/components/Tabs";
@@ -45,7 +46,24 @@ const SECTION_FOR_TAB = { boq: "boq", quote: "quote", po: "po", receipt: "receip
 const tabForStep = (step) => TAB_FOR_STEP[step] ?? "boq";
 const stepForTab = (tab, step) => (tab === "boq" ? (step === "matching" ? "matching" : "boq") : (STEP_FOR_TAB[tab] ?? null));
 
-export default function ProcurementWorkflow({ job, canEdit = false, canApprove = false, onChecklistChange, embedded = false }) {
+export default function ProcurementWorkflow({
+  job,
+  canEdit = false,
+  canApprove = false,
+  user = null,
+  error = null,
+  onClearError,
+  onChecklistChange,
+  onUpload,
+  onSaveBoq,
+  onAddQuote,
+  onRemoveQuote,
+  onCreatePurchaseOrder,
+  onUpdatePurchaseOrder,
+  onDeletePurchaseOrder,
+  onDecide,
+  embedded = false,
+}) {
   const step = currentStep(job);
   const [tab, setTab] = useState(tabForStep(step));
 
@@ -74,38 +92,59 @@ export default function ProcurementWorkflow({ job, canEdit = false, canApprove =
     { key: "po", label: "PO release", icon: <Truck size={14} />, count: count("po") },
     { key: "receipt", label: "Material receipt", icon: <PackageCheck size={14} />, count: count("receipt") },
     { key: "green_deal", label: "Job creation", icon: <Leaf size={14} />, count: count("jobCreation") },
-    { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length },
+    { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length || undefined },
   ];
 
   const section = procurementChecklistOf(SECTION_FOR_TAB[tab]);
   const checklistFor = (key) => {
     const entry = procurementChecklistOf(key);
-    return <ProcurementChecklist section={entry} job={job} canEdit={canEdit} canApprove={canApprove} onChange={(patch) => onChecklistChange?.(entry.key, patch)} />;
+    return (
+      <ProcurementChecklist
+        section={entry}
+        job={job}
+        canEdit={canEdit}
+        canApprove={canApprove}
+        onChange={(patch) => onChecklistChange?.(entry.key, patch)}
+        upload={canEdit || canApprove ? onUpload : null}
+      />
+    );
   };
 
   const body = (
     <>
       <WorkflowSteps current={step} viewing={stepForTab(tab, step)} round={currentRound(job)} onSelect={(key) => setTab(tabForStep(key))} />
+      {error ? (
+        <Alert tone="danger" style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <span>{error}</span>
+            {onClearError ? (
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={onClearError}>
+                Dismiss
+              </button>
+            ) : null}
+          </div>
+        </Alert>
+      ) : null}
       <Tabs items={tabs} value={tab} onChange={setTab} />
       <div className="panel">
         {tab === "boq" ? (
           <>
-            <BoqVerification job={job} />
+            <BoqVerification job={job} canEdit={canEdit} onSave={onSaveBoq} />
             <div className="cl-divider" />
             {checklistFor("boq")}
           </>
         ) : tab === "quote" ? (
           <>
-            <SupplierQuotes job={job} />
+            <SupplierQuotes job={job} canEdit={canEdit} onAdd={onAddQuote} onRemove={onRemoveQuote} />
             {checklistFor("quote")}
           </>
         ) : tab === "variation" ? (
           <PriceVariationCheck job={job} />
         ) : tab === "approvals" ? (
-          <ApprovalsPanel job={job} />
+          <ApprovalsPanel job={job} user={user} onDecide={onDecide} />
         ) : tab === "po" ? (
           <>
-            <PurchaseOrders job={job} />
+            <PurchaseOrders job={job} canEdit={canEdit} onCreate={onCreatePurchaseOrder} onUpdate={onUpdatePurchaseOrder} onDelete={onDeletePurchaseOrder} />
             <div className="cl-divider" />
             {checklistFor("po")}
           </>
@@ -123,13 +162,14 @@ export default function ProcurementWorkflow({ job, canEdit = false, canApprove =
     </>
   );
 
+  const people = [job.salesperson ? `${job.salesperson} (sales)` : null, job.coordinator ? `${job.coordinator} (coordinator)` : null].filter(Boolean);
+  const accepted = job.acceptedValue !== null && job.acceptedValue !== undefined ? `${formatCurrency(job.acceptedValue)} accepted` : null;
+
   if (embedded) {
     return (
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-          <span className="row-meta">
-            {job.number} · {job.customer} · {formatCurrency(job.acceptedValue)} accepted
-          </span>
+          <span className="row-meta">{[job.number, job.customer, accepted].filter(Boolean).join(" · ")}</span>
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
         {body}
@@ -141,7 +181,7 @@ export default function ProcurementWorkflow({ job, canEdit = false, canApprove =
     <Card
       title={`${job.number} · ${job.customer}`}
       icon={<PackageSearch size={16} />}
-      sub={`${job.site} · ${formatCurrency(job.acceptedValue)} accepted · ${job.salesperson} (sales) · ${job.coordinator} (procurement)`}
+      sub={[job.site, accepted, ...people].filter(Boolean).join(" · ")}
       actions={<Badge tone={status.tone}>{status.label}</Badge>}
     >
       {body}

@@ -76,8 +76,6 @@ export function emptyLeadForm() {
     salespersonId: "",
     unassignedReason: "",
     customFields: [],
-    // Which approvals the job will need at stage 5 — keys from the unit's catalogue.
-    requiredApprovals: [],
     potential: "",
     notPotentialReason: "",
   };
@@ -168,7 +166,6 @@ export function leadToForm(opp) {
     customFields: Array.isArray(opp.customFields)
       ? opp.customFields.map((f) => ({ label: str(f?.label), value: str(f?.value) }))
       : [],
-    requiredApprovals: Array.isArray(opp.requiredApprovals) ? opp.requiredApprovals.map(String) : [],
     potential: opp.qualification === "qualified" ? "yes" : opp.qualification === "disqualified" ? "no" : "",
     notPotentialReason: str(opp.notPotentialReason),
   };
@@ -205,10 +202,66 @@ export function isAutomatedSource(source) {
  */
 const DECISION_KEYS = ["qualification", "potential", "notPotentialReason"];
 
-export function autosavePayload(form) {
-  const payload = formToPayload(form);
+export function autosavePayload(form, base) {
+  const payload = changedPayload(form, base);
   for (const key of DECISION_KEYS) delete payload[key];
   return payload;
+}
+
+/**
+ * Two payload values that mean the same: blanks of any kind, numbers against
+ * the DECIMAL strings the API returns ("5000.00" and 5000), and objects by
+ * their contents. Numbers only match numbers when one side really is a number,
+ * so a postcode "0800" is never taken for "800".
+ */
+const sameValue = (a, b) => {
+  if (a === b) return true;
+  const blankA = a === null || a === undefined || a === "";
+  const blankB = b === null || b === undefined || b === "";
+  if (blankA || blankB) return blankA && blankB;
+  if (typeof a === "object" || typeof b === "object") return JSON.stringify(a) === JSON.stringify(b);
+  if ((typeof a === "number" || typeof b === "number") && typeof a !== "boolean" && typeof b !== "boolean")
+    return Number(a) === Number(b);
+  return String(a) === String(b);
+};
+
+/**
+ * Only what this screen changed, measured against `base` — the record as it
+ * was when the form was built from it. Every save used to send the whole
+ * pack, all ~40 estimation inputs included, so a field nobody touched here
+ * went back as it was loaded and wiped whatever estimation had written since.
+ * Both sides go through formToPayload, so values the form derives (the full
+ * name, a billing address that is the site's) compare like for like; the
+ * estimation inputs are compared key by key, and the API merges them.
+ */
+export function changedPayload(form, base) {
+  const now = formToPayload(form);
+  const before = formToPayload(leadToForm(base));
+  const body = {};
+  for (const [key, value] of Object.entries(now)) {
+    if (key === "estimationInput") {
+      const changed = Object.entries(value).filter(([inputKey, inputValue]) => !sameValue(inputValue, before.estimationInput?.[inputKey]));
+      if (changed.length) body.estimationInput = Object.fromEntries(changed);
+    } else if (!sameValue(value, before[key])) {
+      body[key] = value;
+    }
+  }
+  return body;
+}
+
+/**
+ * Form fields the PATCH never carries: the assignments go through their own
+ * endpoints on Save, and the Potential decision waits for Save too (autosave
+ * leaves it out). They still count as unsaved work, and a refresh after an
+ * autosave must not put them back to what the record says.
+ */
+export const LOCAL_UNTIL_SAVED = ["salespersonId", "estimatorId", "unassignedReason", "potential", "notPotentialReason"];
+
+/** Whether the form holds anything not yet on the record `base`. */
+export function hasChanges(form, base) {
+  if (Object.keys(changedPayload(form, base)).length) return true;
+  const before = leadToForm(base);
+  return LOCAL_UNTIL_SAVED.some((key) => !sameValue(form[key], before[key]));
 }
 
 /**
@@ -280,7 +333,8 @@ export function formToPayload(form) {
     customFields: (form.customFields || [])
       .map((f) => ({ label: trim(f.label), value: trim(f.value) }))
       .filter((f) => f.label || f.value),
-    requiredApprovals: Array.isArray(form.requiredApprovals) ? form.requiredApprovals : [],
+    // requiredApprovals is not the lead form's: estimation and the approvals
+    // stage set it (PUT /required-approvals), so it is never sent from here.
     potential: form.potential || null,
     notPotentialReason: form.potential === "no" ? trim(form.notPotentialReason) : "",
     estimationInput: pickEstimationInput(form),

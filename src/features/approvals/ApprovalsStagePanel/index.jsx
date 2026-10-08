@@ -24,7 +24,7 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
   const { hasPermission } = useAuth();
   const canApprove = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
   const [tab, setTab] = useState("approvals");
-  const { job, status, error, updateChecklist, updateItem, setRequired } = useApprovalJob(opp?.id);
+  const { job, status, error, saveError, dismissSaveError, updateChecklist, updateItem, setRequired } = useApprovalJob(opp?.id);
   const notThereYet = Number(opp?.stage) < APPROVALS_STAGE.id;
 
   return (
@@ -53,8 +53,8 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
         <StageRequestsPanel opp={opp} stage={stage.id} unit={unit} canEdit={canEdit} />
       ) : notThereYet ? (
         <Alert tone="info">
-          <strong>Approvals marked as required so far:</strong> {requiredApprovalsLabel(opp, unit, "none yet")}. Sales ticks them on the lead
-          and estimation confirms them; each one is tracked here once the customer accepts the proposal.
+          <strong>Approvals marked as required so far:</strong> {requiredApprovalsLabel(opp, unit, "none yet")}. Estimation marks them
+          on the job; each one is tracked here once the customer accepts the proposal.
         </Alert>
       ) : status === "failed" ? (
         <Alert tone="danger">{error || "The job's approvals could not be loaded."}</Alert>
@@ -72,6 +72,8 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
             if (next && Number(next.stage) !== Number(opp.stage)) onMoved?.();
           }}
           onSetRequired={setRequired}
+          saveError={saveError}
+          onDismissSaveError={dismissSaveError}
         />
       )}
     </div>

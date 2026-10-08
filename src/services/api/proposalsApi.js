@@ -26,11 +26,16 @@
 //     completedAt, completedBy, estimatorNote, revisedQuoteVersion: { id, version, quoteNumber, grandTotal } | null }
 // The open round also rides on the opportunity record as `requote`.
 
-import { apiClient, unwrap } from "./client";
+import { apiClient, unwrap, unwrapList } from "./client";
 
 /** Stage-3 jobs with their latest proposal and quote, plus ones answered in the last 30 days. */
-export async function getProposalBoard({ businessUnitId, search } = {}) {
-  return unwrap(await apiClient.get("/opportunities/proposals", { params: { businessUnitId, search: search || undefined } }));
+/**
+ * The proposals board, a page at a time, newest first.
+ * params: { businessUnitId, search?, bucket?: draft | waiting | changes | requote | accepted | declined, page, pageSize }
+ * → { items, total, page, pageSize, counts: { all, draft, waiting, changes, requote, accepted, declined } }
+ */
+export async function getProposalBoard(params = {}) {
+  return unwrapList(await apiClient.get("/opportunities/proposals", { params }));
 }
 
 /** Every proposal sent on a job, newest first. */

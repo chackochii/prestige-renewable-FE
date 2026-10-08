@@ -13,9 +13,12 @@
 //              another owner signs (item.owner); both false = read only
 // locked     — a sentence saying why the checklist cannot be worked yet, or null
 // autoRows   — (source) => [[label, value, missingText?]] for auto items
+// upload     — async (itemKey, files) => [{ id, filename, url }]: where a stage
+//              files the documents attached on an item. Without it, files are
+//              kept by name with the answers.
 
-import { useRef } from "react";
-import { Check, Leaf, Lock, Paperclip, Send, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, ExternalLink, Leaf, Lock, Paperclip, Send, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -43,13 +46,33 @@ function AutoRows({ rows }) {
   );
 }
 
-/** Attached documents: kept by name with the checklist until a service takes uploads. */
-function FilePicker({ id, files = [], onChange, disabled }) {
+/**
+ * Attached documents. With an uploader they go on the job and come back with a
+ * link; without one they are kept by name with the checklist.
+ */
+function FilePicker({ id, files = [], onChange, disabled, upload = null }) {
   const inputRef = useRef(null);
-  const add = (list) => {
-    const added = Array.from(list || []).map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}`, filename: file.name }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const add = async (list) => {
+    const chosen = Array.from(list || []);
+    if (!chosen.length) return;
     const known = new Set(files.map((file) => file.id));
-    onChange([...files, ...added.filter((file) => !known.has(file.id))]);
+    if (!upload) {
+      const added = chosen.map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}`, filename: file.name }));
+      onChange([...files, ...added.filter((file) => !known.has(file.id))]);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const uploaded = await upload(chosen);
+      onChange([...files, ...uploaded.filter((file) => !known.has(file.id))]);
+    } catch (err) {
+      setError(typeof err === "string" ? err : err?.message || "The file could not be uploaded.");
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="cl-files">
@@ -59,7 +82,13 @@ function FilePicker({ id, files = [], onChange, disabled }) {
             <div className="list-row" key={file.id}>
               <span style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
                 <Paperclip size={14} />
-                <span className="row-title cl-filename">{file.filename}</span>
+                {file.url ? (
+                  <a className="row-title cl-filename" href={file.url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    {file.filename} <ExternalLink size={12} />
+                  </a>
+                ) : (
+                  <span className="row-title cl-filename">{file.filename}</span>
+                )}
               </span>
               {!disabled ? (
                 <button type="button" className="btn btn-ghost btn-sm" aria-label={`Remove ${file.filename}`} onClick={() => onChange(files.filter((f) => f.id !== file.id))}>
@@ -72,10 +101,11 @@ function FilePicker({ id, files = [], onChange, disabled }) {
       ) : (
         <span className="row-meta">Nothing attached yet.</span>
       )}
+      {error ? <span className="row-meta cl-missing">{error}</span> : null}
       {!disabled ? (
         <>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => inputRef.current?.click()}>
-            <Paperclip size={14} /> Attach {files.length ? "another" : "file"}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => inputRef.current?.click()} disabled={busy}>
+            <Paperclip size={14} /> {busy ? "Uploading…" : `Attach ${files.length ? "another" : "file"}`}
           </button>
           <input
             ref={inputRef}
@@ -120,9 +150,10 @@ const YES_NO = [
   { value: "no", label: "No" },
 ];
 
-export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange }) {
+export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange, upload = null }) {
   const summary = checklistSummary(section, answers, ctx, { locked: Boolean(locked) });
   const set = (key, value) => onChange?.({ [key]: value });
+  const uploaderFor = (key) => (upload ? (files) => upload(key, files) : null);
   // A locked checklist is shown, not hidden — the coordinator can see what is coming.
   const editable = (item) => !locked && (item?.owner ? canApprove : canEdit);
   const owners = [...new Set(section.items.map((item) => item.owner).filter(Boolean))];
@@ -150,7 +181,7 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
           </label>
         );
       case "files":
-        return <FilePicker id={id} files={value ?? []} onChange={onValue} disabled={disabled} />;
+        return <FilePicker id={id} files={value ?? []} onChange={onValue} disabled={disabled} upload={uploaderFor(field.key)} />;
       case "auto":
         return <AutoRows rows={autoRows(field.source)} />;
       default:
@@ -247,14 +278,14 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
                   <span className="row-title">{slot.label}</span>
                   {documents[slot.key]?.length ? <Badge tone="success">Attached</Badge> : <Badge tone="neutral">Missing</Badge>}
                 </div>
-                <FilePicker id={`${id}-${slot.key}`} files={documents[slot.key] ?? []} disabled={disabled} onChange={(files) => set("documents", { ...documents, [slot.key]: files })} />
+                <FilePicker id={`${id}-${slot.key}`} files={documents[slot.key] ?? []} disabled={disabled} upload={uploaderFor(slot.key)} onChange={(files) => set("documents", { ...documents, [slot.key]: files })} />
               </div>
             ))}
           </div>
         );
       }
       case "files":
-        return <FilePicker id={id} files={answers[item.key] ?? []} disabled={disabled} onChange={(files) => set(item.key, files)} />;
+        return <FilePicker id={id} files={answers[item.key] ?? []} disabled={disabled} upload={uploaderFor(item.key)} onChange={(files) => set(item.key, files)} />;
       case "status": {
         const current = statusOf(section, answers);
         const stale = statusBlockers(section, answers, ctx, current.value);

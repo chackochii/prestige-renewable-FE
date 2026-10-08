@@ -171,7 +171,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const quote = useAppSelector((s) => s.leads.quote);
   const { oppId: collabOppId, byOpp } = useAppSelector((s) => s.collaboration);
   const requests = collabOppId === Number(opp.id) ? byOpp : [];
-  const { active, siteOps } = useUnitUsers();
+  const { active } = useUnitUsers();
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadingSketches, setUploadingSketches] = useState(false);
   // Sales edited the lead pack after this reached estimation. Dismissing
@@ -258,8 +258,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
       await dispatch(collectEstimationInputs({ id: opp.id, body: { input: { [field]: value } } })).unwrap();
     });
 
-  // Which approvals the job will need at stage 5 — sales may have ticked
-  // some on the lead; estimation confirms the list. Stage 5 tracks only these.
+  // Which approvals the job will need at stage 5 — estimation marks the list
+  // (the lead form no longer asks sales). Stage 5 tracks only these.
   const saveRequiredApprovals = (keys) => run(() => dispatch(updateRequiredApprovals({ id: opp.id, keys })).unwrap());
 
   const answerClientInfo = (needed) => {
@@ -296,14 +296,28 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const findingsIn = inspectionDelivered(inspection);
   const findingsApproved = inspectionApproved(inspection);
   const preSiteResolved = preSiteInspectionRequired === false || findingsApproved;
+  // What the API asks before the job may leave estimation (prestige-be
+  // estimationService.preSiteInspectionBlocker): no inspection needed — the
+  // estimator's answer, else the lead's — or the latest one's findings
+  // approved. It applies whichever way the client-input question went: a lead
+  // that said "inspection: yes" needs it even when no client input was asked
+  // for, so the quote and the hand-over wait on it too.
+  const needsInspection = preSiteInspectionRequired === true;
+  const inspectionCleared = !needsInspection || findingsApproved;
+  const inspectionMissing = inspectionCleared
+    ? []
+    : [inspection ? `Approve the pre-site inspection findings (${requestCode(inspection)})` : "Request the pre-site inspection and approve its findings"];
   // The quote waits on the requirements checklist as well, whichever way the
   // client-input question went.
   const showQuoteBuilder =
-    requirementsChecklistComplete && (state === "ready" || (showEstimatorChecklist && preSiteResolved));
+    requirementsChecklistComplete && inspectionCleared && (state === "ready" || (showEstimatorChecklist && preSiteResolved));
+  // The pre-site visit tab is open whenever there is a visit to deal with,
+  // not only when the estimator's checklist is.
+  const showSiteVisit = showEstimatorChecklist || needsInspection;
 
   // One flag per tab, for the tick on the tab and for choosing where to open.
   const requirementsDone = requirementsChecklistComplete && opp.estimationClientInfoNeeded != null;
-  const siteVisitDone = showEstimatorChecklist && preSiteResolved;
+  const siteVisitDone = showSiteVisit && preSiteResolved;
   const quoteDone = Boolean(quote?.items?.length);
 
   // Sales sent the job back from proposal: the customer wants changes, and
@@ -315,7 +329,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const [tab, setTab] = useState(() => {
     if (requote && showQuoteBuilder) return "quote";
     if (!requirementsDone) return "requirements";
-    if (showEstimatorChecklist && !siteVisitDone) return "site-visit";
+    if (showSiteVisit && !siteVisitDone) return "site-visit";
     return showQuoteBuilder ? "quote" : "requirements";
   });
 
@@ -483,7 +497,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
       ) : null}
 
       {tab === "site-visit" ? (
-        showEstimatorChecklist ? (
+        showSiteVisit ? (
           <div className="section">
             <QuestionBlock title="Is a pre-site inspection required?">
               <YesNo value={preSiteInspectionRequired} onChange={answerPreSite} disabled={!canEdit || saving} />
@@ -606,7 +620,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                 ? "The quote opens once the requirements checklist on the first tab is complete."
                 : findingsIn && !findingsApproved
                   ? "The pre-site inspection findings are in — approve them on the pre-site visit tab and the quote opens."
-                  : "The quote opens once estimation is ready — requirements confirmed and, if one is needed, the pre-site inspection approved."
+                  : needsInspection && !inspection
+                    ? "This job needs a pre-site inspection — request it on the pre-site visit tab. The quote opens once its findings are approved."
+                    : "The quote opens once estimation is ready — requirements confirmed and, if one is needed, the pre-site inspection approved."
             }
           />
         )
@@ -614,7 +630,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
       {tab === "handover" ? (
         showQuoteBuilder && quoteDone ? (
-          <ProposalHandover opp={opp} unit={unit} requote={requote} onSent={onSent} />
+          <ProposalHandover opp={opp} unit={unit} requote={requote} onSent={onSent} inspectionMissing={inspectionMissing} />
         ) : (
           <LockedStep
             title="Nothing to send yet"
@@ -637,7 +653,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           kind="assignment"
           template="pre_site_inspection"
           department="operations"
-          people={siteOps.length ? siteOps : active}
+          people={active}
           onClose={() => setRequestingInspection(false)}
           onSubmit={async (body) => {
             await dispatch(
