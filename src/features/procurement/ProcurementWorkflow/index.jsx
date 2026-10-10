@@ -1,7 +1,9 @@
 // One job's passage through procurement & delivery: the step strip across the
 // top says where it is, the tabs open each step's records with the
-// checklist that belongs to it — CL-11 BOQ vs site with the BOQ table, CL-12
-// supplier quote with the quotes received, the price variation and its
+// checklist that belongs to it — CL-11 BOQ vs site with the BOQ table and the
+// coordinator's completed pre-site inspections and the order-list PDF, CL-12
+// supplier quote with the quotes received and the per-line pricing taken
+// from them, the price variation and its
 // approvals, CL-13 PO release with the purchase orders, CL-14 material
 // receipt with the deliveries, and CL-10 job creation in Green Deal, which
 // opens once the variation approval and the material receipt are complete.
@@ -9,25 +11,32 @@
 // `job` comes from useProcurementJob (it carries `checklist`, and what the
 // answers settle is already applied); the `on…` handlers are that hook's
 // writes. `canEdit` — may work the stage (procurement.update); `canApprove` —
-// may sign the Procurement Manager's items (procurement.approve); `user` —
-// whose roles decide whether the approval buttons show.
+// may sign the Procurement Manager's items (procurement.approve). Price-
+// variation approvals are not decided here: the coordinator requests them and
+// the approver answers on the request (see ApprovalsPanel).
+//
+// `requests` — the stage's Request / Response panel, shown as the last tab
+// when given (the opportunity page passes it; the procurement page does not).
 //
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-6 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { BellRing, ClipboardCheck, Clock, FileText, Leaf, PackageCheck, PackageSearch, Percent, Truck } from "lucide-react";
+import { BellRing, ClipboardCheck, Clock, FileText, HandHelping, Leaf, PackageCheck, PackageSearch, Percent, Truck } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
 import Tabs from "@/components/Tabs";
 import ApprovalsPanel from "@/features/procurement/ApprovalsPanel";
+import BoqOrderList from "@/features/procurement/BoqOrderList";
+import BoqPricing from "@/features/procurement/BoqPricing";
 import BoqVerification from "@/features/procurement/BoqVerification";
 import Deliveries from "@/features/procurement/Deliveries";
 import PriceVariationCheck from "@/features/procurement/PriceVariationCheck";
 import ProcurementChecklist from "@/features/procurement/ProcurementChecklist";
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
 import PurchaseOrders from "@/features/procurement/PurchaseOrders";
+import SiteInspectionLinks from "@/features/procurement/SiteInspectionLinks";
 import SupplierQuotes from "@/features/procurement/SupplierQuotes";
 import WorkflowSteps from "@/features/procurement/WorkflowSteps";
 import { PROCUREMENT_CHECKLISTS, procurementChecklistOf } from "@/constants/procurementChecklists";
@@ -50,7 +59,6 @@ export default function ProcurementWorkflow({
   job,
   canEdit = false,
   canApprove = false,
-  user = null,
   error = null,
   onClearError,
   onChecklistChange,
@@ -61,7 +69,7 @@ export default function ProcurementWorkflow({
   onCreatePurchaseOrder,
   onUpdatePurchaseOrder,
   onDeletePurchaseOrder,
-  onDecide,
+  requests = null,
   embedded = false,
 }) {
   const step = currentStep(job);
@@ -93,10 +101,11 @@ export default function ProcurementWorkflow({
     { key: "receipt", label: "Material receipt", icon: <PackageCheck size={14} />, count: count("receipt") },
     { key: "green_deal", label: "Job creation", icon: <Leaf size={14} />, count: count("jobCreation") },
     { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length || undefined },
+    ...(requests ? [{ key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> }] : []),
   ];
 
   const section = procurementChecklistOf(SECTION_FOR_TAB[tab]);
-  const checklistFor = (key) => {
+  const checklistFor = (key, intro = null) => {
     const entry = procurementChecklistOf(key);
     return (
       <ProcurementChecklist
@@ -106,6 +115,7 @@ export default function ProcurementWorkflow({
         canApprove={canApprove}
         onChange={(patch) => onChecklistChange?.(entry.key, patch)}
         upload={canEdit || canApprove ? onUpload : null}
+        intro={intro}
       />
     );
   };
@@ -131,17 +141,20 @@ export default function ProcurementWorkflow({
           <>
             <BoqVerification job={job} canEdit={canEdit} onSave={onSaveBoq} />
             <div className="cl-divider" />
-            {checklistFor("boq")}
+            {checklistFor("boq", <SiteInspectionLinks job={job} />)}
+            <BoqOrderList job={job} />
           </>
         ) : tab === "quote" ? (
           <>
             <SupplierQuotes job={job} canEdit={canEdit} onAdd={onAddQuote} onRemove={onRemoveQuote} />
+            <BoqPricing job={job} canEdit={canEdit} onSave={onSaveBoq} />
+            <div className="cl-divider" />
             {checklistFor("quote")}
           </>
         ) : tab === "variation" ? (
           <PriceVariationCheck job={job} />
         ) : tab === "approvals" ? (
-          <ApprovalsPanel job={job} user={user} onDecide={onDecide} />
+          <ApprovalsPanel job={job} canEdit={canEdit} />
         ) : tab === "po" ? (
           <>
             <PurchaseOrders job={job} canEdit={canEdit} onCreate={onCreatePurchaseOrder} onUpdate={onUpdatePurchaseOrder} onDelete={onDeletePurchaseOrder} />
@@ -153,6 +166,8 @@ export default function ProcurementWorkflow({
             <Deliveries job={job} />
             {checklistFor("receipt")}
           </>
+        ) : tab === "requests" && requests ? (
+          requests
         ) : section ? (
           checklistFor(section.key)
         ) : (

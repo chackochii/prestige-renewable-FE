@@ -7,6 +7,9 @@
 //     accepted or sent back for clarification.
 //   - assignment  — "Operations, we need a site visit." Worked over time:
 //     scheduled, progressed, completed, reported on.
+//   - approval    — "Sales manager, approve this price variation." Raised from
+//     the procurement approvals tab; the assignee approves or rejects it with
+//     a note, and the decision lands on the job's approval.
 //
 // Statuses are data, not code: the flows below are the defaults the frontend
 // understands, and any status the API sends that isn't listed still renders
@@ -25,7 +28,19 @@ export const REQUEST_KINDS = {
     short: "Assignment",
     prefix: "ASG",
   },
+  approval: {
+    key: "approval",
+    label: "Approval request",
+    short: "Approval",
+    prefix: "APR",
+  },
 };
+
+/**
+ * Which department an approval request for a price-variation approver goes
+ * to (prestige-be collaborationRequest.js APPROVAL_ROLE_BY_DEPARTMENT).
+ */
+export const APPROVAL_DEPARTMENT_FOR_ROLE = { SMM: "sales", BO: "admin" };
 
 /** Departments a request can be sent to. The API may add its own. */
 export const DEPARTMENTS = [
@@ -139,8 +154,16 @@ export const ASSIGNMENT_STATUSES = [
   { key: "cancelled", label: "Cancelled", tone: "neutral", open: false, step: 0 },
 ];
 
+/** Approval requests: pending → approved or rejected. */
+export const APPROVAL_STATUSES = [
+  { key: "pending", label: "Awaiting approval", tone: "warning", open: true, step: 1 },
+  { key: "approved", label: "Approved", tone: "success", open: false, step: 2 },
+  { key: "rejected", label: "Rejected", tone: "danger", open: false, step: 2 },
+  { key: "cancelled", label: "Cancelled", tone: "neutral", open: false, step: 0 },
+];
+
 export function statusesFor(kind) {
-  return kind === "assignment" ? ASSIGNMENT_STATUSES : INFORMATION_STATUSES;
+  return kind === "assignment" ? ASSIGNMENT_STATUSES : kind === "approval" ? APPROVAL_STATUSES : INFORMATION_STATUSES;
 }
 
 /** Never throws on a status the API added — it just shows as-is. */
@@ -192,6 +215,20 @@ export function canDecide(request, user) {
   return ["responded", "under_review"].includes(request.status);
 }
 
+/** The person asked approving or rejecting an approval request. */
+export function canApprove(request, user) {
+  return request?.kind === "approval" && isAssignee(request, user) && request.status === "pending";
+}
+
+/** The approval requests on a job for one approver role, newest first. */
+export function approvalRequestsFor(requests = [], role) {
+  const department = APPROVAL_DEPARTMENT_FOR_ROLE[role];
+  return requests
+    .filter((r) => r.kind === "approval" && r.department === department && r.status !== "cancelled")
+    .slice()
+    .sort((a, b) => Number(b.id) - Number(a.id));
+}
+
 /** The coordinator moving an assignment along. */
 export function canProgress(request, user) {
   if (request?.kind !== "assignment" || !isAssignee(request, user)) return false;
@@ -218,6 +255,7 @@ export function visibleProgress(request, user) {
 export function contextualAction(request, user) {
   if (!request) return null;
   if (canRespond(request, user)) return { key: "respond", label: "Respond" };
+  if (canApprove(request, user)) return { key: "approve", label: "Approve or reject" };
   if (canProgress(request, user)) return { key: "progress", label: "Update progress" };
   if (canDecide(request, user)) {
     return request.kind === "information"
@@ -271,6 +309,18 @@ export function inspectionRequests(requests = []) {
     .filter((r) => r.kind === "assignment" && r.department === "operations" && r.status !== "cancelled")
     .slice()
     .sort((a, b) => Number(b.id) - Number(a.id));
+}
+
+/**
+ * The pre-site inspections on a job that the given coordinator was asked to do
+ * and that have come back — findings in or approved — newest first. What
+ * procurement reads when checking the BOQ against the site.
+ */
+export function completedInspectionsFor(requests = [], coordinatorId) {
+  if (!coordinatorId) return [];
+  return inspectionRequests(requests).filter(
+    (r) => Number(r.assigneeId) === Number(coordinatorId) && (inspectionDelivered(r) || inspectionApproved(r)),
+  );
 }
 
 /**

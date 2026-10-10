@@ -166,12 +166,8 @@ export const PROCUREMENT_CHECKLISTS = [
         onlyIf: "variationNeedsApproval",
         waitingOn: ["variationChecked"],
         notNeeded: "Not needed — the quoted cost matches the proposal.",
-        note: "Below 5%: the sales manager approves. 5% or more: the business owner and the sales manager.",
-        fields: [
-          { key: "__variationApprovals", label: "Approvals", kind: "auto", source: "variationApprovals" },
-          { key: "variationApproved", label: "Required approval obtained", kind: "checkbox" },
-          { key: "variationApprovedBy", label: "Approved by", kind: "text", optional: true, placeholder: "e.g. Sam Okafor (sales manager), 22 Sept" },
-        ],
+        note: "Below 5%: the sales manager approves. 5% or more: the business owner and the sales manager. Taken from the Approvals tab — each approver decides on their own approval request, so it cannot be ticked here.",
+        fields: [{ key: "__variationApprovals", label: "Approvals", kind: "auto", source: "variationApprovals" }],
       },
       {
         key: "supplierConfirmed",

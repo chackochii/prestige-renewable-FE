@@ -150,7 +150,7 @@ const YES_NO = [
   { value: "no", label: "No" },
 ];
 
-export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange, upload = null }) {
+export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange, upload = null, intro = null }) {
   const summary = checklistSummary(section, answers, ctx, { locked: Boolean(locked) });
   const set = (key, value) => onChange?.({ [key]: value });
   const uploaderFor = (key) => (upload ? (files) => upload(key, files) : null);
@@ -376,6 +376,8 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
         </div>
         <Badge tone={summary.tone}>{summary.label}</Badge>
       </div>
+
+      {intro}
 
       {section.optional ? (
         <label className="check cl-check cl-applies">

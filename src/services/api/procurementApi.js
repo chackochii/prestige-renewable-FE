@@ -14,7 +14,7 @@
 //     sections: { boq, quote, po, receipt, jobCreation } (complete or not, as the API reads it),
 //     history: [{ at, by, action, detail }], notifications: [{ at, rule, to, priority, message }] }
 // A BOQ line:
-//   { key, kind: material | service, item, brand, unit, proposalQty, siteQty,
+//   { key, kind: material | service, item, brand, unit, proposalQty, siteQty, inInventory,
 //     proposalUnitCost, quotedUnitCost | null, supplier, availability, leadTimeDays }
 // The board and the single job return the same shape, so the procurement page
 // is one request and opening a job on it is none. Every write returns the job.

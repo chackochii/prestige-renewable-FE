@@ -35,7 +35,7 @@ export default function PriceVariationCheck({ job }) {
       <>
         <Alert tone="info">
           Waiting on supplier quotes — {quotedLineCount(job)} of {lines.length} lines priced. The variation check runs once
-          every line has a quote against it.
+          every line has a quote against it — price the lines on the supplier-quote tab.
         </Alert>
         <LineTable job={job} />
       </>
