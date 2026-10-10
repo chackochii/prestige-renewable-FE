@@ -1,8 +1,8 @@
 // The supplier quotes received on a job, as the record has them — shown above
 // the supplier-quote checklist (CL-12) so the coordinator confirms against
 // what actually came in. `onAdd(body)` records one as it arrives,
-// `onRemove(index)` takes out one recorded in error. The prices themselves go
-// on the BOQ lines (BOQ vs site tab); this is the record of each quote.
+// `onRemove(index)` takes out one recorded in error. This is the record of
+// each quote; the chosen prices go on the BOQ lines just below (BoqPricing).
 
 import { useState } from "react";
 import { FileText, Plus, X } from "lucide-react";
@@ -55,8 +55,8 @@ export default function SupplierQuotes({ job, canEdit = false, onAdd, onRemove }
         <Alert tone="success">Every line is quoted — {quotes.length} supplier quote{quotes.length === 1 ? "" : "s"} on record.</Alert>
       ) : (
         <Alert tone="info">
-          {quoted} of {lines} lines quoted so far. Record each quote here as it comes in and put its prices against the BOQ lines; the
-          checklist below is worked once the ones being compared are in.
+          {quoted} of {lines} lines priced so far. Record each quote here as it comes in, compare them, then price the BOQ lines
+          below from the one chosen; the checklist is worked once that is done.
         </Alert>
       )}
       <div className="estimation-item-head">

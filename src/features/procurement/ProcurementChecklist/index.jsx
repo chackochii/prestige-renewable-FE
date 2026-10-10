@@ -65,8 +65,11 @@ function procurementAutoRows(source, job, checklist) {
       if (!required.length) return [["Approvals", "None needed — no price variation"]];
       return required.map((role) => {
         const approval = approvalFor(job, role);
-        const state = approval ? (approval.status === "approved" ? `approved ${formatDate(approval.decidedAt)}` : `pending since ${formatDate(approval.requestedAt)}`) : null;
-        return [roleLabel(role), approval ? `${approval.approver} — ${state}` : null, "Not requested yet"];
+        const decided = approval?.status === "approved" || approval?.status === "rejected";
+        const state = decided
+          ? `${approval.status === "approved" ? "approved" : "declined"} by ${approval.approver ?? "—"} ${formatDate(approval.decidedAt)}`
+          : "waiting — request it on the Approvals tab";
+        return [roleLabel(role), approval ? state : null, "Not requested yet — request it on the Approvals tab"];
       });
     }
     case "suppliers": {
@@ -106,7 +109,7 @@ function procurementAutoRows(source, job, checklist) {
   }
 }
 
-export default function ProcurementChecklist({ section, job, canEdit = false, canApprove = false, onChange, upload = null }) {
+export default function ProcurementChecklist({ section, job, canEdit = false, canApprove = false, onChange, upload = null, intro = null }) {
   const checklist = job.checklist ?? {};
   return (
     <ChecklistForm
@@ -119,6 +122,7 @@ export default function ProcurementChecklist({ section, job, canEdit = false, ca
       autoRows={(source) => procurementAutoRows(source, job, checklist)}
       onChange={onChange}
       upload={upload}
+      intro={intro}
     />
   );
 }

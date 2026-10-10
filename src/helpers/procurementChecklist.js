@@ -8,7 +8,7 @@
 
 import { PROCUREMENT_CHECKLIST_OWNER, procurementChecklistOf } from "@/constants/procurementChecklists";
 import { itemDone, itemNumber } from "@/helpers/checklist";
-import { materialLines, priceVariationPct, quotesReceived, variationTier } from "@/helpers/procurement";
+import { approvalsComplete, materialLines, priceVariationPct, quotesReceived, variationTier } from "@/helpers/procurement";
 
 export const answersOf = (checklist, sectionKey) => checklist?.[sectionKey] ?? {};
 
@@ -24,9 +24,16 @@ export function hasDiscrepancy(checklist) {
   return found === "yes" ? true : found === "no" ? false : null;
 }
 
-/** The rules' context for a job's procurement checklists (see helpers/checklist.js). */
+/**
+ * The rules' context for a job's procurement checklists (see helpers/checklist.js).
+ * `autoAnswered`: the CL-13 variation approval is done only when every required
+ * approver has approved on the Approvals tab — never by a tick on the checklist.
+ */
 export function procurementContext(job, checklist) {
-  return { conditions: { variationNeedsApproval: variationNeedsApproval(job), hasDiscrepancy: hasDiscrepancy(checklist) } };
+  return {
+    conditions: { variationNeedsApproval: variationNeedsApproval(job), hasDiscrepancy: hasDiscrepancy(checklist) },
+    autoAnswered: (field) => (field.source === "variationApprovals" ? approvalsComplete(job) : undefined),
+  };
 }
 
 /** The approved system as the BOQ has it — what Green Deal is told. */
@@ -67,9 +74,10 @@ export const sectionComplete = (section, answers, ctx) => section.items.every((i
 
 /**
  * The job with what the checklists settle, so the step strip and status
- * follow them: the variation approvals are in once CL-13 records them, the
- * drafted orders are sent once CL-13 releases them, they are delivered once
- * CL-14 has everything arrived, and the Green Deal job comes from CL-10.
+ * follow them: the drafted orders are sent once CL-13 releases them, they are
+ * delivered once CL-14 has everything arrived, and the Green Deal job comes
+ * from CL-10. The variation approvals are not among them — only the approvers
+ * decide those, on their approval requests.
  */
 export function applyProcurementChecklist(job, checklist) {
   if (!job) return job;
@@ -79,9 +87,6 @@ export function applyProcurementChecklist(job, checklist) {
   const jobCreation = answersOf(checklist, "jobCreation");
   const created = sectionComplete(procurementChecklistOf("jobCreation"), jobCreation, ctx);
 
-  const approvals = (job.approvals ?? []).map((approval) =>
-    po.variationApproved === true && approval.status !== "approved" ? { ...approval, status: "approved", decidedAt: approval.decidedAt ?? po.poReleasedOn ?? null } : approval,
-  );
   const purchaseOrders = (job.purchaseOrders ?? []).map((order) => {
     let next = order;
     if (po.poReleasedConfirmed === true && next.status === "draft") next = { ...next, status: "sent", sentAt: po.poReleasedOn || next.sentAt || null };
@@ -92,7 +97,6 @@ export function applyProcurementChecklist(job, checklist) {
 
   return {
     ...job,
-    approvals,
     purchaseOrders,
     greenDeal: created
       ? { created: true, jobId: jobCreation.greenDealJobId, createdAt: jobCreation.greenDealCreatedOn || job.greenDeal?.createdAt || null, by: job.greenDeal?.by ?? PROCUREMENT_CHECKLIST_OWNER }

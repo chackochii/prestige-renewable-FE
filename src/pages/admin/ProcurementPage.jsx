@@ -35,7 +35,7 @@ import { formatCurrency } from "@/utils/formatCurrency";
 export default function ProcurementPage() {
   const dispatch = useAppDispatch();
   const { unitId } = useBusinessUnit();
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.procurement);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState(null);
@@ -156,7 +156,6 @@ export default function ProcurementPage() {
               job={procurement.job}
               canEdit={hasPermission(PERMISSIONS.PROCUREMENT_UPDATE)}
               canApprove={hasPermission(PERMISSIONS.PROCUREMENT_APPROVE)}
-              user={user}
               error={procurement.error}
               onClearError={procurement.clearError}
               onChecklistChange={procurement.updateChecklist}
@@ -167,7 +166,6 @@ export default function ProcurementPage() {
               onCreatePurchaseOrder={procurement.createPurchaseOrder}
               onUpdatePurchaseOrder={procurement.updatePurchaseOrder}
               onDeletePurchaseOrder={procurement.deletePurchaseOrder}
-              onDecide={procurement.decide}
             />
           ) : (
             <LoadingState label="Loading the job…" />

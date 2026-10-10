@@ -2,7 +2,8 @@
 // dashboard, the assigned list or a stage panel. What it offers depends on
 // who is looking:
 //
-//   the assignee   → the response form, or the assignment progress form
+//   the assignee   → the response form, the assignment progress form, or —
+//                    on an approval request — approve / reject with notes
 //   the requester  → the response read-only, with accept / ask for clarification
 //   anyone else    → the same read-only view, with no actions
 //
@@ -30,6 +31,7 @@ import SiteVisitTaskForm from "./SiteVisitTaskForm";
 import ResponseForm from "./ResponseForm";
 import RequestStatusBadge from "./RequestStatusBadge";
 import {
+  canApprove,
   canCancel,
   canDecide,
   canProgress,
@@ -67,6 +69,7 @@ import {
   submitResponse,
   uploadRequestAttachment,
 } from "@/slices/collaborationSlice";
+import { fetchProcurementJob } from "@/slices/procurementSlice";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
@@ -163,6 +166,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
   const [filing, setFiling] = useState(null);
   const [clarifying, setClarifying] = useState(false);
   const [clarification, setClarification] = useState("");
+  const [approvalNote, setApprovalNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -292,6 +296,28 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
     }
   };
 
+  /** The approver's answer — recorded on the job's price-variation approval too. */
+  const decideApproval = async (outcome) => {
+    if (outcome === "rejected" && !approvalNote.trim()) {
+      notifyError("Add a note saying why it is rejected.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await dispatch(
+        decideResponse({ id: request.id, body: { outcome, note: approvalNote.trim() || undefined } }),
+      ).unwrap();
+      // The procurement approvals tab reads the job, which the decision just changed.
+      if (request.opportunityId) dispatch(fetchProcurementJob(request.opportunityId));
+      notify(outcome === "approved" ? "Approved" : "Rejected");
+      onClose?.();
+    } catch (err) {
+      notifyError(errText(err, "Could not record the decision."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const cancel = async () => {
     setBusy(true);
     try {
@@ -413,7 +439,44 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
             Shown whether or not there is a response yet: the requester wants
             to see the items they asked for while they are still waiting, not
             only once they are answered. */}
-        {request.kind !== "assignment" && !canRespond(request, user) && (fields.length || response?.submittedAt) ? (
+        {/* ---- An approval request: the decision, or the approver's form ---- */}
+        {request.kind === "approval" && canApprove(request, user) ? (
+          <div className="decision-card" style={{ marginTop: 18 }}>
+            <Field label="Notes" hint="required to reject — the requester and the procurement approvals tab show this">
+              <textarea rows={3} value={approvalNote} onChange={(e) => setApprovalNote(e.target.value)} />
+            </Field>
+            <div className="decision-actions" style={{ marginTop: 12, display: "flex", gap: 8 }}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => decideApproval("approved")} disabled={busy}>
+                <Check size={14} /> Approve
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={() => decideApproval("rejected")}
+                disabled={busy || !approvalNote.trim()}
+              >
+                <ThumbsDown size={14} /> Reject
+              </button>
+            </div>
+          </div>
+        ) : request.kind === "approval" ? (
+          <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
+            <h3>Decision</h3>
+            {response?.submittedAt ? (
+              <div className="list-stack">
+                <Fact
+                  label={statusMeta("approval", request.status).label}
+                  value={`${response.submittedByName || "—"} · ${formatDate(response.submittedAt, { withTime: true, timeZone })}`}
+                />
+                {response.note ? <Fact label="Notes" value={response.note} /> : null}
+              </div>
+            ) : (
+              <p className="lede">Waiting on {request.assigneeName || "the approver"}.</p>
+            )}
+          </div>
+        ) : null}
+
+        {request.kind === "information" && !canRespond(request, user) && (fields.length || response?.submittedAt) ? (
           <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
             <h3>Information requested</h3>
             <p className="lede" style={{ marginBottom: 10 }}>
@@ -565,7 +628,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
           </div>
         ) : null}
 
-        {!canRespond(request, user) && !canProgress(request, user) && !canDecide(request, user) ? (
+        {!canRespond(request, user) && !canProgress(request, user) && !canDecide(request, user) && !canApprove(request, user) ? (
           <Alert tone="info" style={{ marginTop: 18, marginBottom: 0 }}>
             You are seeing this because it belongs to a job you work on. Only{" "}
             {request.assigneeName || departmentLabel(request.department)} can act on it.

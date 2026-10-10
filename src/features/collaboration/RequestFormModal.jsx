@@ -3,6 +3,10 @@
 // An information request carries the exact fields you want answered — the
 // other department's response form is built from them, so they see only what
 // you asked for and you get it back in a shape you can read.
+//
+// An approval request (kind "approval", with `approvalRole`) goes to someone
+// holding that role — the sales manager or the business owner — who approves
+// or rejects it from the request itself.
 
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, ClipboardCheck, ClipboardList, ListChecks, Plus, X } from "lucide-react";
@@ -53,11 +57,19 @@ export default function RequestFormModal({
   // for instance. It opens on the custom template so nothing overwrites it,
   // and every field stays editable.
   initial = null,
+  // Approval requests: the role code whose holders may decide it (SMM, BO).
+  approvalRole = null,
+  approvalRoleLabel = "",
   onClose,
   onSubmit,
 }) {
   const isAssignment = kind === "assignment";
-  const templates = isAssignment ? ASSIGNMENT_TEMPLATES : INFORMATION_TEMPLATES;
+  const isApproval = kind === "approval";
+  const templates = isAssignment
+    ? ASSIGNMENT_TEMPLATES
+    : isApproval
+      ? [{ key: "approval", label: "Approval", title: "", description: "" }]
+      : INFORMATION_TEMPLATES;
   const start =
     templates.find((t) => t.key === template) ||
     (initial ? templates.find((t) => t.key === "custom") : null) ||
@@ -71,7 +83,7 @@ export default function RequestFormModal({
     priority: PRIORITIES[0].key,
     dueAt: "",
     dueTime: "",
-    fields: initial?.fields?.length ? initial.fields.map((f) => ({ ...f })) : isAssignment ? [] : [blankField()],
+    fields: initial?.fields?.length ? initial.fields.map((f) => ({ ...f })) : isAssignment || isApproval ? [] : [blankField()],
   }));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -90,7 +102,11 @@ export default function RequestFormModal({
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   // The people on the team chosen — or everyone, when the unit has nobody on
   // that team yet, in which case the field says so.
-  const { people: candidates, exact: teamHasPeople } = peopleInDepartment(people, form.department);
+  // An approval can only go to someone holding the approver role.
+  const roleHolders = isApproval ? people.filter((p) => Array.isArray(p.roles) && p.roles.includes(approvalRole)) : [];
+  const { people: candidates, exact: teamHasPeople } = isApproval
+    ? { people: roleHolders, exact: true }
+    : peopleInDepartment(people, form.department);
   const changeDepartment = (department) => {
     const { people: next } = peopleInDepartment(people, department);
     setForm((f) => ({
@@ -135,9 +151,9 @@ export default function RequestFormModal({
   const submit = async () => {
     if (isBlank(form.title)) return setError("Give the request a title.");
     if (!form.assigneeId) return setError("Choose who this goes to.");
-    if (!isAssignment && !form.fields.length && !documents.length)
+    if (!isAssignment && !isApproval && !form.fields.length && !documents.length)
       return setError("Add at least one piece of information you need back.");
-    if (!isAssignment && form.fields.some((f) => isBlank(f.label)))
+    if (!isAssignment && !isApproval && form.fields.some((f) => isBlank(f.label)))
       return setError("Name every item you need — that is what the other team sees.");
 
     setSaving(true);
@@ -164,7 +180,7 @@ export default function RequestFormModal({
         inspectionChecklist: isInspection ? checklist : null,
         requestedFields: isInspection
           ? namedCustom.map((f, i) => ({ key: slug(f.label, i), label: f.label.trim(), kind: "text" }))
-          : isAssignment
+          : isAssignment || isApproval
             ? null
           : form.fields.map((f, i) => ({
               key: f.key?.trim() || slug(f.label, i),
@@ -183,7 +199,7 @@ export default function RequestFormModal({
 
   return (
     <Modal
-      title={isAssignment ? "Assign to another team" : "Request information"}
+      title={isAssignment ? "Assign to another team" : isApproval ? `Request approval${approvalRoleLabel ? ` — ${approvalRoleLabel}` : ""}` : "Request information"}
       body={`${opportunity?.number ? `${opportunity.number} · ` : ""}${stageById(stage).label}`}
       className="wide"
       onClose={onClose}
@@ -203,7 +219,7 @@ export default function RequestFormModal({
             </button>
           ) : null}
           <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
-            {saving ? "Sending…" : isAssignment ? "Send assignment" : "Send request"}
+            {saving ? "Sending…" : isAssignment ? "Send assignment" : isApproval ? "Send for approval" : "Send request"}
           </button>
         </>
       }
@@ -261,29 +277,45 @@ export default function RequestFormModal({
       ) : (
         <>
       <div className="form-grid">
-        <Field label="What do you need?" className="span-2">
-          <select value={templateKey} onChange={(e) => applyTemplate(e.target.value)}>
-            {templates.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {isApproval ? (
+          <Field label="Approver role">
+            <input value={approvalRoleLabel || approvalRole || ""} readOnly />
+          </Field>
+        ) : (
+          <>
+            <Field label="What do you need?" className="span-2">
+              <select value={templateKey} onChange={(e) => applyTemplate(e.target.value)}>
+                {templates.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-        <Field label="Department">
-          <select value={form.department} onChange={(e) => changeDepartment(e.target.value)}>
-            {DEPARTMENTS.map((d) => (
-              <option key={d.key} value={d.key}>
-                {d.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+            <Field label="Department">
+              <select value={form.department} onChange={(e) => changeDepartment(e.target.value)}>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d.key} value={d.key}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </>
+        )}
         <Field
-          label="Assign to"
+          label={isApproval ? "Approver" : "Assign to"}
           required
-          hint={teamHasPeople ? undefined : `nobody in ${departmentLabel(form.department)} yet — showing everyone`}
+          hint={
+            isApproval
+              ? candidates.length
+                ? undefined
+                : `nobody in this unit holds the ${approvalRoleLabel || approvalRole} role`
+              : teamHasPeople
+                ? undefined
+                : `nobody in ${departmentLabel(form.department)} yet — showing everyone`
+          }
         >
           <select value={form.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
             <option value="">{candidates.length ? "Choose a person" : "Nobody in this unit yet"}</option>
@@ -313,11 +345,11 @@ export default function RequestFormModal({
               Inspection checklist — {askedCount} item{askedCount === 1 ? "" : "s"} requested
             </button>
           </div>
-        ) : initial ? null : (
+        ) : initial && !isApproval ? null : (
           <Field
-            label={isAssignment ? "What needs doing" : "Why you need it"}
+            label={isAssignment ? "What needs doing" : isApproval ? "What needs approving" : "Why you need it"}
             className="span-2"
-            hint={isAssignment ? "the coordinator sees this" : "context for whoever answers"}
+            hint={isAssignment ? "the coordinator sees this" : isApproval ? "the approver reads this before deciding" : "context for whoever answers"}
           >
             <textarea
               rows={descriptionRows}
@@ -344,7 +376,7 @@ export default function RequestFormModal({
         </Field>
       </div>
 
-      {!isAssignment ? (
+      {!isAssignment && !isApproval ? (
         <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
           <h3>Information you need back</h3>
           <p className="lede" style={{ marginBottom: 12 }}>

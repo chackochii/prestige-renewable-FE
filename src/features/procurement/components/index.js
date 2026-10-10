@@ -6,6 +6,7 @@
 // records every step in, and the panel that puts it all on an opportunity.
 
 export { default as ApprovalsPanel } from "../ApprovalsPanel";
+export { default as BoqPricing } from "../BoqPricing";
 export { default as BoqVerification } from "../BoqVerification";
 export { default as Deliveries } from "../Deliveries";
 export { default as PriceVariationCheck } from "../PriceVariationCheck";

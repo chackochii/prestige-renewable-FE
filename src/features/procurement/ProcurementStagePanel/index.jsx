@@ -17,8 +17,9 @@ import { useProcurementJob } from "@/hooks/useProcurementJob";
 
 export default function ProcurementStagePanel({ opp, unit, canEdit = false }) {
   const stage = stageById(PROCUREMENT_STAGE.id);
+  const requests = <StageRequestsPanel opp={opp} stage={stage.id} unit={unit} canEdit={canEdit} />;
   const slaDays = unit?.slaDays?.[stage.id];
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const notThereYet = Number(opp?.stage) < PROCUREMENT_STAGE.id;
   const procurement = useProcurementJob(opp?.id, { enabled: !notThereYet });
 
@@ -55,7 +56,6 @@ export default function ProcurementStagePanel({ opp, unit, canEdit = false }) {
           job={procurement.job}
           canEdit={hasPermission(PERMISSIONS.PROCUREMENT_UPDATE)}
           canApprove={hasPermission(PERMISSIONS.PROCUREMENT_APPROVE)}
-          user={user}
           error={procurement.error}
           onClearError={procurement.clearError}
           onChecklistChange={procurement.updateChecklist}
@@ -66,12 +66,13 @@ export default function ProcurementStagePanel({ opp, unit, canEdit = false }) {
           onCreatePurchaseOrder={procurement.createPurchaseOrder}
           onUpdatePurchaseOrder={procurement.updatePurchaseOrder}
           onDeletePurchaseOrder={procurement.deletePurchaseOrder}
-          onDecide={procurement.decide}
+          requests={requests}
           embedded
         />
       )}
 
-      <StageRequestsPanel opp={opp} stage={stage.id} unit={unit} canEdit={canEdit} />
+      {/* Until the workflow (and its Request / Response tab) is on screen, the requests sit below. */}
+      {notThereYet || !procurement.job ? requests : null}
     </div>
   );
 }
