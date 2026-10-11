@@ -51,6 +51,13 @@ import { useNotifications } from "@/hooks/useNotifications";
 
 const emptyItemForm = () => ({ itemKey: "", brand: "", quantity: 1, unit: "", unitPrice: "", discountPct: 0 });
 
+// The Unit field takes numbers only. A catalog or saved unit that is a word
+// ("unit", "panel") starts the field empty rather than putting text in it.
+const numericUnit = (value) => {
+  const text = String(value ?? "").trim();
+  return text !== "" && Number.isFinite(Number(text)) ? text : "";
+};
+
 function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(() =>
@@ -59,7 +66,7 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
           itemKey: initial.itemKey,
           brand: initial.brand,
           quantity: initial.quantity,
-          unit: initial.unit,
+          unit: numericUnit(initial.unit),
           unitPrice: initial.unitPrice,
           discountPct: initial.discountPct,
         }
@@ -75,7 +82,7 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
   const selectItem = (key) => {
     const item = findCatalogItem(catalogItems, key);
     const brand = item?.brands?.[0];
-    setForm((f) => ({ ...f, itemKey: key, unit: item?.unit || "", brand: brand?.name || "", unitPrice: brand?.unitPrice ?? "" }));
+    setForm((f) => ({ ...f, itemKey: key, unit: numericUnit(item?.unit), brand: brand?.name || "", unitPrice: brand?.unitPrice ?? "" }));
   };
 
   const selectBrand = (name) => {
@@ -94,6 +101,10 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
       setError("Select a brand.");
       return;
     }
+    if (String(form.unit ?? "").trim() !== "" && !Number.isFinite(Number(form.unit))) {
+      setError("Unit must be a number.");
+      return;
+    }
     if (!(Number(form.quantity) > 0)) {
       setError("Quantity must be greater than zero.");
       return;
@@ -105,7 +116,7 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
         itemKey: form.itemKey,
         itemName: selectedItem?.name || "",
         brand: form.brand,
-        unit: form.unit,
+        unit: String(form.unit ?? "").trim(),
         quantity: Number(form.quantity),
         unitPrice: Number(form.unitPrice) || 0,
         discountPct: Number(form.discountPct) || 0,
@@ -156,8 +167,8 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
             ))}
           </select>
         </Field>
-        <Field label="Unit" hint="auto from item">
-          <input type="text" value={form.unit} disabled />
+        <Field label="Unit" hint="numbers only">
+          <NumberInput value={form.unit} min={0} step="any" onChange={(v) => setForm((f) => ({ ...f, unit: v }))} />
         </Field>
         <Field label="Quantity">
           <NumberInput value={form.quantity} min={0} onChange={(v) => setForm((f) => ({ ...f, quantity: v }))} />
@@ -366,7 +377,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
 
   const blurCostField = (cost, field) => {
     const draft = costDrafts[cost.id];
-    if (!draft) return;
+    if (!draft || draft[field] === undefined) return;
     const value = field === "value" ? Number(draft.value) || 0 : draft.description;
     if (value !== cost[field]) patchCostField(cost.id, { [field]: value });
   };
@@ -415,18 +426,47 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
               </thead>
               <tbody>
                 {rows.map((cost) => {
-                  const draft = costDrafts[cost.id] || { value: cost.value, description: cost.description };
+                  const draft = { value: cost.value, description: cost.description, ...costDrafts[cost.id] };
+                  // "Other": a type outside the list is a name the estimator typed.
+                  const otherType = meta.otherType;
+                  const isOther = Boolean(otherType) && (cost.costType === otherType || !meta.types.includes(cost.costType));
+                  const otherName = draft.otherName ?? (cost.costType === otherType ? "" : cost.costType);
                   return (
                     <tr key={cost.id}>
                       <td data-label={`${meta.label} type`}>
                         {canEdit ? (
-                          <select value={cost.costType} onChange={(e) => patchCostField(cost.id, { costType: e.target.value })}>
-                            {[...new Set([...meta.types, cost.costType].filter(Boolean))].map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
-                          </select>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 180 }}>
+                            <select
+                              value={isOther ? otherType : cost.costType}
+                              onChange={(e) => {
+                                setCostDraftField(cost.id, "otherName", undefined);
+                                patchCostField(cost.id, { costType: e.target.value });
+                              }}
+                            >
+                              {(otherType ? meta.types : [...new Set([...meta.types, cost.costType].filter(Boolean))]).map((t) => (
+                                <option key={t} value={t}>
+                                  {t === otherType ? "Other" : t}
+                                </option>
+                              ))}
+                            </select>
+                            {isOther ? (
+                              <input
+                                type="text"
+                                maxLength={50}
+                                value={otherName}
+                                placeholder={`Name the ${meta.label.toLowerCase()}`}
+                                aria-label={`Other ${meta.label.toLowerCase()} name`}
+                                onChange={(e) => setCostDraftField(cost.id, "otherName", e.target.value)}
+                                onBlur={() => {
+                                  const name = String(otherName ?? "").trim();
+                                  const next = name || otherType;
+                                  if (next !== cost.costType) patchCostField(cost.id, { costType: next });
+                                }}
+                              />
+                            ) : null}
+                          </div>
+                        ) : cost.costType === otherType ? (
+                          "Other"
                         ) : (
                           cost.costType
                         )}

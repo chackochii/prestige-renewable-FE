@@ -222,14 +222,12 @@ const blank = (v) => !String(v ?? "").trim();
  * that only apply in some cases (retrofit details, inspection findings, VPP)
  * are only required once that case applies.
  */
-export function estimationInputMissing(input, { drawingsCount = 0, sitePhotoCount = 0 } = {}) {
+export function estimationInputMissing(input, { drawingsCount = 0 } = {}) {
   const missing = [];
   if (blank(input.siteType)) missing.push("site type");
   if (blank(input.preSiteInspectionRequired)) missing.push("whether a pre-site inspection is required");
-  if (input.preSiteInspectionRequired === "yes") {
-    if (!input.siteVisitCompleted) missing.push("site visit completed and findings reviewed");
-    if (!sitePhotoCount && !input.sitePhotosOnFile) missing.push("site photos");
-  }
+  // A required pre-site inspection brings back the visit and its photos itself,
+  // so neither is asked for separately then.
   if (blank(input.roofMeasurements)) missing.push("roof / site measurements");
   if (blank(input.existingElectrical)) missing.push("existing electrical system");
   if (blank(input.switchboardCondition)) missing.push("main switchboard / DB details");

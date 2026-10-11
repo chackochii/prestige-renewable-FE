@@ -37,7 +37,7 @@ export function leadCompletenessItems(opp) {
   const missing = [];
   if (isBlank(opp.customerLegalName)) missing.push("Customer name");
   if (isBlank(opp.siteLine1) || isBlank(opp.siteSuburb)) missing.push("Site street and suburb");
-  if (isBlank(opp.propertyStoreys)) missing.push("House type (single or double storey)");
+  if (isBlank(opp.propertyStoreys)) missing.push("Building type (single or double storey)");
   if (isBlank(opp.roofType)) missing.push("Roof type");
   if (isBlank(opp.electricalPhase)) missing.push("Electrical phase");
   if (isBlank(opp.energyAnnualKwh) && !opp.energyHasBills) missing.push("Energy usage or bills");

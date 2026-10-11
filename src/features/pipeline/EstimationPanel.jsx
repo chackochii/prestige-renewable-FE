@@ -19,7 +19,7 @@
 // on a round trip. The actual stage-advance gate (helpers/stageTransition.js)
 // reads the saved opportunity, so advancing still requires an actual save.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Calculator,
   Check,
@@ -28,12 +28,13 @@ import {
   FileCheck2,
   HardHat,
   HandHelping,
+  ChevronDown,
+  ChevronRight,
   ListChecks,
   Lock,
   MessageCircleQuestion,
   Receipt,
   Send,
-  Stamp,
 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -178,6 +179,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   // clears it on the record; the local flag hides it straight away.
   const [leadChangeSeen, setLeadChangeSeen] = useState(false);
   const [requestingInspection, setRequestingInspection] = useState(false);
+  // "Approvals required" on the requirements tab starts collapsed, like the checklist sections above it.
+  const [approvalsOpen, setApprovalsOpen] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -262,9 +265,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   // (the lead form no longer asks sales). Stage 5 tracks only these.
   const saveRequiredApprovals = (keys) => run(() => dispatch(updateRequiredApprovals({ id: opp.id, keys })).unwrap());
 
-  const answerClientInfo = (needed) => {
-    run(() => dispatch(submitEstimationClientInfo({ id: opp.id, body: { needed } })).unwrap());
-  };
 
   const answerPreSite = (required) => {
     setPreSiteInspectionRequired(required);
@@ -274,6 +274,10 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           id: opp.id,
           body: { checklistValues, preSiteInspectionRequired: required },
         }),
+      ).unwrap();
+      // The same question sits in the requirements checklist (Site & Inspection) — keep it in step.
+      await dispatch(
+        collectEstimationInputs({ id: opp.id, body: { input: { preSiteInspectionRequired: required ? "yes" : "no" } } }),
       ).unwrap();
       notify(required ? "Pre-site inspection required" : "No pre-site inspection needed");
     });
@@ -285,8 +289,17 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const leadRows = leadMandatoryItems(opp, { billCount: billFiles.length });
   const requirementsChecklistComplete = leadRows.every((row) => row.done);
 
-  const showClientInfoGate = requirementsChecklistComplete;
-  const showEstimatorChecklist = opp.estimationClientInfoNeeded === true;
+  // The "does the client need to provide more input?" question is no longer
+  // asked: anything more from the client goes through Request / Response. The
+  // API still gates the stage on its answer (prestige-be isEstimationReady),
+  // so once the requirements checklist is complete it is recorded as "no" —
+  // once, by someone who may edit.
+  const clientInfoSent = useRef(false);
+  useEffect(() => {
+    if (!canEdit || !requirementsChecklistComplete || opp.estimationClientInfoNeeded === false || clientInfoSent.current) return;
+    clientInfoSent.current = true;
+    dispatch(submitEstimationClientInfo({ id: opp.id, body: { needed: false } }));
+  }, [canEdit, requirementsChecklistComplete, opp.estimationClientInfoNeeded, opp.id, dispatch]);
 
   // Resolved when no inspection is needed, or when the estimator has read the
   // findings of the one they asked for and approved them. Operations finishing
@@ -309,14 +322,14 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
     : [inspection ? `Approve the pre-site inspection findings (${requestCode(inspection)})` : "Request the pre-site inspection and approve its findings"];
   // The quote waits on the requirements checklist as well, whichever way the
   // client-input question went.
-  const showQuoteBuilder =
-    requirementsChecklistComplete && inspectionCleared && (state === "ready" || (showEstimatorChecklist && preSiteResolved));
-  // The pre-site visit tab is open whenever there is a visit to deal with,
-  // not only when the estimator's checklist is.
-  const showSiteVisit = showEstimatorChecklist || needsInspection;
+  const showQuoteBuilder = requirementsChecklistComplete && inspectionCleared && state === "ready";
+  // The pre-site visit tab opens once the requirements are in (the estimator
+  // decides there whether a visit is needed), or straight away when the lead
+  // already said one is.
+  const showSiteVisit = requirementsChecklistComplete || needsInspection;
 
   // One flag per tab, for the tick on the tab and for choosing where to open.
-  const requirementsDone = requirementsChecklistComplete && opp.estimationClientInfoNeeded != null;
+  const requirementsDone = requirementsChecklistComplete;
   const siteVisitDone = showSiteVisit && preSiteResolved;
   const quoteDone = Boolean(quote?.items?.length);
 
@@ -348,18 +361,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
   // Why the checklist and site-visit tabs are closed, depending on how far
   // the requirements step got.
-  const estimatorLocked =
-    opp.estimationClientInfoNeeded === false ? (
-      <LockedStep
-        title="Not needed for this lead"
-        body="The client didn't need to provide more input, so estimation went straight to the quote."
-      />
-    ) : (
-      <LockedStep
-        title="Finish the requirements first"
-        body="This opens once the requirements checklist is complete and the client input question is answered."
-      />
-    );
+  const estimatorLocked = (
+    <LockedStep title="Finish the requirements first" body="This opens once the requirements checklist is complete." />
+  );
 
   return (
     <div className="card card-pad">
@@ -433,7 +437,20 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           </div>
 
           <div className="section" style={{ marginTop: 24 }}>
-            <SectionHead icon={<Stamp size={13} />} title="Approvals required" />
+            <div className="input-group-head">
+              <button
+                type="button"
+                className="group-toggle"
+                onClick={() => setApprovalsOpen((open) => !open)}
+                aria-expanded={approvalsOpen}
+              >
+                {approvalsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <h4>Approvals required</h4>
+              </button>
+              <span>{requiredKeysOf(opp).length} selected</span>
+            </div>
+            {approvalsOpen ? (
+              <div style={{ marginTop: 12 }}>
             <RequiredApprovalsPicker
               unit={unit}
               value={requiredKeysOf(opp)}
@@ -462,24 +479,17 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                 </button>
               ) : null}
             </div>
+              </div>
+            ) : null}
           </div>
-
-          {showClientInfoGate ? (
-            <div className="section" style={{ marginTop: 24 }}>
-              <SectionHead icon={<MessageCircleQuestion size={13} />} title="Client input" />
-              <QuestionBlock title="Does the client need to provide more input before this can be estimated?">
-                <YesNo value={opp.estimationClientInfoNeeded} onChange={answerClientInfo} disabled={!canEdit || saving} />
-              </QuestionBlock>
-            </div>
-          ) : null}
 
           {requirementsDone ? (
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => setTab(showEstimatorChecklist ? "site-visit" : "quote")}
+              onClick={() => setTab(needsInspection && !preSiteResolved ? "site-visit" : "quote")}
             >
-              Continue to {showEstimatorChecklist ? "pre-site visit" : "quote"}
+              Continue to {needsInspection && !preSiteResolved ? "Pre-site visit" : "Quote"}
             </button>
           ) : null}
         </>
@@ -596,6 +606,12 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                 </div>
               </>
             ) : null}
+
+            {showQuoteBuilder ? (
+              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("quote")}>
+                Continue to Quote
+              </button>
+            ) : null}
           </div>
         ) : (
           estimatorLocked
@@ -608,7 +624,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             <QuoteBuilder opp={opp} unit={unit} canEdit={canEdit} />
             {quoteDone ? (
               <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("handover")}>
-                Continue to send to proposal
+                Continue to {requote ? "Send revised quote" : "Send to proposal"}
               </button>
             ) : null}
           </>

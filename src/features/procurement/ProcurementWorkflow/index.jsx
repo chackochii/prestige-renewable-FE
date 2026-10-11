@@ -41,7 +41,7 @@ import SupplierQuotes from "@/features/procurement/SupplierQuotes";
 import WorkflowSteps from "@/features/procurement/WorkflowSteps";
 import { PROCUREMENT_CHECKLISTS, procurementChecklistOf } from "@/constants/procurementChecklists";
 import { checklistSummary } from "@/helpers/checklist";
-import { currentRound, currentStep, procurementStatus, requiredApprovers } from "@/helpers/procurement";
+import { approvalsComplete, currentRound, currentStep, procurementStatus, quotesReceived, requiredApprovers, tierFor } from "@/helpers/procurement";
 import { jobCreationBlocker, procurementContext } from "@/helpers/procurementChecklist";
 import { formatCurrency } from "@/utils/formatCurrency";
 
@@ -105,6 +105,20 @@ export default function ProcurementWorkflow({
   ];
 
   const section = procurementChecklistOf(SECTION_FOR_TAB[tab]);
+
+  // Each step leads to the next once it is done: a "Continue to <tab>" button
+  // under the step, named for the tab it opens. No variation skips approvals.
+  const complete = (key) => summaries[key].applies !== false && !summaries[key].locked && summaries[key].done === summaries[key].total;
+  const noApprovals = tierFor(job)?.key === "none";
+  const NEXT = {
+    boq: complete("boq") ? "quote" : null,
+    quote: complete("quote") && quotesReceived(job) ? "variation" : null,
+    variation: quotesReceived(job) ? (noApprovals ? "po" : "approvals") : null,
+    approvals: quotesReceived(job) && (noApprovals || approvalsComplete(job)) ? "po" : null,
+    po: complete("po") ? "receipt" : null,
+    receipt: complete("receipt") ? "green_deal" : null,
+  };
+  const nextTab = tabs.find((item) => item.key === NEXT[tab]) ?? null;
   const checklistFor = (key, intro = null) => {
     const entry = procurementChecklistOf(key);
     return (
@@ -173,6 +187,11 @@ export default function ProcurementWorkflow({
         ) : (
           <ProcurementHistory job={job} />
         )}
+        {nextTab ? (
+          <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab(nextTab.key)}>
+            Continue to {nextTab.label}
+          </button>
+        ) : null}
       </div>
     </>
   );

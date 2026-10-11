@@ -215,7 +215,7 @@ export default function RequestFormModal({
           ) : null}
           {isInspection && screen === "request" ? (
             <button type="button" className="btn btn-ghost" onClick={() => setScreen("inspection")} disabled={saving}>
-              Inspection checklist <ArrowRight size={14} />
+              Continue to Inspection checklist <ArrowRight size={14} />
             </button>
           ) : null}
           <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
