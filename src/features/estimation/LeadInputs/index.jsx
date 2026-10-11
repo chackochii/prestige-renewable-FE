@@ -6,7 +6,7 @@
 // anything still blank is collected here, from the client, by the estimator.
 
 import { useState } from "react";
-import { Check, Circle, Pencil, Send, UserPlus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Circle, Pencil, Send, UserPlus, X } from "lucide-react";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
@@ -18,7 +18,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useAppDispatch } from "@/store";
 import { createRequest } from "@/slices/collaborationSlice";
-import { collectEstimationInputs } from "@/slices/leadsSlice";
+import { collectEstimationInputs, submitEstimatorChecklist } from "@/slices/leadsSlice";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
 
@@ -28,6 +28,16 @@ const errText = (err, fallback) => (typeof err === "string" ? err : err?.message
  * slots rather than as an answer field.
  */
 const askable = (row) => row.type !== "readonly";
+
+/** A section heading that expands or collapses the rows under it. */
+function SectionToggle({ open, onToggle, children }) {
+  return (
+    <button type="button" className="group-toggle" onClick={onToggle} aria-expanded={open}>
+      {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      {children}
+    </button>
+  );
+}
 
 function Tick({ done, label, value }) {
   return (
@@ -204,11 +214,17 @@ export default function LeadInputs({
   const { active } = useUnitUsers();
   const [saving, setSaving] = useState(false);
   // Assigning the blanks back to sales: tick the rows, then raise one
-  // information request for all of them. Starts on whatever sales left out,
-  // which is the usual ask.
+  // information request for all of them. Starts with nothing ticked — the
+  // estimator picks exactly what to ask for.
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState([]);
   const [requesting, setRequesting] = useState(false);
+  // The sections work as an accordion: one open at a time, starting on the
+  // first (the mandatory items from the lead); opening another folds the rest.
+  // While picking rows to ask sales about, all of them show so any row can be ticked.
+  const [openSection, setOpenSection] = useState("mandatory");
+  const isOpen = (key) => selecting || openSection === key;
+  const toggleSection = (key) => setOpenSection((current) => (current === key ? null : key));
 
   const mandatory = leadMandatoryItems(opp, { billCount: billFiles.length });
   const optional = leadOptionalItems(opp, { drawingCount: drawings.length, sitePhotoCount: sitePhotos.length });
@@ -223,7 +239,7 @@ export default function LeadInputs({
   const pickedRows = optional.filter((row) => picked.includes(row.field));
 
   const startPicking = () => {
-    setPicked(outstanding.map((row) => row.field));
+    setPicked([]);
     setSelecting(true);
   };
 
@@ -238,6 +254,13 @@ export default function LeadInputs({
   const saveField = async (field, value) => {
     setSaving(true);
     try {
+      // "Pre-site inspection required" is also the estimator's own answer on the
+      // pre-site visit tab — keep the two the same, so Continue and the quote
+      // gate follow whichever was answered last.
+      if (field === "preSiteInspectionRequired") {
+        const required = value === "yes" ? true : value === "no" ? false : null;
+        await dispatch(submitEstimatorChecklist({ id: opp.id, body: { preSiteInspectionRequired: required } })).unwrap();
+      }
       await dispatch(collectEstimationInputs({ id: opp.id, body: { input: { [field]: value } } })).unwrap();
       notify("Saved to the job");
     } catch (err) {
@@ -256,20 +279,27 @@ export default function LeadInputs({
   return (
     <>
       <div className="section" style={{ marginTop: 24 }}>
-        <div className="estimation-item-head">
-          <h3>From the lead · mandatory</h3>
-          <Badge tone={mandatoryDone === mandatory.length ? "success" : "warning"}>
-            {mandatoryDone}/{mandatory.length} complete
-          </Badge>
+        {/* Headed the way the lead checklist heads its groups. */}
+        <div className="input-group-head">
+          <SectionToggle open={isOpen("mandatory")} onToggle={() => toggleSection("mandatory")}>
+            <h4>Mandatory information</h4>
+          </SectionToggle>
+          <span>
+            {mandatoryDone}/{mandatory.length}
+          </span>
         </div>
-        <p className="lede" style={{ marginBottom: 12 }}>
-          What sales had to confirm before handing the lead over. Read-only here.
-        </p>
-        <div className="lead-input-list">
-          {mandatory.map((row) => (
-            <Tick key={row.key} done={row.done} label={row.label} value={row.value} />
-          ))}
-        </div>
+        {isOpen("mandatory") ? (
+          <>
+            <p className="lede" style={{ marginBottom: 12 }}>
+              What sales had to confirm before handing the lead over. Read-only here.
+            </p>
+            <div className="lead-input-list">
+              {mandatory.map((row) => (
+                <Tick key={row.key} done={row.done} label={row.label} value={row.value} />
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="section" style={{ marginTop: 24 }}>
@@ -311,11 +341,14 @@ export default function LeadInputs({
         {optionalGroups.map((group) => (
           <div key={group.title} className="input-group">
             <div className="input-group-head">
-              <h4>{group.title}</h4>
+              <SectionToggle open={isOpen(group.title)} onToggle={() => toggleSection(group.title)}>
+                <h4>{group.title}</h4>
+              </SectionToggle>
               <span>
                 {countDone(group.rows)}/{group.rows.length}
               </span>
             </div>
+            {isOpen(group.title) ? (
             <div className="lead-input-list">
               {group.rows.map((row) => (
                 <OptionalRow
@@ -331,6 +364,7 @@ export default function LeadInputs({
                 />
               ))}
             </div>
+            ) : null}
           </div>
         ))}
       </div>

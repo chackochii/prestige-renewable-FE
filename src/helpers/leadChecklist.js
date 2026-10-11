@@ -74,7 +74,7 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
       value: estimationInputFromOpp(opp).roofMeasurements,
       done: filled(estimationInputFromOpp(opp).roofMeasurements),
     },
-    { key: "storeys", label: "House type", value: storeyLabel(opp.propertyStoreys), done: filled(opp.propertyStoreys) },
+    { key: "storeys", label: "Building type", value: storeyLabel(opp.propertyStoreys), done: filled(opp.propertyStoreys) },
     { key: "roof", label: "Roof type", value: roofTypeLabel(opp.roofType), done: filled(opp.roofType) },
     {
       key: "phase",
@@ -171,11 +171,15 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       value: input.preSiteInspectionRequired,
       display: input.preSiteInspectionRequired,
     },
+    // Site visit completed and site photos are only asked when no pre-site
+    // inspection is required — when one is, the inspection request brings the
+    // visit and its photos back, so these two would only repeat it.
     {
       group: "Site & Inspection",
       field: "siteVisitCompleted",
       label: "Site visit completed",
       type: "checkbox",
+      onlyWhen: input.preSiteInspectionRequired !== "yes",
       value: input.siteVisitCompleted,
       display: input.siteVisitCompleted ? "Yes" : "",
     },
@@ -183,6 +187,7 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       group: "Site & Inspection",
       field: "__sitePhotos",
       label: "Site photos",
+      onlyWhen: input.preSiteInspectionRequired !== "yes",
       // Estimation can add these itself, so the row carries an upload slot
       // rather than just a count.
       type: "files",

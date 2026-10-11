@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import Alert from "@/components/Alert";
-import Modal from "@/components/Modal";
 import LeadForm from "@/features/leads/LeadForm";
 import StageRequestsPanel from "@/features/collaboration/StageRequestsPanel";
 import {
@@ -87,28 +86,25 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [saving, setSaving] = useState(false);
   const [uploadingBills, setUploadingBills] = useState(false);
   const [uploadingCategory, setUploadingCategory] = useState(null);
-  // Lead capture opens ready to edit: the checklist runs across several tabs
-  // and people fill it in over more than one sitting. A record that has moved
-  // on opens read-only instead — an estimator reviewing the pack is reading it,
-  // and unlocking it is a deliberate act that needs the Leads permission.
-  const [editing, setEditing] = useState(() => Number(opp?.stage) === LEAD_STAGE);
-  const [confirmEdit, setConfirmEdit] = useState(false);
+  // The lead pack is always open to edit for anyone with the Leads permission,
+  // at every stage — there is no separate "Edit lead details" unlock. Once an
+  // estimator has it, a warning above the form says so and they are notified
+  // on save.
   // "", "saving", "saved" or "error" — what the autosave line shows.
   const [autosaveState, setAutosaveState] = useState("");
+  // Bumped on every successful Save: the form moves on to its next tab.
+  const [advanceTab, setAdvanceTab] = useState(0);
+  // The tab a save moves on to, as LeadForm reports it — named on the Save button.
+  const [nextTabLabel, setNextTabLabel] = useState(null);
 
-  // A fresh record (after fetch or save) replaces any unsaved edits. Opening a
-  // different record starts read-only again, but saving the one you are on
-  // leaves the form unlocked so you can carry straight on to the next tab.
+  // A fresh record (after fetch or save) replaces any unsaved edits.
   const openedId = useRef(opp?.id);
   // The latest dirty flag, readable from the effect below without making the
   // effect re-run on every keystroke.
   const dirtyRef = useRef(false);
   useEffect(() => {
     const changedRecord = openedId.current !== opp?.id;
-    if (changedRecord) {
-      openedId.current = opp?.id;
-      setEditing(Number(opp?.stage) === LEAD_STAGE);
-    }
+    if (changedRecord) openedId.current = opp?.id;
     // A refresh of the record already open must not overwrite unsaved typing
     // — autosave's own response comes back through here too.
     if (changedRecord || !dirtyRef.current) {
@@ -203,7 +199,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
 
   /** Leaving a tab commits what was filled in on it. */
   const handleTabChange = () => {
-    if (canEdit && editing && dirty && !saving) persist();
+    if (canEdit && dirty && !saving) persist();
   };
 
   const billFiles = attachments.filter((a) => a.category === "bill");
@@ -351,6 +347,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
       // people save as they go.
       clearDraft(opp.id);
       notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
+      setAdvanceTab((n) => n + 1);
       return true;
     } catch (err) {
       setSaveError(typeof err === "string" ? err : err?.message || "Could not save the lead pack.");
@@ -364,12 +361,11 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   // "Handed over" means an estimator owns it now, whether or not the stage moved.
   const estimatorName = opp.estimator?.name || userName(opp.estimatorId);
   const handedOver = Boolean(opp.estimatorId);
-  const startEditing = () => (handedOver ? setConfirmEdit(true) : setEditing(true));
+  // Throws away what was typed since the last save.
   const cancelEditing = () => {
     setForm(leadToForm(opp));
     setBase(opp);
     setErrors({});
-    setEditing(false);
   };
   const gate = leadGateItems(opp);
   const errorList = [...new Set(Object.values(errors))];
@@ -420,7 +416,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         )
       ) : null}
 
-      {canEdit && editing && handedOver ? (
+      {canEdit && handedOver ? (
         <Alert tone="warning" style={{ marginBottom: 12 }}>
           {estimatorName || "An estimator"} is pricing this lead
           {opp.estimatorAssignedAt ? ` (assigned ${formatWhen(opp.estimatorAssignedAt)})` : ""}. Changes here change
@@ -436,17 +432,18 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         sales={sales}
         referrers={referrers}
         unit={unit}
-        disabled={!canEdit || !editing}
-        onUnlock={canEdit && !editing ? startEditing : undefined}
+        disabled={!canEdit}
         billFiles={billFiles}
-        onUploadBills={canEdit && editing ? uploadBills : undefined}
+        onUploadBills={canEdit ? uploadBills : undefined}
         uploadingBills={uploadingBills}
         drawings={drawings}
         sitePhotos={sitePhotos}
-        onUploadDrawings={canEdit && editing ? uploadCategory(DRAWING_CATEGORY) : undefined}
-        onUploadSitePhotos={canEdit && editing ? uploadCategory(SITE_PHOTO_CATEGORY) : undefined}
+        onUploadDrawings={canEdit ? uploadCategory(DRAWING_CATEGORY) : undefined}
+        onUploadSitePhotos={canEdit ? uploadCategory(SITE_PHOTO_CATEGORY) : undefined}
         uploadingCategory={uploadingCategory}
         onTabChange={handleTabChange}
+        advanceTab={advanceTab}
+        onNextTabChange={setNextTabLabel}
         requestsPanel={
           <StageRequestsPanel
             opp={opp}
@@ -464,10 +461,10 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         <p className="lede" style={{ marginTop: 16 }}>
           You have read access to this lead. Editing needs the “Update Leads” permission.
         </p>
-      ) : editing ? (
+      ) : (
         <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save lead details"}
+            {saving ? "Saving…" : nextTabLabel ? `Save & continue to ${nextTabLabel}` : "Save lead details"}
           </button>
           <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={saving}>
             Cancel
@@ -489,39 +486,8 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
             </span>
           ) : null}
         </div>
-      ) : (
-        <p className="lede" style={{ marginTop: 16 }}>
-          Read-only. Use “Edit lead details” above to make changes.
-        </p>
       )}
 
-      {confirmEdit ? (
-        <Modal
-          title="This lead is with estimation"
-          confirmClose={false}
-          body={`${estimatorName || "An estimator"} is working from these details${
-            opp.estimatorAssignedAt ? ` (assigned ${formatWhen(opp.estimatorAssignedAt)})` : ""
-          }. Editing now changes what they are pricing, and they will be notified when you save.`}
-          onClose={() => setConfirmEdit(false)}
-          actions={
-            <>
-              <button type="button" className="btn btn-ghost" onClick={() => setConfirmEdit(false)}>
-                Leave it as it is
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  setConfirmEdit(false);
-                  setEditing(true);
-                }}
-              >
-                Edit anyway
-              </button>
-            </>
-          }
-        />
-      ) : null}
       </div>
 
     </>

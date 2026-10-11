@@ -7,8 +7,8 @@
 // wrongly. The checklist below is what Estimation needs confirmed with the
 // customer before the lead can be marked Potential.
 
-import { useState } from "react";
-import { Building2, Check, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Building2, Check, ChevronDown, ChevronRight, ClipboardCheck, ExternalLink, HandHelping, Pencil, PhoneCall, Plus, Send, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
@@ -45,11 +45,22 @@ import { isAutomatedSource } from "@/features/leads/leadFormModel";
 import { isBlank } from "@/utils/validators";
 import ChecklistRow from "./ChecklistRow";
 
-/** Heading above a run of estimation-input rows — the same titles estimation shows. */
-function GroupHead({ title }) {
+/**
+ * Heading above a run of checklist rows — the same titles estimation shows.
+ * With `onToggle` it collapses and expands the rows under it.
+ */
+function GroupHead({ title, count, open = true, onToggle }) {
   return (
     <div className="input-group-head">
-      <h4>{title}</h4>
+      {onToggle ? (
+        <button type="button" className="group-toggle" onClick={onToggle} aria-expanded={open}>
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <h4>{title}</h4>
+        </button>
+      ) : (
+        <h4>{title}</h4>
+      )}
+      {count ? <span>{count}</span> : null}
     </div>
   );
 }
@@ -123,6 +134,12 @@ export default function LeadForm({
   // Unlocks a saved lead for editing. Passed only when the person may edit;
   // without it a locked form just says why it is locked.
   onUnlock,
+  // Bumped by the panel after a successful save: the form moves on to the
+  // next tab (customer → checklist → mark potential).
+  advanceTab = 0,
+  // Told which tab a save moves on to (its label), or null on the last one —
+  // so the panel's Save button can say "Save & continue to …".
+  onNextTabChange,
 }) {
   const err = (field) => errors[field];
   const hasSalesperson = !isBlank(form.salespersonId) && showChecklist;
@@ -131,6 +148,36 @@ export default function LeadForm({
   // requests do not, so they stay reachable on an unassigned lead.
   const needsSalesperson = ["checklist", "decision"].includes(tab);
   const activeTab = hasSalesperson || !needsSalesperson ? tab : "customer";
+  // A save just went through: move on to the next tab, as far as Mark Potential.
+  const tabOrder = hasSalesperson ? ["customer", "checklist", "decision"] : ["customer"];
+  const nextTabKey = tabOrder.includes(activeTab) ? (tabOrder[tabOrder.indexOf(activeTab) + 1] ?? null) : null;
+  const [seenAdvance, setSeenAdvance] = useState(advanceTab);
+  if (advanceTab !== seenAdvance) {
+    setSeenAdvance(advanceTab);
+    if (nextTabKey) setTab(nextTabKey);
+  }
+  // The panel names the tab a save leads to on its Save button.
+  const nextTabLabel = nextTabKey ? { checklist: "Checklist", decision: "Mark Potential" }[nextTabKey] : null;
+  useEffect(() => {
+    onNextTabChange?.(nextTabLabel);
+  }, [nextTabLabel, onNextTabChange]);
+  // The checklist groups work as an accordion: one open at a time, starting
+  // on the first (Mandatory information). Opening another folds the rest;
+  // clicking the open one folds it too.
+  const [openGroup, setOpenGroup] = useState("mandatory");
+  const [showAllGroups, setShowAllGroups] = useState(false);
+  const isOpen = (key) => showAllGroups || openGroup === key;
+  const toggleGroup = (key) => {
+    setOpenGroup(isOpen(key) && !showAllGroups ? null : key);
+    setShowAllGroups(false);
+  };
+  // A failed save must not leave its message inside a collapsed group: open them all.
+  const errorKey = Object.keys(errors).filter((key) => errors[key]).sort().join(",");
+  const [seenErrors, setSeenErrors] = useState(errorKey);
+  if (errorKey !== seenErrors) {
+    setSeenErrors(errorKey);
+    if (errorKey) setShowAllGroups(true);
+  }
   const automated = isAutomatedSource(form.leadSource);
   const tiers = commissionTiersFor(unit);
   const business = isBusinessLead(form.leadType);
@@ -266,6 +313,7 @@ export default function LeadForm({
   // One entry per mandatory row — the single source of truth for the row
   // ticks, the progress bar and the "Potential" gate below.
   const requiredRows = [
+    { label: "Where they got our details", done: doneSource },
     { label: "Initial requirements & comments", done: doneComments },
     { label: "Genuine interest", done: doneIntent },
     { label: "Contact client", done: doneContact },
@@ -273,7 +321,7 @@ export default function LeadForm({
     { label: "Service requirement", done: doneService },
     { label: "Billing address", done: doneBilling },
     { label: "Roof / site measurements", done: doneMeasurements },
-    { label: "House type", done: doneStoreys },
+    { label: "Building type", done: doneStoreys },
     { label: "Roof type", done: doneRoof },
     { label: "Electrical phase", done: donePhase },
     { label: "Electricity bills", done: doneBills },
@@ -282,7 +330,6 @@ export default function LeadForm({
     { label: "Site requirements & extra costs", done: doneSiteRequirements },
     { label: "Preferred timeframe", done: doneTimeframe },
     { label: "Preferred location", done: doneLocation },
-    { label: "Where they got our details", done: doneSource },
   ];
   const outstanding = requiredRows.filter((r) => !r.done);
   const doneCount = requiredRows.length - outstanding.length;
@@ -435,6 +482,69 @@ export default function LeadForm({
             </div>
 
               <div className="checklist" style={{ marginBottom: 20 }}>
+              <GroupHead
+                title="Mandatory information"
+                count={`${doneCount}/${requiredRows.length}`}
+                open={isOpen("mandatory")}
+                onToggle={() => toggleGroup("mandatory")}
+              />
+              {isOpen("mandatory") ? (
+              <>
+              <ChecklistRow done={doneSource} label="Where they got our details" required>
+                <Field hint="feeds the referral reward program" error={err("leadSource")}>
+                  {automated ? (
+                    <input value={leadSourceLabel(form.leadSource)} disabled />
+                  ) : (
+                    <select value={form.leadSource} disabled={disabled} onChange={(e) => set("leadSource", e.target.value)}>
+                      {MANUAL_LEAD_SOURCES.map((s) => (
+                        <option key={s.key} value={s.key}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </Field>
+                {!automated && !isBlank(form.leadSource) ? (
+                  <div style={{ marginTop: 10 }}>
+                    <Field label="Source details" error={err("leadSourceDetails")}>
+                      <input
+                        value={form.leadSourceDetails}
+                        disabled={disabled}
+                        onChange={(e) => set("leadSourceDetails", e.target.value)}
+                        placeholder="Who referred, or where this lead came from"
+                      />
+                    </Field>
+                  </div>
+                ) : null}
+                {form.leadSource === "referrer" ? (
+                  <div className="form-grid" style={{ marginTop: 10 }}>
+                    <Field label="Referrer" required error={err("referrerId")}>
+                      <select value={form.referrerId} disabled={disabled} onChange={(e) => set("referrerId", e.target.value)}>
+                        <option value="">Select</option>
+                        {referrers.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.organisation}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Involvement tier">
+                      <select
+                        value={form.involvementTier}
+                        disabled={disabled}
+                        onChange={(e) => set("involvementTier", e.target.value)}
+                      >
+                        {tiers.map((t) => (
+                          <option key={t.key} value={t.key}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                ) : null}
+              </ChecklistRow>
+
               <ChecklistRow done={doneComments} label="Initial requirements & comments" required>
                 <Field
                   hint="what they want from the system, anything else they asked for, financial options discussed"
@@ -675,7 +785,7 @@ export default function LeadForm({
               </Field>
             </ChecklistRow>
 
-            <ChecklistRow done={doneStoreys} label="House type" required>
+            <ChecklistRow done={doneStoreys} label="Building type" required>
                 <ChoiceGroup
                   name="lf-storeys"
                   options={STOREY_OPTIONS}
@@ -799,61 +909,6 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneSource} label="Where they got our details" required>
-                <Field hint="feeds the referral reward program" error={err("leadSource")}>
-                  {automated ? (
-                    <input value={leadSourceLabel(form.leadSource)} disabled />
-                  ) : (
-                    <select value={form.leadSource} disabled={disabled} onChange={(e) => set("leadSource", e.target.value)}>
-                      {MANUAL_LEAD_SOURCES.map((s) => (
-                        <option key={s.key} value={s.key}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </Field>
-                {!automated && !isBlank(form.leadSource) ? (
-                  <div style={{ marginTop: 10 }}>
-                    <Field label="Source details" error={err("leadSourceDetails")}>
-                      <input
-                        value={form.leadSourceDetails}
-                        disabled={disabled}
-                        onChange={(e) => set("leadSourceDetails", e.target.value)}
-                        placeholder="Who referred, or where this lead came from"
-                      />
-                    </Field>
-                  </div>
-                ) : null}
-                {form.leadSource === "referrer" ? (
-                  <div className="form-grid" style={{ marginTop: 10 }}>
-                    <Field label="Referrer" required error={err("referrerId")}>
-                      <select value={form.referrerId} disabled={disabled} onChange={(e) => set("referrerId", e.target.value)}>
-                        <option value="">Select</option>
-                        {referrers.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.organisation}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Involvement tier">
-                      <select
-                        value={form.involvementTier}
-                        disabled={disabled}
-                        onChange={(e) => set("involvementTier", e.target.value)}
-                      >
-                        {tiers.map((t) => (
-                          <option key={t.key} value={t.key}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                ) : null}
-              </ChecklistRow>
-
               <ChecklistRow done={doneOffers} label="Business offers & budget">
                 <div className="form-grid">
                   <Field label="Offers made" className="span-2" hint="promotions or pricing the customer was offered — leave blank if none">
@@ -869,12 +924,16 @@ export default function LeadForm({
                   </Field>
                 </div>
               </ChecklistRow>
+              </>
+              ) : null}
 
               </div>
             <div className="checklist" style={{ marginBottom: 20 }}>
               {/* ---- What estimation needs before BOQ preparation ---- */}
 
-              <GroupHead title="Site & Inspection" />
+              <GroupHead title="Site & Inspection" open={isOpen("site")} onToggle={() => toggleGroup("site")} />
+              {isOpen("site") ? (
+              <>
 
                 <ChecklistRow done={!isBlank(form.preSiteInspectionRequired)} label="Pre-site inspection">
                 <Field label="Inspection required">{yesNo("preSiteInspectionRequired")}</Field>
@@ -883,6 +942,15 @@ export default function LeadForm({
                     Estimation raises the request and tracks the visit.
                   </p>
                 ) : null}
+              </ChecklistRow>
+
+              {/* Site visit completed and site photos are only asked when no
+                  pre-site inspection is required — when one is, the inspection
+                  request brings the visit and its photos back. */}
+              {!inspectionNeeded ? (
+              <>
+              <ChecklistRow done={Boolean(form.siteVisitCompleted)} label="Site visit completed">
+                {checkbox("siteVisitCompleted", "Site visit completed")}
               </ChecklistRow>
 
               {/* Optional, like every other estimation-input row: tick it when the
@@ -907,8 +975,15 @@ export default function LeadForm({
                   </p>
                 )}
               </ChecklistRow>
+              </>
+              ) : null}
 
-              <GroupHead title={TECHNICAL_GROUP} />
+              </>
+              ) : null}
+
+              <GroupHead title={TECHNICAL_GROUP} open={isOpen("technical")} onToggle={() => toggleGroup("technical")} />
+              {isOpen("technical") ? (
+              <>
 
               <ChecklistRow
                 done={!isBlank(form.existingElectrical) || !isBlank(form.switchboardCondition)}
@@ -1009,7 +1084,12 @@ export default function LeadForm({
                 </div>
               </ChecklistRow>
 
-              <GroupHead title="Installation, Permits & Utility" />
+              </>
+              ) : null}
+
+              <GroupHead title="Installation, Permits & Utility" open={isOpen("installation")} onToggle={() => toggleGroup("installation")} />
+              {isOpen("installation") ? (
+              <>
 
               <ChecklistRow
                 done={!isBlank(form.specialRequirements)}
@@ -1057,8 +1137,11 @@ export default function LeadForm({
                 )}
               </ChecklistRow>
 
-              <GroupHead title="Customer-Specific Notes" />
+              </>
+              ) : null}
 
+              <GroupHead title="Customer-Specific Notes" open={isOpen("notes")} onToggle={() => toggleGroup("notes")} />
+              {isOpen("notes") ? (
               <ChecklistRow
                 done={!isBlank(form.inclusions) || !isBlank(form.exclusions)}
                 label="Customer-specific notes"
@@ -1075,6 +1158,7 @@ export default function LeadForm({
                   <Field label="Exclusions" hint="what is not covered">{textarea("exclusions")}</Field>
                 </div>
               </ChecklistRow>
+              ) : null}
 
             </div>
         </div>
@@ -1082,55 +1166,6 @@ export default function LeadForm({
 
       {activeTab === "decision" ? (
         <div className="section" id="lf-decision">
-            <div className="decision-card">
-              <SectionHead icon={<ClipboardCheck size={13} />} title="Custom fields" />
-              <div className="list-stack" style={{ marginBottom: 10 }}>
-                {customFields.map((f, i) => (
-                  <div key={i} className="form-grid" style={{ alignItems: "start" }}>
-                    <Field>
-                      <input
-                        placeholder="Field name"
-                        value={f.label}
-                        disabled={disabled}
-                        onChange={(e) => setCustomField(i, "label", e.target.value)}
-                      />
-                    </Field>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
-                        <Field>
-                          <input
-                            placeholder="Value"
-                            value={f.value}
-                            disabled={disabled}
-                            onChange={(e) => setCustomField(i, "value", e.target.value)}
-                          />
-                        </Field>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={disabled}
-                        onClick={() => removeCustomField(i)}
-                        aria-label="Remove field"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={addCustomField} disabled={disabled}>
-                <Plus size={14} /> Add custom field
-              </button>
-            </div>
-
-            <div className="decision-card">
-              <SectionHead icon={<ClipboardCheck size={13} />} title="Note for the estimator" />
-              <Field hint="optional — anything estimation should know before they pick this up">
-                {textarea("noteForEstimator", { rows: 2 })}
-              </Field>
-            </div>
-
             <div className="decision-card">
               <SectionHead icon={<Check size={13} />} title="Potential client?" />
               {!checklistComplete ? (
@@ -1197,6 +1232,56 @@ export default function LeadForm({
                 </div>
               ) : null}
             </div>
+
+            <div className="decision-card">
+              <SectionHead icon={<ClipboardCheck size={13} />} title="Additional information" />
+              <div className="list-stack" style={{ marginBottom: 10 }}>
+                {customFields.map((f, i) => (
+                  <div key={i} className="form-grid" style={{ alignItems: "start" }}>
+                    <Field>
+                      <input
+                        placeholder="Field name"
+                        value={f.label}
+                        disabled={disabled}
+                        onChange={(e) => setCustomField(i, "label", e.target.value)}
+                      />
+                    </Field>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <Field>
+                          <input
+                            placeholder="Value"
+                            value={f.value}
+                            disabled={disabled}
+                            onChange={(e) => setCustomField(i, "value", e.target.value)}
+                          />
+                        </Field>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={disabled}
+                        onClick={() => removeCustomField(i)}
+                        aria-label="Remove field"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={addCustomField} disabled={disabled}>
+                <Plus size={14} /> Add item
+              </button>
+            </div>
+
+            <div className="decision-card">
+              <SectionHead icon={<ClipboardCheck size={13} />} title="Note for the estimator" />
+              <Field hint="optional — anything estimation should know before they pick this up">
+                {textarea("noteForEstimator", { rows: 2 })}
+              </Field>
+            </div>
+
         </div>
       ) : null}
     </>
