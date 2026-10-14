@@ -3,6 +3,7 @@
 
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import * as api from "@/services/api/catalogApi";
+import { logout } from "./authSlice";
 
 export const fetchCatalog = createAsyncThunk("catalog/fetch", async (_, { rejectWithValue }) => {
   try {
@@ -35,7 +36,11 @@ const catalogSlice = createSlice({
       .addCase(fetchCatalog.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload;
-      });
+      })
+      // The next person on this browser starts clean — and gets the catalog
+      // asked for again, rather than inheriting a failed load that is never
+      // retried (the quote builder only fetches from "idle").
+      .addCase(logout, () => initialState);
   },
 });
 

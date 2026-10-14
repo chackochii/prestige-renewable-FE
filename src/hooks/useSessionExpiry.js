@@ -8,7 +8,7 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { logout, SESSION_NOTICES } from "@/slices/authSlice";
 import { pushToast } from "@/slices/notificationsSlice";
 
-const WARN_BEFORE_MS = 5 * 60 * 1000;
+const WARN_BEFORE_MS = 10 * 60 * 1000;
 
 export function useSessionExpiry() {
   const dispatch = useAppDispatch();

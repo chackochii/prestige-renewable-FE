@@ -18,6 +18,7 @@ const initialState = {
   boardStatus: "idle",
   boardError: null,
   boardQuery: null,
+  boardRequestId: null, // the newest board request — an older answer arriving later is dropped
   jobs: {}, // opportunityId → job
   jobStatus: {}, // opportunityId → idle | loading | succeeded | failed
   jobError: {}, // opportunityId → the last failure on that job, cleared by the next success
@@ -115,8 +116,11 @@ const procurementSlice = createSlice({
         state.boardStatus = "loading";
         state.boardError = null;
         state.boardQuery = boardQueryOf(action.meta.arg);
+        state.boardRequestId = action.meta.requestId;
       })
       .addCase(fetchProcurementBoard.fulfilled, (state, action) => {
+        // A search or page asked for before the newest one: its answer is out of date.
+        if (action.meta.requestId !== state.boardRequestId) return;
         state.boardStatus = "succeeded";
         state.board = action.payload?.items ?? [];
         state.boardTotal = action.payload?.total ?? state.board.length;
@@ -129,6 +133,7 @@ const procurementSlice = createSlice({
         }
       })
       .addCase(fetchProcurementBoard.rejected, (state, action) => {
+        if (action.meta.requestId !== state.boardRequestId) return;
         state.boardStatus = "failed";
         state.boardError = action.payload;
       })

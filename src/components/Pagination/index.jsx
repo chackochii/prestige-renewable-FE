@@ -6,8 +6,16 @@
 // noun — what the rows are, for the summary.
 //
 // A page past the end (the list shrank under it: a filter, a record moving on)
-// is pulled back to the last page there is. Changing page scrolls the top of
-// the list back into view when it has gone off screen.
+// is pulled back to the last page there is — once the list has loaded (a total
+// from the list before is no guide), and as a correction rather than a history
+// step (`onPageChange(page, { replace: true })`), so Back does not land on the
+// empty page again and bounce. Changing page brings the top of
+// the list (its card) back into view when it has gone off screen — once the
+// new page has rendered, so nothing that happens on the way (the router's
+// scroll handling, the list re-rendering) can undo it. The page param is
+// written with preventScrollReset (usePageParam), so the router leaves the
+// scroll alone; the card's scroll-margin keeps its title clear of the sticky
+// top bar.
 
 import { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -15,11 +23,19 @@ import { PAGE_SIZE, pageWindow } from "@/helpers/pagination";
 
 export default function Pagination({ page = 1, total = 0, pageSize = PAGE_SIZE, onPageChange, noun = "records", loading = false }) {
   const navRef = useRef(null);
+  const bringIntoView = useRef(false); // set by a click here, used once the page has changed
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
   useEffect(() => {
-    if (total > 0 && page > pages) onPageChange?.(pages);
-  }, [page, pages, total, onPageChange]);
+    if (!loading && total > 0 && page > pages) onPageChange?.(pages, { replace: true });
+  }, [loading, page, pages, total, onPageChange]);
+
+  useEffect(() => {
+    if (!bringIntoView.current) return;
+    bringIntoView.current = false;
+    const list = navRef.current?.closest(".card") ?? navRef.current?.parentElement;
+    if (list && list.getBoundingClientRect().top < 0) list.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [page]);
 
   if (!total) return null;
 
@@ -29,9 +45,8 @@ export default function Pagination({ page = 1, total = 0, pageSize = PAGE_SIZE, 
 
   const go = (next) => {
     if (next < 1 || next > pages || next === current) return;
+    bringIntoView.current = true;
     onPageChange?.(next);
-    const list = navRef.current?.closest(".card") ?? navRef.current?.parentElement;
-    if (list && list.getBoundingClientRect().top < 0) list.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
   return (

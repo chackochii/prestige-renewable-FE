@@ -9,11 +9,17 @@
 // `onUpdateItem(type, body)` and `onSetRequired(keys)` change it.
 // `canEdit` — the person may work the approvals (approvals.update).
 //
+// Checklist answers save by themselves a moment after they are given; the
+// Save bar on each checklist (`onSaveChecklist(sectionKey)` +
+// `checklistSaveState(sectionKey)` → { dirty, saving, savedAt }) sends them
+// at once and shows "Unsaved changes" / "Saved just now", so nobody has to
+// wonder whether what they typed is on the record.
+//
 // `embedded` drops the card chrome for use inside another card — the
 // opportunity page's stage-5 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, SquareCheckBig } from "lucide-react";
+import { Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, Save, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
@@ -28,7 +34,8 @@ import { APPROVALS_STAGE } from "@/constants/approvals";
 import { approvalContext, checklistOf, sectionOf } from "@/helpers/approvalChecklist";
 import { approvalItems, approvalStatus, isOverdue } from "@/helpers/approvals";
 import { checklistSummary } from "@/helpers/checklist";
-import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
+import { formatDate, slaStatus, timeAgo } from "@/helpers/dateTimeHelpers";
+import { useNotifications } from "@/hooks/useNotifications";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 const CHECKLIST_ICONS = { dnsp: Plug, da: Building2, finance: Landmark };
@@ -38,10 +45,23 @@ const CHECKLIST_ICONS = { dnsp: Plug, da: Building2, finance: Landmark };
  * the answers on screen have already gone back to what the API holds, so the
  * reason has to stay up until it is dismissed or the next save goes through.
  */
-export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChange, onUpdateItem, onSetRequired, saveError = null, onDismissSaveError, embedded = false }) {
+export default function ApprovalWorkflow({
+  job,
+  canEdit = false,
+  onChecklistChange,
+  onSaveChecklist,
+  checklistSaveState,
+  onUpdateItem,
+  onSetRequired,
+  saveError = null,
+  onDismissSaveError,
+  embedded = false,
+}) {
+  const { notify, error: notifyError } = useNotifications();
   const [tab, setTab] = useState("overview");
   const [choosing, setChoosing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingChecklist, setSavingChecklist] = useState(false);
   const [error, setError] = useState("");
 
   // A different job opens on its overview, not wherever the last one was.
@@ -82,6 +102,42 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
       setSaving(false);
     }
   };
+
+  /** The open checklist's Save button: sends what is waiting and says so. */
+  const saveChecklistNow = async () => {
+    if (!section || !onSaveChecklist) return;
+    setSavingChecklist(true);
+    try {
+      // true: answers were sent (now, or a save already on its way has landed).
+      const sent = await onSaveChecklist(section.key);
+      notify(sent ? `${section.tab} saved` : `${section.tab} saved — everything was already on the record`);
+    } catch (err) {
+      notifyError(typeof err === "string" ? err : err?.message || "The checklist could not be saved.");
+    } finally {
+      setSavingChecklist(false);
+    }
+  };
+
+  // The save bar on the open checklist: where its answers stand, and Save.
+  const checklistEditable = canEdit && !movedOn;
+  const saveState = section && checklistSaveState ? checklistSaveState(section.key) : null;
+  const saveBar =
+    section && checklistEditable && onSaveChecklist ? (
+      <span className="save-bar">
+        <span className={`row-meta${saveState?.dirty ? " is-dirty" : ""}`}>
+          {saveState?.dirty ? "Unsaved changes" : saveState?.saving ? "Saving…" : saveState?.savedAt ? `Saved ${timeAgo(saveState.savedAt)}` : "All changes saved"}
+        </span>
+        <button
+          type="button"
+          className={`btn btn-sm ${saveState?.dirty ? "btn-primary" : "btn-ghost"}`}
+          onClick={saveChecklistNow}
+          disabled={savingChecklist || saveState?.saving}
+          title={saveState?.dirty ? "Save what you have entered" : "Everything is saved — save again anyway"}
+        >
+          <Save size={14} /> {savingChecklist || saveState?.saving ? "Saving…" : "Save"}
+        </button>
+      </span>
+    ) : null;
 
   const body = (
     <>
@@ -157,7 +213,7 @@ export default function ApprovalWorkflow({ job, canEdit = false, onChecklistChan
             ) : null}
           </>
         ) : section ? (
-          <ApprovalChecklist section={section} job={job} canEdit={canEdit && !movedOn} onChange={(patch) => onChecklistChange?.(section.key, patch)} />
+          <ApprovalChecklist section={section} job={job} canEdit={checklistEditable} onChange={(patch) => onChecklistChange?.(section.key, patch)} actions={saveBar} />
         ) : (
           <ProcurementHistory job={job} />
         )}

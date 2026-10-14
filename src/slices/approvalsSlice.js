@@ -18,6 +18,7 @@ const initialState = {
   boardStatus: "idle",
   boardError: null,
   boardQuery: null, // what the board on screen (or on its way) was asked for
+  boardRequestId: null, // the newest board request — an older answer arriving later is dropped
   jobs: {}, // opportunityId → job
   jobStatus: {}, // opportunityId → idle | loading | succeeded | failed
   jobError: {},
@@ -122,8 +123,11 @@ const approvalsSlice = createSlice({
         state.boardStatus = "loading";
         state.boardError = null;
         state.boardQuery = boardQueryOf(action.meta.arg);
+        state.boardRequestId = action.meta.requestId;
       })
       .addCase(fetchApprovalsBoard.fulfilled, (state, action) => {
+        // A search or page asked for before the newest one: its answer is out of date.
+        if (action.meta.requestId !== state.boardRequestId) return;
         state.boardStatus = "succeeded";
         state.board = action.payload?.items ?? [];
         state.boardTotal = action.payload?.total ?? state.board.length;
@@ -138,6 +142,7 @@ const approvalsSlice = createSlice({
         }
       })
       .addCase(fetchApprovalsBoard.rejected, (state, action) => {
+        if (action.meta.requestId !== state.boardRequestId) return;
         state.boardStatus = "failed";
         state.boardError = action.payload;
       })

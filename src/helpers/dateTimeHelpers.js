@@ -1,20 +1,41 @@
-// Date/time helpers. Display is in the business unit's timezone when given,
-// otherwise Australia/Sydney.
+// Date/time helpers. Display is in the business unit's timezone: the one a
+// call names, else the unit the person is working in (set once the unit is
+// known — see setDisplayTimeZone in UnitSelectGate), else Australia/Sydney.
 
 const DEFAULT_TZ = "Australia/Sydney";
+const HOUR = 3600000;
+const DAY = 86400000;
 
-export function formatDate(value, { withTime = false, timeZone = DEFAULT_TZ } = {}) {
+let displayZone = DEFAULT_TZ;
+
+/**
+ * The zone dates and times are shown in when a call names none — the
+ * business unit's. Before this, every time on screen read in Sydney time
+ * whatever the unit, two or three hours out for Perth, Adelaide or Brisbane.
+ */
+export function setDisplayTimeZone(timeZone) {
+  displayZone = zoneOr(timeZone);
+}
+
+export const displayTimeZone = () => displayZone;
+
+export function formatDate(value, { withTime = false, timeZone } = {}) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
+  // A calendar day with no clock time ("2026-10-07", or the UTC midnight it is
+  // stored as — see hasClockTime) is that day wherever it is read: shown in
+  // UTC so no zone moves it, and never given a made-up time.
+  const dayOnly = typeof value === "string" && !hasClockTime(value);
+  const zone = dayOnly ? "UTC" : zoneOr(timeZone || displayZone);
   const day = date.toLocaleDateString("en-AU", {
     day: "numeric",
     month: "short",
     year: "numeric",
-    timeZone,
+    timeZone: zone,
   });
-  if (!withTime) return day;
-  const time = date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", timeZone });
+  if (!withTime || dayOnly) return day;
+  const time = date.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", timeZone: zone });
   return `${day} · ${time}`;
 }
 
@@ -30,13 +51,24 @@ export function timeAgo(value) {
   return days < 30 ? `${days}d ago` : formatDate(value);
 }
 
-/** SLA state for a due timestamp → { label, tone, overdue }. */
+/**
+ * SLA state for a due timestamp → { label, tone, overdue }. Overdue the moment
+ * the due time has passed — the same test as isOverdue, so a badge and the
+ * Home "Past SLA" count never disagree. (Rounding the days up used to turn the
+ * first day overdue into "-0 days" and read it as "Due today".)
+ */
 export function slaStatus(dueAt) {
   if (!dueAt) return { label: "No SLA", tone: "neutral", overdue: false };
-  const due = new Date(dueAt);
-  const days = Math.ceil((due - new Date()) / 86400000);
-  if (days < 0) return { label: `${Math.abs(days)}d overdue`, tone: "danger", overdue: true };
-  if (days === 0) return { label: "Due today", tone: "warning", overdue: false };
+  const left = new Date(dueAt).getTime() - Date.now();
+  if (Number.isNaN(left)) return { label: "No SLA", tone: "neutral", overdue: false };
+  if (left < 0) {
+    const days = Math.floor(-left / DAY);
+    const hours = Math.floor(-left / HOUR);
+    const label = days >= 1 ? `${days}d overdue` : hours >= 1 ? `${hours}h overdue` : "Overdue";
+    return { label, tone: "danger", overdue: true };
+  }
+  if (left < DAY) return { label: `Due in ${Math.max(1, Math.ceil(left / HOUR))}h`, tone: "warning", overdue: false };
+  const days = Math.ceil(left / DAY);
   if (days <= 2) return { label: `Due in ${days}d`, tone: "warning", overdue: false };
   return { label: `${days}d remaining`, tone: "success", overdue: false };
 }
@@ -153,19 +185,50 @@ export function sameInstant(a, b) {
   return new Date(a).getTime() === new Date(b).getTime();
 }
 
-/** Start of the current week / month / quarter. */
-export function periodStart(period) {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/**
+ * Today's date where the unit works, as "yyyy-mm-dd" — not the UTC date
+ * (toISOString), which is still yesterday until 10 or 11 am in Australia.
+ */
+export function todayIso(timeZone) {
+  const p = wallParts(new Date(), zoneOr(timeZone || displayZone));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+/**
+ * A calendar day plus `days`, as "yyyy-mm-dd". Pure calendar arithmetic, so a
+ * daylight-saving change in between cannot land it a day early or late (local
+ * setDate + toISOString did, across early October in NSW, VIC, SA and TAS).
+ */
+export function addDaysIso(date, days) {
+  const [y, m, d] = String(date ?? "").slice(0, 10).split("-").map(Number);
+  if (![y, m, d].every(Number.isFinite)) return "";
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * Start of the current week (Monday) / month / quarter in the unit's
+ * timezone, as the instant it begins — the same boundary for someone in
+ * Sydney and someone in India looking at the same unit.
+ */
+export function periodStart(period, timeZone) {
+  const zone = zoneOr(timeZone || displayZone);
+  const p = wallParts(new Date(), zone);
+  let year = Number(p.year);
+  let month = Number(p.month);
+  let day = Number(p.day);
   if (period === "week") {
-    const day = d.getDay();
-    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-    return d;
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = Sunday
+    const monday = new Date(Date.UTC(year, month - 1, day - (weekday === 0 ? 6 : weekday - 1)));
+    year = monday.getUTCFullYear();
+    month = monday.getUTCMonth() + 1;
+    day = monday.getUTCDate();
+  } else if (period === "month") {
+    day = 1;
+  } else {
+    month = Math.floor((month - 1) / 3) * 3 + 1;
+    day = 1;
   }
-  if (period === "month") {
-    d.setDate(1);
-    return d;
-  }
-  d.setMonth(Math.floor(d.getMonth() / 3) * 3, 1);
-  return d;
+  return new Date(zonedTimeToIso(`${year}-${pad2(month)}-${pad2(day)}`, "00:00", zone));
 }

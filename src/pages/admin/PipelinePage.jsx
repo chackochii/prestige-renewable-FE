@@ -5,10 +5,11 @@
 // for the work the list is bad at: seeing where everything sits, and dragging
 // a job into the next stage.
 //
-// The view, the stage filter, the lifecycle and the page all live in the URL,
-// so a filtered board or list is a link somebody can send. The list shows 12
-// jobs a page with numbered pages below, newest first; every filter is applied
-// by the API across the whole pipeline. The board shows the newest 200.
+// The view, the search, every filter and the page all live in the URL, so a
+// filtered board or list is a link somebody can send — and Back from a job
+// returns to the list as it was. The list shows 12 jobs a page with numbered
+// pages below, newest first; every filter is applied by the API across the
+// whole pipeline. The board shows the newest 200.
 
 import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -33,9 +34,10 @@ import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { usePageParam } from "@/hooks/usePageParam";
+import { useSearchParamWriter } from "@/hooks/useSearchParamWriter";
+import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -57,11 +59,9 @@ export default function PipelinePage() {
   const { unit } = useBusinessUnit();
   const { users, sales, byId, userName } = useUnitUsers();
   const { notify } = useNotifications();
-  const [params, setParams] = useSearchParams();
-  const [search, setSearch] = useState("");
-  const [ownerId, setOwnerId] = useState("");
-  const [authorId, setAuthorId] = useState("");
-  const [statusKey, setStatusKey] = useState("");
+  const [params] = useSearchParams();
+  const writeParams = useSearchParamWriter();
+  const { search, setSearch, term: settledSearch } = useUrlSearch();
   const [draggingId, setDraggingId] = useState(null);
 
   // A ?stage= pointing at a stage this person cannot see is ignored rather than
@@ -70,9 +70,11 @@ export default function PipelinePage() {
   const stageFilter = requestedStage && canViewStage(user, requestedStage) ? requestedStage : "";
   const lifecycle = params.get("life") || "Active";
   const view = params.get("view") === "board" ? "board" : "list";
+  const ownerId = params.get("owner") || "";
+  const authorId = params.get("author") || "";
+  const statusKey = params.get("status") || "";
   // Every filter is applied by the API, not in the browser: with only one page
   // of the pipeline loaded, filtering here would silently miss the rest.
-  const settledSearch = useDebouncedValue(search.trim(), 300);
   const filters = {
     ...(lifecycle === "all" ? {} : { lifecycle }),
     ...(settledSearch ? { search: settledSearch } : {}),
@@ -87,13 +89,15 @@ export default function PipelinePage() {
     pageSize: view === "board" ? BOARD_LIMIT : PAGE_SIZE,
   });
 
-  /** Keeps the other URL filters when one of them changes. */
-  const setParam = (key, value) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next);
-  };
+  /** One filter or the view, keeping the others; a history step, so Back undoes it. */
+  const setParam = (key, value) =>
+    writeParams(
+      (next) => {
+        if (value) next.set(key, value);
+        else next.delete(key);
+      },
+      { replace: false },
+    );
 
   // Stages this unit runs, narrowed to the ones this person may see. A stage
   // their role does not cover gets no column and no cards — the API filters the
@@ -138,12 +142,16 @@ export default function PipelinePage() {
   const ownerOptions = sales.length ? sales : users;
   const filtered = Boolean(stageFilter || ownerId || authorId || statusKey || search);
 
+  // Every filter in one write — written one after another, each used to
+  // overwrite the last, and only one of them actually cleared.
   const clearFilters = () => {
-    setOwnerId("");
-    setAuthorId("");
-    setStatusKey("");
     setSearch("");
-    setParam("stage", "");
+    writeParams(
+      (next) => {
+        for (const key of ["q", "stage", "owner", "author", "status"]) next.delete(key);
+      },
+      { replace: false },
+    );
   };
 
   return (
@@ -192,7 +200,7 @@ export default function PipelinePage() {
         <select
           className="select"
           value={statusKey}
-          onChange={(e) => setStatusKey(e.target.value)}
+          onChange={(e) => setParam("status", e.target.value)}
           aria-label="Status filter"
         >
           <option value="">All statuses</option>
@@ -202,7 +210,7 @@ export default function PipelinePage() {
             </option>
           ))}
         </select>
-        <select className="select" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} aria-label="Owner filter">
+        <select className="select" value={ownerId} onChange={(e) => setParam("owner", e.target.value)} aria-label="Owner filter">
           <option value="">All owners</option>
           {ownerOptions.map((u) => (
             <option key={u.id} value={u.id}>
@@ -213,7 +221,7 @@ export default function PipelinePage() {
         <select
           className="select"
           value={authorId}
-          onChange={(e) => setAuthorId(e.target.value)}
+          onChange={(e) => setParam("author", e.target.value)}
           aria-label="Created by filter"
         >
           <option value="">Created by anyone</option>
@@ -266,9 +274,13 @@ export default function PipelinePage() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      {loading && !rows.length ? (
+      {(loading && !rows.length) || (ready && !rows.length && total > 0) ? (
+        // A page past the end (the list shrank since) has no rows but a total:
+        // the pager moves it back to the last page rather than this saying
+        // there is nothing to show.
         <div className="card card-pad">
           <LoadingState label="Loading pipeline…" />
+          {view === "list" ? <Pagination page={page} total={total} onPageChange={setPage} noun="opportunities" loading={loading} /> : null}
         </div>
       ) : ready && rows.length === 0 ? (
         <div className="card card-pad">

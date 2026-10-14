@@ -2,8 +2,13 @@
 // The API re-validates the token on every request, so a disabled account or a
 // role change takes effect immediately regardless of what is cached here.
 
+import { clearAllLeadDrafts } from "@/helpers/leadDrafts";
+
 const SESSION_KEY = "prestige.session";
 const UNIT_KEY = "prestige.unit";
+
+/** The storage key the session lives under — the store listens for other tabs changing it. */
+export const SESSION_STORAGE_KEY = SESSION_KEY;
 
 function read(key) {
   try {
@@ -33,9 +38,21 @@ export function saveSession(session) {
   write(SESSION_KEY, session);
 }
 
-export function clearSession() {
+/**
+ * Ends the stored session. Given the token this tab signed in with, it only
+ * clears the session if it is still that one: storage is shared by every tab,
+ * and another tab may have signed in since — its session is not this tab's to
+ * end (an old tab's expiry timer used to sign the new tab out).
+ *
+ * The unsaved lead drafts go with it: they hold customer details, and the
+ * next person on this browser must not find them (helpers/leadDrafts.js).
+ */
+export function clearSession(token = null) {
+  const stored = loadSession();
+  if (token && stored && stored.token !== token) return;
   write(SESSION_KEY, null);
   write(UNIT_KEY, null);
+  clearAllLeadDrafts();
 }
 
 export function getToken() {

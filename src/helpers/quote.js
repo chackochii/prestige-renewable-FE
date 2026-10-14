@@ -100,16 +100,22 @@ export function quoteGstBreakdown({ itemsTotal, additionalCosts, taxTreatment, g
   if (taxTreatment === "inclusive") {
     const grandTotal = combined;
     const preTaxTotal = rate ? grandTotal / (1 + rate / 100) : grandTotal;
-    return { costsTotal, ...split, preTaxTotal, gst: grandTotal - preTaxTotal, grandTotal };
+    // The price before rebates and discounts, ex GST. Those deductions were
+    // entered GST-inclusive like every other amount, so they come back on
+    // *before* the GST is taken out — adding them to the ex-GST total
+    // overstated the price by their GST share ($11,000 less a $1,100 rebate
+    // is $10,000 + GST, not $10,100).
+    const systemPrice = (grandTotal + split.deductionsTotal) / (1 + rate / 100);
+    return { costsTotal, ...split, preTaxTotal, systemPrice, gst: grandTotal - preTaxTotal, grandTotal };
   }
 
   if (taxTreatment === "no_gst") {
-    return { costsTotal, ...split, preTaxTotal: combined, gst: 0, grandTotal: combined };
+    return { costsTotal, ...split, preTaxTotal: combined, systemPrice: combined + split.deductionsTotal, gst: 0, grandTotal: combined };
   }
 
   // exclusive
   const gst = combined * (rate / 100);
-  return { costsTotal, ...split, preTaxTotal: combined, gst, grandTotal: combined + gst };
+  return { costsTotal, ...split, preTaxTotal: combined, systemPrice: combined + split.deductionsTotal, gst, grandTotal: combined + gst };
 }
 
 /**

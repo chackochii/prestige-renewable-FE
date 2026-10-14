@@ -6,6 +6,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import LoadingState from "@/components/LoadingState";
+import { setDisplayTimeZone } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 
@@ -109,5 +110,10 @@ export default function UnitSelectGate({ children }) {
     );
   }
 
+  // Every date and time in the workspace reads in this unit's timezone unless
+  // a screen names another. Set here, while rendering and before the
+  // workspace below renders, so the first paint is already right; it only
+  // stores a value, so running it again is harmless.
+  setDisplayTimeZone(unit.timezone);
   return children;
 }

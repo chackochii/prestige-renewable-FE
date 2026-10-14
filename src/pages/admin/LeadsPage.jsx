@@ -1,8 +1,8 @@
 // Leads: opportunities still at stage 1 in the current business unit, 12 to
 // a page with numbered pages below, newest first. The search runs on the API
-// across every lead; the page is kept in the URL.
+// across every lead; the search and the page are kept in the URL, so Back
+// from a lead returns to the list as it was.
 
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
@@ -18,9 +18,9 @@ import { enquiryLink } from "@/features/leads/enquiryLink";
 import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { usePageParam } from "@/hooks/usePageParam";
+import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 
 /** How to reach the customer — captured on every lead, so always worth showing. */
@@ -30,11 +30,10 @@ export default function LeadsPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { unit } = useBusinessUnit();
-  const [search, setSearch] = useState("");
   // Only part of the list is loaded now, so searching in the browser would miss
   // anything further down. The search goes to the API, which applies it across
   // every lead and pages the result.
-  const settledSearch = useDebouncedValue(search.trim(), 300);
+  const { search, setSearch, term: settledSearch } = useUrlSearch();
 
   const [page, setPage] = usePageParam(settledSearch);
 
@@ -85,7 +84,10 @@ export default function LeadsPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <div className="card card-pad">
-        {loading && !rows.length ? (
+        {/* A page past the end (the list shrank since) has no rows but a total:
+            the pager below moves it back to the last page rather than this
+            saying there are no leads. */}
+        {(loading && !rows.length) || (ready && !rows.length && total > 0) ? (
           <LoadingState label="Loading leads…" />
         ) : ready && rows.length === 0 ? (
           <EmptyState
@@ -127,9 +129,9 @@ export default function LeadsPage() {
                 })}
               </tbody>
             </table>
-            <Pagination page={page} total={total} onPageChange={setPage} noun="leads" loading={loading} />
           </div>
         )}
+        <Pagination page={page} total={total} onPageChange={setPage} noun="leads" loading={loading} />
       </div>
     </>
   );

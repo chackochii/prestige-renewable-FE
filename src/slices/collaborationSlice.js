@@ -21,6 +21,7 @@ const initialState = {
   byOpp: [],
   byOppStatus: "idle",
   byOppError: null,
+  byOppRequestId: null, // the newest job's list asked for — an older answer arriving later is dropped
   selected: null,
   selectedStatus: "idle",
   selectedError: null,
@@ -248,16 +249,22 @@ const collaborationSlice = createSlice({
         state.raisedError = action.payload;
       })
       .addCase(fetchOpportunityRequests.pending, (state, action) => {
+        // Another job: its requests, not the last job's, from the start.
+        if (Number(action.meta.arg) !== state.oppId) state.byOpp = [];
         state.byOppStatus = "loading";
         state.byOppError = null;
         state.oppId = Number(action.meta.arg);
+        state.byOppRequestId = action.meta.requestId;
       })
       .addCase(fetchOpportunityRequests.fulfilled, (state, action) => {
+        // Asked for before the newest (two jobs opened in quick succession): out of date.
+        if (action.meta.requestId !== state.byOppRequestId) return;
         state.byOppStatus = "succeeded";
         state.oppId = action.payload.opportunityId;
         state.byOpp = action.payload.items || [];
       })
       .addCase(fetchOpportunityRequests.rejected, (state, action) => {
+        if (action.meta.requestId !== state.byOppRequestId) return;
         state.byOppStatus = "failed";
         state.byOppError = action.payload;
         state.byOpp = [];
@@ -277,8 +284,9 @@ const collaborationSlice = createSlice({
       .addCase(createRequest.fulfilled, (state, action) => {
         const request = action.payload;
         if (!request?.id) return;
-        state.raised.unshift(request);
-        if (state.oppId && Number(request.opportunityId) === state.oppId) state.byOpp.unshift(request);
+        // A list reloaded meanwhile may already hold it — never twice.
+        if (!state.raised.some((row) => row.id === request.id)) state.raised.unshift(request);
+        if (state.oppId && Number(request.opportunityId) === state.oppId && !state.byOpp.some((row) => row.id === request.id)) state.byOpp.unshift(request);
       })
       .addCase(updateRequest.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitResponse.fulfilled, (state, action) => upsert(state, action.payload))

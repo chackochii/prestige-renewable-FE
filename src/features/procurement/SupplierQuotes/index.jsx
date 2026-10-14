@@ -10,12 +10,12 @@ import Alert from "@/components/Alert";
 import Field from "@/components/Field";
 import SectionHead from "@/components/SectionHead";
 import { boqLines, quotedLineCount, quotesReceived } from "@/helpers/procurement";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 const errText = (err, fallback) => (typeof err === "string" ? err : err?.message || fallback);
-const today = () => new Date().toISOString().slice(0, 10);
-const blank = () => ({ supplier: "", total: "", validUntil: "", receivedAt: today() });
+// Today where the unit works — the UTC date is still yesterday on Australian mornings.
+const blank = () => ({ supplier: "", total: "", validUntil: "", receivedAt: todayIso() });
 
 export default function SupplierQuotes({ job, canEdit = false, onAdd, onRemove }) {
   const quotes = Array.isArray(job?.quotes) ? job.quotes : [];

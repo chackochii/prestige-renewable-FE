@@ -221,20 +221,31 @@ export async function deleteQuoteCost(id, costId) {
 }
 
 // ---- Quote versions ------------------------------------------------------
-// A saved version is a frozen snapshot of the quote (see
+// A generated version is a frozen snapshot of the quote (see
 // helpers/invoice.js#invoiceSnapshot). The PDF is rebuilt from that snapshot
 // on view/download, so nothing needs storing but the snapshot itself.
+//
+// The quote is a draft until it is generated, then locked (status
+// "generated", the write endpoints answer 409); a new quote makes it a
+// pre-filled draft again.
 
-/** Saved quote versions for this opportunity, newest first. */
+/** Generated quote versions for this opportunity, newest first. */
 export async function listQuoteVersions(id) {
   return unwrap(await apiClient.get(`/opportunities/${id}/quote/versions`));
 }
 
 /**
- * body: { quoteNumber, version, grandTotal, snapshot } — the server owns the
- * version number (ours is a hint, so two people saving at once can't collide)
- * and fills in createdAt and createdByName.
+ * Generates the quote. body: { quoteNumber, version, grandTotal, snapshot } —
+ * the server owns the version number (ours is a hint, so two people
+ * generating at once can't collide) and fills in createdAt and
+ * createdByName. Returns the version with the now-locked quote as `quote`.
+ * A draft unchanged from the newest version is locked back onto it.
  */
 export async function createQuoteVersion(id, body) {
   return unwrap(await apiClient.post(`/opportunities/${id}/quote/versions`, body));
+}
+
+/** Starts a new quote from the generated one: a draft again, pre-filled from it. */
+export async function startQuoteDraft(id) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/draft`));
 }

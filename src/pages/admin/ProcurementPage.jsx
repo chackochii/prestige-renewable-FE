@@ -22,8 +22,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { PROCUREMENT_STAGE } from "@/constants/procurement";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePageParam } from "@/hooks/usePageParam";
+import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 import { useProcurementJob } from "@/hooks/useProcurementJob";
 import { procurementStatus } from "@/helpers/procurement";
@@ -37,9 +37,9 @@ export default function ProcurementPage() {
   const { unitId } = useBusinessUnit();
   const { hasPermission } = useAuth();
   const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.procurement);
-  const [search, setSearch] = useState("");
+  // The search and the page live in the URL, so Back returns to the board as it was.
+  const { search, setSearch, term } = useUrlSearch();
   const [selectedId, setSelectedId] = useState(null);
-  const term = useDebouncedValue(search.trim(), 300);
   const [page, setPage] = usePageParam(term);
   const boardKey = JSON.stringify(unitId ? { businessUnitId: unitId, search: term || undefined, page, pageSize: PAGE_SIZE } : null);
   const loading = boardStatus === "loading";

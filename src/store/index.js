@@ -3,8 +3,9 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { useDispatch, useSelector } from "react-redux";
 import { setForbiddenHandler, setUnauthorizedHandler } from "@/services/api/client";
+import { loadSession, SESSION_STORAGE_KEY } from "@/services/api/tokenStore";
 
-import authReducer, { fetchMe, logout, SESSION_NOTICES } from "@/slices/authSlice";
+import authReducer, { adoptSession, fetchMe, logout, SESSION_NOTICES } from "@/slices/authSlice";
 import businessUnitsReducer from "@/slices/businessUnitsSlice";
 import pagesReducer from "@/slices/pagesSlice";
 import rolesReducer from "@/slices/rolesSlice";
@@ -66,6 +67,30 @@ setForbiddenHandler(() => {
   lastPermissionSync = Date.now();
   store.dispatch(fetchMe());
 });
+
+// Every tab shares the stored session, but each holds its own copy in memory.
+// When another tab signs in or out, this one follows (the `storage` event
+// fires in every tab except the one that wrote):
+//  - signed out there → signed out here too;
+//  - the same person signed in again → carry on with the new token;
+//  - somebody else signed in → nothing from the first person's session may
+//    stay on screen or be sent under the new token: end it here (every slice
+//    resets on logout) and continue as the new person.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== SESSION_STORAGE_KEY && event.key !== null) return; // null: storage cleared
+    const { token, user } = store.getState().auth;
+    const next = loadSession();
+    // `elsewhere`: this tab only follows — the stored session is the other tab's.
+    if (!next?.token) {
+      if (token) store.dispatch(logout({ notice: SESSION_NOTICES.SIGNED_OUT, elsewhere: true }));
+      return;
+    }
+    if (next.token === token) return;
+    if (token && next.user?.id !== user?.id) store.dispatch(logout({ notice: SESSION_NOTICES.SIGNED_OUT, elsewhere: true }));
+    store.dispatch(adoptSession(next));
+  });
+}
 
 export const useAppDispatch = useDispatch;
 export const useAppSelector = useSelector;

@@ -25,8 +25,8 @@ import ProposalWorkflow from "@/features/proposals/ProposalWorkflow";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePageParam } from "@/hooks/usePageParam";
+import { useUrlParam, useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { boardStatus } from "@/helpers/proposals";
@@ -51,10 +51,12 @@ export default function ProposalsPage() {
   const [board, setBoard] = useState(null); // { items, total, counts } — the page on screen
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  // The search, the filter chip and the page live in the URL, so Back from a
+  // job returns to the board as it was.
+  const { search, setSearch, term } = useUrlSearch();
+  const [requestedFilter, setFilter] = useUrlParam("filter", "all");
+  const filter = FILTERS.some((option) => option.key === requestedFilter) ? requestedFilter : "all";
   const [selectedId, setSelectedId] = useState(null);
-  const term = useDebouncedValue(search.trim(), 300);
   const [page, setPage] = usePageParam(`${term}|${filter}`);
   // Only the newest request may land: an older answer arriving late (a fast
   // typist, a quick page change) is dropped.

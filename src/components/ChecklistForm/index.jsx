@@ -16,6 +16,8 @@
 // upload     — async (itemKey, files) => [{ id, filename, url }]: where a stage
 //              files the documents attached on an item. Without it, files are
 //              kept by name with the answers.
+// actions    — a node shown beside the summary at the top and again under the
+//              items (a Save button with its saved state, say); optional.
 
 import { useRef, useState } from "react";
 import { Check, ExternalLink, Leaf, Lock, Paperclip, Send, X } from "lucide-react";
@@ -23,7 +25,7 @@ import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import NumberInput from "@/components/NumberInput";
-import { appliesTo, blank, checklistSummary, isNmi, itemDone, itemNumber, itemRange, sectionApplies, statusBlockers, statusOf } from "@/helpers/checklist";
+import { appliesTo, blank, checklistSummary, isNmi, itemDone, itemNumber, itemRange, sectionApplies, statusOf } from "@/helpers/checklist";
 
 const ACTION_ICONS = { leaf: Leaf, send: Send };
 
@@ -150,7 +152,7 @@ const YES_NO = [
   { value: "no", label: "No" },
 ];
 
-export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange, upload = null, intro = null }) {
+export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange, upload = null, intro = null, actions = null }) {
   const summary = checklistSummary(section, answers, ctx, { locked: Boolean(locked) });
   const set = (key, value) => onChange?.({ [key]: value });
   const uploaderFor = (key) => (upload ? (files) => upload(key, files) : null);
@@ -287,40 +289,29 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
       case "files":
         return <FilePicker id={id} files={answers[item.key] ?? []} disabled={disabled} upload={uploaderFor(item.key)} onChange={(files) => set(item.key, files)} />;
       case "status": {
+        // Every status can be chosen — the coordinator's call, with nothing
+        // listed under it about what each status expects (the items above
+        // show for themselves what is still open). The records come first —
+        // reference, dates, the evidence attached — and the status last, as
+        // the decision made once those are in.
         const current = statusOf(section, answers);
-        const stale = statusBlockers(section, answers, ctx, current.value);
-        const choices = item.statuses.map((status) => ({ ...status, blockers: statusBlockers(section, answers, ctx, status.value) }));
-        // What it takes to move forward — a rejection needs no prompting.
-        const next = choices.filter((status) => status.value !== current.value && status.blockers.length && status.track !== "rejected");
         return (
           <>
-            <Field label="Status" htmlFor={id}>
-              <select id={id} value={current.value} disabled={disabled} onChange={(e) => set("status", e.target.value)}>
-                {choices.map((status) => (
-                  <option key={status.value} value={status.value} disabled={status.blockers.length > 0 && status.value !== current.value}>
-                    {status.label}
-                    {status.blockers.length && status.value !== current.value ? " — not yet" : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {stale.length ? (
-              <Alert tone="warning" style={{ margin: "10px 0 0" }}>
-                Marked <strong>{current.label.toLowerCase()}</strong>, but something has changed since: {stale.join("; ")}.
-              </Alert>
-            ) : next.length && !disabled ? (
-              <div className="row-meta cl-blockers">
-                {next.map((status) => (
-                  <div key={status.value}>
-                    <strong>{status.label.split(" — ")[0]}</strong>: {status.blockers.join("; ")}.
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <div className="form-grid cl-grid" style={{ marginTop: 12 }}>
+            <div className="form-grid cl-grid">
               {item.records
                 .filter((record) => appliesTo(record, ctx) !== false)
                 .map((record) => labelled(record, answers[record.key], (value) => set(record.key, value), `${id}-${record.key}`, disabled, { span: spans(record) }))}
+            </div>
+            <div className="form-grid cl-grid" style={{ marginTop: 12 }}>
+              <Field label="Status" htmlFor={id}>
+                <select id={id} value={current.value} disabled={disabled} onChange={(e) => set("status", e.target.value)}>
+                  {item.statuses.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
           </>
         );
@@ -374,7 +365,10 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
             {readOnly ? " · read only" : ""}
           </div>
         </div>
-        <Badge tone={summary.tone}>{summary.label}</Badge>
+        <div className="cl-head-right">
+          <Badge tone={summary.tone}>{summary.label}</Badge>
+          {actions}
+        </div>
       </div>
 
       {intro}
@@ -406,6 +400,7 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
             </div>
           </div>
           <div className="cl-items">{items}</div>
+          {actions ? <div className="cl-foot">{actions}</div> : null}
         </>
       )}
     </div>

@@ -57,8 +57,12 @@ export const fetchMe = createAsyncThunk("auth/fetchMe", async (_, { rejectWithVa
   }
 });
 
-const clearState = (state, notice) => {
-  clearSession();
+const clearState = (state, notice, { elsewhere = false } = {}) => {
+  // Only this tab's own session — another tab may have signed in since. When
+  // this tab is only following another tab's sign-out (`elsewhere`), storage
+  // is that tab's business and is left alone: writing to it late could wipe
+  // what the other tab saved since (a new sign-in, the unit just chosen).
+  if (!elsewhere) clearSession(state.token);
   state.user = null;
   state.token = null;
   state.expiresAt = null;
@@ -73,9 +77,29 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    /** payload (optional): { notice: SESSION_NOTICES.* } */
+    /**
+     * payload (optional): { notice: SESSION_NOTICES.*, elsewhere } — elsewhere:
+     * following another tab's change, so the stored session is not touched.
+     */
     logout(state, action) {
-      clearState(state, action.payload?.notice ?? SESSION_NOTICES.SIGNED_OUT);
+      clearState(state, action.payload?.notice ?? SESSION_NOTICES.SIGNED_OUT, { elsewhere: Boolean(action.payload?.elsewhere) });
+    },
+    /**
+     * The same person signed in again in another tab: this tab carries on
+     * with that session (payload: { token, user }) instead of running out on
+     * the old token.
+     */
+    adoptSession(state, action) {
+      const { token, user } = action.payload ?? {};
+      if (!token) return;
+      state.token = token;
+      state.user = user ?? state.user;
+      state.expiresAt = decodeTokenExpiry(token);
+      state.initialized = true;
+      state.status = "succeeded";
+      state.error = null;
+      state.notice = null;
+      state.noticeSeen = false;
     },
     clearAuthError(state) {
       state.error = null;
@@ -125,5 +149,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearAuthError, clearSessionNotice, markSessionNoticeSeen } = authSlice.actions;
+export const { logout, adoptSession, clearAuthError, clearSessionNotice, markSessionNoticeSeen } = authSlice.actions;
 export default authSlice.reducer;

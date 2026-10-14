@@ -12,13 +12,22 @@ const initialState = {
   page: 1, // the page held
   pageSize: 200,
   totals: null, // figures across every matching record, when asked for (the Quotes page)
-  query: null,
+  query: null, // the list the rows held belong to — set when they arrive, not when asked for
   requested: null, // the list and page last asked for — see useOpportunities
+  listRequestId: null, // the newest list request; an older answer arriving later is dropped
   status: "idle",
-  error: null,
+  error: null, // belongs to `requested`
   selected: null,
   selectedStatus: "idle",
   selectedError: null,
+  selectedRequestId: null, // the newest fetch of the open record
+  // The record open in the detail view. Everything hung off a record (its
+  // history, meetings, attachments, quote, versions) is only taken from an
+  // answer about this record: open two records in quick succession and the
+  // first one's late answers must not land on the second.
+  openId: null,
+  quoteRequestId: null,
+  versionsRequestId: null,
   mutationStatus: "idle",
   history: [],
   historyStatus: "idle",
@@ -52,20 +61,54 @@ export const listIdentity = (params = {}) => {
   return filters;
 };
 
+/** Exactly what a request asks for — the list and the page — as useOpportunities compares it. */
+const requestOf = (params = {}) => ({ ...listIdentity(params), page: params.page ?? 1, pageSize: params.pageSize ?? 200 });
+const sameJson = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
 /**
  * params: the filters, plus { page, pageSize, append }. With append the rows
  * are added to what is already held (infinite scroll); without it they replace
  * it (first load, filter change, refresh).
  */
-export const fetchOpportunities = createAsyncThunk("leads/fetchAll", async (params = {}, { rejectWithValue }) => {
-  try {
-    const { page = 1, pageSize = 200, append = false } = params;
-    const result = await api.listOpportunities({ ...listIdentity(params), page, pageSize });
-    return { ...result, query: listIdentity(params), page, pageSize, append };
-  } catch (err) {
-    return reject(err, rejectWithValue);
-  }
-});
+export const fetchOpportunities = createAsyncThunk(
+  "leads/fetchAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { page = 1, pageSize = 200, append = false } = params;
+      const result = await api.listOpportunities({ ...listIdentity(params), page, pageSize });
+      return { ...result, query: listIdentity(params), page, pageSize, append };
+    } catch (err) {
+      return reject(err, rejectWithValue);
+    }
+  },
+  {
+    // The very same page already on its way is not asked for twice (a screen
+    // and its Refresh button, or React's development double-run of effects).
+    condition: (params, { getState }) => {
+      const { status, requested } = getState().leads;
+      return !(status === "loading" && sameJson(requested, requestOf(params)));
+    },
+  },
+);
+
+/** The record a record-level thunk was about: its argument is the id, or { id, … }. */
+const oppIdOf = (arg) => Number(arg && typeof arg === "object" ? arg.id : arg);
+/** Whether an answer is about the record that is open (or nothing is open yet). */
+const forOpen = (state, action) => state.openId === null || oppIdOf(action.meta.arg) === state.openId;
+
+/**
+ * Whether a record still belongs in the list held, on the filters that can be
+ * checked here — the unit, stage, minimum stage and lifecycle. (Search, owner
+ * and status are left to the list being asked for again on the next visit.)
+ */
+const fitsList = (opp, query) => {
+  if (!query) return true;
+  if (query.businessUnitId && Number(opp.businessUnitId) !== Number(query.businessUnitId)) return false;
+  if (query.stage !== undefined && query.stage !== "" && Number(opp.stage) !== Number(query.stage)) return false;
+  if (query.minStage !== undefined && Number(opp.stage) < Number(query.minStage)) return false;
+  if (query.lifecycle && opp.lifecycle !== query.lifecycle) return false;
+  return true;
+};
 
 export const fetchOpportunity = createAsyncThunk("leads/fetchOne", async (id, { rejectWithValue }) => {
   try {
@@ -438,6 +481,7 @@ export const fetchQuoteVersions = createAsyncThunk("leads/quote/versions/fetch",
   }
 });
 
+/** Generates the quote: the next version, and the quote comes back locked. */
 export const saveQuoteVersion = createAsyncThunk(
   "leads/quote/versions/save",
   async ({ id, body }, { rejectWithValue }) => {
@@ -449,12 +493,52 @@ export const saveQuoteVersion = createAsyncThunk(
   },
 );
 
+/** A new quote from the generated one: the quote comes back as a draft, pre-filled. */
+export const startQuoteDraft = createAsyncThunk("leads/quote/draft", async (id, { rejectWithValue }) => {
+  try {
+    return await api.startQuoteDraft(id);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/**
+ * A record changed (or created): refresh it where it is shown. In the list
+ * held it is updated in place — or taken out, when the change moved it out of
+ * the list (a lead advanced to estimation leaves Leads). A record not already
+ * in the list is never added: a new lead does not belong in, say, a Pipeline
+ * filtered to stage 5, and the list is asked for again on the next visit.
+ */
 const upsert = (state, opp) => {
   if (!opp) return;
   const idx = state.items.findIndex((o) => o.id === opp.id);
-  if (idx === -1) state.items.unshift(opp);
-  else state.items[idx] = opp;
+  if (idx !== -1) {
+    if (fitsList(opp, state.query)) state.items[idx] = opp;
+    else {
+      state.items.splice(idx, 1);
+      state.total = Math.max(0, state.total - 1);
+    }
+  }
   if (state.selected?.id === opp.id) state.selected = opp;
+};
+
+/** Everything hung off one record, back to empty — another record is being opened. */
+const resetRecord = (state) => {
+  state.history = [];
+  state.historyStatus = "idle";
+  state.historyError = null;
+  state.meetings = [];
+  state.meetingsStatus = "idle";
+  state.meetingsError = null;
+  state.attachments = [];
+  state.attachmentsStatus = "idle";
+  state.attachmentsError = null;
+  state.quote = null;
+  state.quoteStatus = "idle";
+  state.quoteError = null;
+  state.versions = [];
+  state.versionsStatus = "idle";
+  state.versionsError = null;
 };
 
 const leadsSlice = createSlice({
@@ -465,21 +549,7 @@ const leadsSlice = createSlice({
       state.selected = null;
       state.selectedStatus = "idle";
       state.selectedError = null;
-      state.history = [];
-      state.historyStatus = "idle";
-      state.historyError = null;
-      state.meetings = [];
-      state.meetingsStatus = "idle";
-      state.meetingsError = null;
-      state.attachments = [];
-      state.attachmentsStatus = "idle";
-      state.attachmentsError = null;
-      state.quote = null;
-      state.quoteStatus = "idle";
-      state.quoteError = null;
-      state.versions = [];
-      state.versionsStatus = "idle";
-      state.versionsError = null;
+      resetRecord(state);
     },
   },
   extraReducers: (builder) => {
@@ -487,14 +557,18 @@ const leadsSlice = createSlice({
       .addCase(fetchOpportunities.pending, (state, action) => {
         state.status = "loading";
         state.error = null;
-        // Loading a further page keeps the current query and the rows already
-        // on screen; only a genuinely new list replaces them.
-        if (!action.meta.arg?.append) state.query = listIdentity(action.meta.arg);
+        // `query` stays the list the rows held belong to until the new rows
+        // arrive: claiming it now made the previous list's rows (and total)
+        // show under the new one while it loaded.
         // Exactly what was asked for — list and page — so a failure is not
         // asked for again on its own, only on reload (useOpportunities).
-        state.requested = { ...listIdentity(action.meta.arg), page: action.meta.arg?.page ?? 1, pageSize: action.meta.arg?.pageSize ?? 200 };
+        state.requested = requestOf(action.meta.arg);
+        state.listRequestId = action.meta.requestId;
       })
       .addCase(fetchOpportunities.fulfilled, (state, action) => {
+        // Asked for before the newest request (a quick filter or page change,
+        // Refresh while loading): out of date, whichever lands last.
+        if (action.meta.requestId !== state.listRequestId) return;
         const { items, total, page, pageSize, totals, append, query } = action.payload;
         state.status = "succeeded";
         state.pageSize = pageSize ?? state.pageSize;
@@ -508,18 +582,29 @@ const leadsSlice = createSlice({
         state.query = query;
       })
       .addCase(fetchOpportunities.rejected, (state, action) => {
+        if (action.meta.requestId !== state.listRequestId) return;
         state.status = "failed";
         state.error = action.payload;
       })
-      .addCase(fetchOpportunity.pending, (state) => {
+      .addCase(fetchOpportunity.pending, (state, action) => {
+        const id = oppIdOf(action.meta.arg);
+        // Another record: nothing of the last one may stay on screen under it.
+        if (id !== state.openId) {
+          state.selected = null;
+          resetRecord(state);
+        }
+        state.openId = id;
         state.selectedStatus = "loading";
         state.selectedError = null;
+        state.selectedRequestId = action.meta.requestId;
       })
       .addCase(fetchOpportunity.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.selectedRequestId) return;
         state.selectedStatus = "succeeded";
         state.selected = action.payload;
       })
       .addCase(fetchOpportunity.rejected, (state, action) => {
+        if (action.meta.requestId !== state.selectedRequestId) return;
         state.selectedStatus = "failed";
         state.selectedError = action.payload;
         state.selected = null;
@@ -529,7 +614,9 @@ const leadsSlice = createSlice({
       .addCase(advanceStage.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(handOverToProposal.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(deleteLead.fulfilled, (state, action) => {
+        const before = state.items.length;
         state.items = state.items.filter((o) => o.id !== action.payload);
+        if (state.items.length < before) state.total = Math.max(0, state.total - 1);
         if (state.selected?.id === action.payload) state.selected = null;
       })
       .addCase(fetchOpportunityHistory.pending, (state) => {
@@ -537,45 +624,51 @@ const leadsSlice = createSlice({
         state.historyError = null;
       })
       .addCase(fetchOpportunityHistory.fulfilled, (state, action) => {
+        if (!forOpen(state, action)) return;
         state.historyStatus = "succeeded";
         state.history = action.payload || [];
       })
       .addCase(fetchOpportunityHistory.rejected, (state, action) => {
+        if (!forOpen(state, action)) return;
         state.historyStatus = "failed";
         state.historyError = action.payload;
       })
       .addCase(addOpportunityHistoryEntry.fulfilled, (state, action) => {
-        state.history.unshift(action.payload);
+        if (forOpen(state, action)) state.history.unshift(action.payload);
       })
       .addCase(fetchOpportunityMeetings.pending, (state) => {
         state.meetingsStatus = "loading";
         state.meetingsError = null;
       })
       .addCase(fetchOpportunityMeetings.fulfilled, (state, action) => {
+        if (!forOpen(state, action)) return;
         state.meetingsStatus = "succeeded";
         state.meetings = action.payload || [];
       })
       .addCase(fetchOpportunityMeetings.rejected, (state, action) => {
+        if (!forOpen(state, action)) return;
         state.meetingsStatus = "failed";
         state.meetingsError = action.payload;
       })
       .addCase(addOpportunityMeeting.fulfilled, (state, action) => {
-        state.meetings.unshift(action.payload);
+        if (forOpen(state, action)) state.meetings.unshift(action.payload);
       })
       .addCase(fetchOpportunityAttachments.pending, (state) => {
         state.attachmentsStatus = "loading";
         state.attachmentsError = null;
       })
       .addCase(fetchOpportunityAttachments.fulfilled, (state, action) => {
+        if (!forOpen(state, action)) return;
         state.attachmentsStatus = "succeeded";
         state.attachments = action.payload || [];
       })
       .addCase(fetchOpportunityAttachments.rejected, (state, action) => {
+        if (!forOpen(state, action)) return;
         state.attachmentsStatus = "failed";
         state.attachmentsError = action.payload;
       })
       .addCase(uploadOpportunityAttachment.fulfilled, (state, action) => {
-        state.attachments.unshift(action.payload);
+        if (forOpen(state, action)) state.attachments.unshift(action.payload);
       })
       .addCase(assignSalesperson.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(assignEstimator.fulfilled, (state, action) => upsert(state, action.payload))
@@ -587,58 +680,75 @@ const leadsSlice = createSlice({
       .addCase(collectEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(acceptEstimationInputs.fulfilled, (state, action) => upsert(state, action.payload))
       .addCase(submitEstimatorChecklist.fulfilled, (state, action) => upsert(state, action.payload))
-      .addCase(fetchOpportunityQuote.pending, (state) => {
+      // ---- The open record's quote and versions: only answers about it ----
+      .addCase(fetchOpportunityQuote.pending, (state, action) => {
         state.quoteStatus = "loading";
         state.quoteError = null;
+        state.quoteRequestId = action.meta.requestId;
       })
       .addCase(fetchOpportunityQuote.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.quoteRequestId || !forOpen(state, action)) return;
         state.quoteStatus = "succeeded";
         state.quote = action.payload || null;
       })
       .addCase(fetchOpportunityQuote.rejected, (state, action) => {
+        if (action.meta.requestId !== state.quoteRequestId || !forOpen(state, action)) return;
         state.quoteStatus = "failed";
         state.quoteError = action.payload;
       })
       .addCase(createOpportunityQuote.fulfilled, (state, action) => {
-        state.quote = action.payload;
+        if (forOpen(state, action)) state.quote = action.payload;
       })
       .addCase(updateOpportunityQuote.fulfilled, (state, action) => {
-        state.quote = action.payload;
+        if (forOpen(state, action)) state.quote = action.payload;
       })
       .addCase(addQuoteItem.fulfilled, (state, action) => {
-        state.quote?.items.push(action.payload);
+        if (forOpen(state, action)) state.quote?.items.push(action.payload);
       })
       .addCase(updateQuoteItem.fulfilled, (state, action) => {
+        if (!forOpen(state, action)) return;
         const idx = state.quote?.items.findIndex((i) => i.id === action.payload.id);
         if (idx != null && idx !== -1) state.quote.items[idx] = action.payload;
       })
       .addCase(deleteQuoteItem.fulfilled, (state, action) => {
-        if (state.quote) state.quote.items = state.quote.items.filter((i) => i.id !== action.payload);
+        if (forOpen(state, action) && state.quote) state.quote.items = state.quote.items.filter((i) => i.id !== action.payload);
       })
       .addCase(addQuoteCost.fulfilled, (state, action) => {
-        state.quote?.additionalCosts.push(action.payload);
+        if (forOpen(state, action)) state.quote?.additionalCosts.push(action.payload);
       })
       .addCase(updateQuoteCost.fulfilled, (state, action) => {
+        if (!forOpen(state, action)) return;
         const idx = state.quote?.additionalCosts.findIndex((c) => c.id === action.payload.id);
         if (idx != null && idx !== -1) state.quote.additionalCosts[idx] = action.payload;
       })
       .addCase(deleteQuoteCost.fulfilled, (state, action) => {
-        if (state.quote) state.quote.additionalCosts = state.quote.additionalCosts.filter((c) => c.id !== action.payload);
+        if (forOpen(state, action) && state.quote) state.quote.additionalCosts = state.quote.additionalCosts.filter((c) => c.id !== action.payload);
       })
-      .addCase(fetchQuoteVersions.pending, (state) => {
+      .addCase(fetchQuoteVersions.pending, (state, action) => {
         state.versionsStatus = "loading";
         state.versionsError = null;
+        state.versionsRequestId = action.meta.requestId;
       })
       .addCase(fetchQuoteVersions.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.versionsRequestId || !forOpen(state, action)) return;
         state.versionsStatus = "succeeded";
         state.versions = action.payload || [];
       })
       .addCase(fetchQuoteVersions.rejected, (state, action) => {
+        if (action.meta.requestId !== state.versionsRequestId || !forOpen(state, action)) return;
         state.versionsStatus = "failed";
         state.versionsError = action.payload;
       })
       .addCase(saveQuoteVersion.fulfilled, (state, action) => {
-        if (action.payload) state.versions.unshift(action.payload);
+        if (!action.payload || !forOpen(state, action)) return;
+        // The version rides with the locked quote; an unchanged draft comes
+        // back as the version it was started from, already in the list.
+        const { quote, ...version } = action.payload;
+        if (quote) state.quote = quote;
+        if (!state.versions.some((v) => v.id === version.id)) state.versions.unshift(version);
+      })
+      .addCase(startQuoteDraft.fulfilled, (state, action) => {
+        if (action.payload && forOpen(state, action)) state.quote = action.payload;
       })
       .addCase(logout, () => initialState);
   },

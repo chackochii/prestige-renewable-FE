@@ -7,6 +7,13 @@
 // Session handling is centralised here: a 401 ends the session everywhere
 // (see setUnauthorizedHandler), a 403 gets a human message and lets the app
 // resync the user's permissions (see setForbiddenHandler).
+//
+// Except for the public endpoints (/public/* — the customer's proposal link,
+// the site-visit form, the website enquiry form). They need no sign-in, so a
+// request there carries no token and is not checked against the session:
+// a staff member who happens to be signed in on the same browser, with a
+// session that has just expired, must not see a customer page fail with
+// "Your session has expired", or be signed out by it.
 
 import axios from "axios";
 import { getToken, isTokenExpired } from "./tokenStore";
@@ -32,7 +39,15 @@ export function setForbiddenHandler(handler) {
 
 const isLoginRequest = (config) => String(config?.url || "").endsWith("/users/login");
 
+/** A call to the API's public routes (/api/public/*), which take no token. */
+export const isPublicRequest = (config) => {
+  const url = String(config?.url || "");
+  return /^\/?public\//.test(url) || /\/api\/public\//.test(url);
+};
+
 apiClient.interceptors.request.use((config) => {
+  // No sign-in behind a public route: no token sent, no session check.
+  if (isPublicRequest(config)) return config;
   const token = getToken();
   if (token) {
     // Don't send a token we already know is dead — end the session instead
@@ -55,8 +70,12 @@ apiClient.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const apiError = toApiError(error);
-    if (status === 401 && !isLoginRequest(error.config)) unauthorizedHandler?.({ reason: "unauthorized" });
-    if (status === 403) forbiddenHandler?.(apiError, error.config);
+    // A public route's refusal is about the link (expired, already answered),
+    // never about the staff session — it neither ends it nor resyncs permissions.
+    if (!isPublicRequest(error.config)) {
+      if (status === 401 && !isLoginRequest(error.config)) unauthorizedHandler?.({ reason: "unauthorized" });
+      if (status === 403) forbiddenHandler?.(apiError, error.config);
+    }
     return Promise.reject(apiError);
   },
 );

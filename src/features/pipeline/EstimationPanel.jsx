@@ -380,8 +380,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
       {requote ? (
         <Alert tone="warning" style={{ marginBottom: 12 }}>
-          <strong>Re-quote requested — the customer wants changes.</strong> Revise the quote, save it as a new version, then hand it back with a
-          note on what changed; sales sends the revised proposal.
+          <strong>Re-quote requested — the customer wants changes.</strong> On the Quote tab, create a new quote from the generated one, revise
+          it and generate it as the next version, then hand it back with a note on what changed; sales sends the revised proposal.
           <div style={{ marginTop: 10 }}>
             <RequoteSummary requote={requote} timeZone={unit?.timezone} />
           </div>

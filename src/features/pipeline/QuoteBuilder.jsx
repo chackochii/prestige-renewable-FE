@@ -1,19 +1,28 @@
 // Create Quote / Quote Builder — appears within the Estimation module once
 // estimation is ready to quote (see EstimationPanel's showQuoteBuilder).
 //
-// Backed by the real prestige-be quote endpoints designed for this module
-// (see fetchOpportunityQuote / createOpportunityQuote / *QuoteItem / *QuoteCost
-// thunks in slices/leadsSlice.js) — the backend doesn't have them yet, so
-// live clicking will 404 until they're implemented, but the quote now lives
-// on the server (state.leads.quote), not in a local-only store.
+// Backed by the prestige-be quote endpoints (see fetchOpportunityQuote /
+// createOpportunityQuote / *QuoteItem / *QuoteCost thunks in
+// slices/leadsSlice.js); the quote lives on the server (state.leads.quote).
+//
+// The quote's life: a draft while it is built — every change saves as it is
+// made — then generated: frozen as the next version and locked, nothing on it
+// can be edited. To change a generated quote the estimator creates a new
+// quote, which is the same quote as a draft again, pre-filled with every
+// line, cost and setting of the generated version; generating that makes the
+// next version. A new quote nothing was changed on can be cancelled, which
+// locks it back onto the version it came from.
 //
 // Selects/dates dispatch immediately on change (discrete, infrequent).
 // Free-text and number fields (project, project type "Other", GST rate, a
 // cost's value/description) are buffered locally and dispatch on blur, so
-// typing doesn't fire a request per keystroke.
+// typing doesn't fire a request per keystroke. "Save draft" sends whatever
+// is still buffered and says so — the draft strip reads "Unsaved changes"
+// while anything typed has not reached the record, and "Saved just now"
+// once it has. Generating waits until the draft is saved.
 
-import { useEffect, useState } from "react";
-import { BadgePercent, Download, Eye, FileSpreadsheet, HandCoins, History, Pencil, Plus, Receipt, Save, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Trash2, Undo2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -21,7 +30,7 @@ import LoadingState from "@/components/LoadingState";
 import Modal from "@/components/Modal";
 import NumberInput from "@/components/NumberInput";
 import SectionHead from "@/components/SectionHead";
-import { COST_KINDS, PROJECT_TYPES, TAX_TREATMENTS } from "@/constants/catalog";
+import { COST_KINDS, PROJECT_TYPES, TAX_TREATMENTS, costKind } from "@/constants/catalog";
 import {
   additionalCostAmount,
   costsOfKind,
@@ -31,7 +40,7 @@ import {
   quoteGstBreakdown,
 } from "@/helpers/quote";
 import { downloadInvoice, invoicePreviewUrl, invoiceSnapshot, matchesSnapshot, versionOf } from "@/helpers/invoice";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { formatDate, timeAgo } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { fetchCatalog } from "@/slices/catalogSlice";
@@ -43,6 +52,7 @@ import {
   deleteQuoteItem,
   fetchQuoteVersions,
   saveQuoteVersion,
+  startQuoteDraft,
   updateOpportunityQuote,
   updateQuoteCost,
   updateQuoteItem,
@@ -241,6 +251,9 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
   const { notify, error: notifyError } = useNotifications();
   const quote = useAppSelector((s) => s.leads.quote);
+  // Generated = locked: the builder is read-only until a new quote is started.
+  const locked = quote?.status === "generated";
+  const editable = canEdit && !locked;
   const catalogItems = useAppSelector((s) => s.catalog.items);
   const catalogStatus = useAppSelector((s) => s.catalog.status);
   const [modal, setModal] = useState(null); // null closed, { item } open (item null = add, set = edit)
@@ -248,6 +261,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const [deletingItemBusy, setDeletingItemBusy] = useState(false);
   const [downloading, setDownloading] = useState(null); // the version id being prepared
   const [savingVersion, setSavingVersion] = useState(false);
+  const [startingDraft, setStartingDraft] = useState(false);
   const [preview, setPreview] = useState(null); // null closed, { version } open
   const [history, setHistory] = useState(false); // the earlier versions, in a modal
   const versions = useAppSelector((s) => s.leads.versions);
@@ -258,6 +272,25 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const [projectTypeOtherDraft, setProjectTypeOtherDraft] = useState("");
   const [gstRateDraft, setGstRateDraft] = useState(10);
   const [costDrafts, setCostDrafts] = useState({});
+  const [savingDraft, setSavingDraft] = useState(false);
+  // When the draft last reached the record (any change saved — a field, an
+  // item, a cost), for the "Saved just now" in the draft strip. Set from the
+  // requests themselves, so nothing is called saved that was only loaded.
+  const [savedAt, setSavedAt] = useState(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  /** Marks the draft saved once a quote request succeeds; returns the thunk promise untouched. */
+  const tracked = (promise) => {
+    promise.then((action) => {
+      if (!action?.error && mounted.current) setSavedAt(new Date());
+    });
+    return promise;
+  };
 
   useEffect(() => {
     if (catalogStatus === "idle") dispatch(fetchCatalog());
@@ -268,14 +301,40 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     if (hasQuote) dispatch(fetchQuoteVersions(opp.id));
   }, [hasQuote, opp.id, dispatch]);
 
+  // The typed-but-unsent fields follow the quote the server returns — but only
+  // the ones nobody has touched. Every save answers with the whole quote, and
+  // with a slow database an earlier save lands while the person is already
+  // typing in the next field; resetting every draft then wiped what they had
+  // typed. A field is "untouched" while it still equals the server value it
+  // was last set from (`seen`).
+  const seen = useRef(null);
   useEffect(() => {
     if (!quote) return;
-    setProjectDraft(quote.project || "");
-    setProjectTypeOtherDraft(quote.projectTypeOther || "");
-    setGstRateDraft(quote.gstRatePct ?? 10);
-    const nextCostDrafts = {};
-    for (const c of quote.additionalCosts) nextCostDrafts[c.id] = { value: c.value, description: c.description };
-    setCostDrafts(nextCostDrafts);
+    const before = seen.current?.id === quote.id ? seen.current : null;
+    const same = (draft, was) => !before || String(draft ?? "") === String(was ?? "");
+    seen.current = {
+      id: quote.id,
+      project: quote.project || "",
+      other: quote.projectTypeOther || "",
+      gst: quote.gstRatePct ?? 10,
+      costs: Object.fromEntries(quote.additionalCosts.map((c) => [c.id, { value: c.value, description: c.description }])),
+    };
+    setProjectDraft((d) => (same(d, before?.project) ? quote.project || "" : d));
+    setProjectTypeOtherDraft((d) => (same(d, before?.other) ? quote.projectTypeOther || "" : d));
+    setGstRateDraft((d) => (same(d, before?.gst) ? quote.gstRatePct ?? 10 : d));
+    setCostDrafts((drafts) => {
+      const next = {};
+      for (const c of quote.additionalCosts) {
+        const mine = drafts[c.id];
+        const was = before?.costs[c.id];
+        next[c.id] = {
+          ...(mine?.otherName !== undefined ? { otherName: mine.otherName } : {}),
+          value: !mine || !was || same(mine.value, was.value) ? c.value : mine.value,
+          description: !mine || !was || same(mine.description, was.description) ? c.description : mine.description,
+        };
+      }
+      return next;
+    });
   }, [quote]);
 
   const createQuote = async () => {
@@ -296,7 +355,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         <p className="lede" style={{ marginBottom: 12 }}>
           Estimation is ready — create a quote to start pricing this job.
         </p>
-        {canEdit ? (
+        {editable ? (
           <button type="button" className="btn btn-primary btn-sm" onClick={createQuote} disabled={creating}>
             {creating ? "Creating…" : "Create Quote"}
           </button>
@@ -326,7 +385,8 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   });
   const deletingItem = quote.items.find((i) => i.id === deleteId);
 
-  const patchHeaderField = (field, value) => dispatch(updateOpportunityQuote({ id: opp.id, body: { [field]: value } }));
+  const patchHeader = (body) => tracked(dispatch(updateOpportunityQuote({ id: opp.id, body })));
+  const patchHeaderField = (field, value) => patchHeader({ [field]: value });
 
   const blurProject = () => {
     if (projectDraft !== (quote.project || "")) patchHeaderField("project", projectDraft);
@@ -340,15 +400,15 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   };
 
   const saveItem = async (values) => {
-    if (modal.item) await dispatch(updateQuoteItem({ id: opp.id, itemId: modal.item.id, body: values })).unwrap();
-    else await dispatch(addQuoteItem({ id: opp.id, body: values })).unwrap();
+    if (modal.item) await tracked(dispatch(updateQuoteItem({ id: opp.id, itemId: modal.item.id, body: values }))).unwrap();
+    else await tracked(dispatch(addQuoteItem({ id: opp.id, body: values }))).unwrap();
     setModal(null);
   };
 
   const confirmDeleteItem = async () => {
     setDeletingItemBusy(true);
     try {
-      await dispatch(deleteQuoteItem({ id: opp.id, itemId: deleteId })).unwrap();
+      await tracked(dispatch(deleteQuoteItem({ id: opp.id, itemId: deleteId }))).unwrap();
       setDeleteId(null);
     } catch (err) {
       notifyError(typeof err === "string" ? err : err?.message || "Could not delete the item.");
@@ -359,18 +419,20 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
 
   const addCost = async (kind) => {
     try {
-      await dispatch(
-        addQuoteCost({
-          id: opp.id,
-          body: { kind, costType: COST_KINDS[kind].types[0], calcType: "fixed", value: 0, description: "" },
-        }),
+      await tracked(
+        dispatch(
+          addQuoteCost({
+            id: opp.id,
+            body: { kind, costType: COST_KINDS[kind].types[0], calcType: "fixed", value: 0, description: "" },
+          }),
+        ),
       ).unwrap();
     } catch (err) {
       notifyError(errText(err, `Could not add the ${COST_KINDS[kind].label.toLowerCase()}.`));
     }
   };
 
-  const patchCostField = (costId, patch) => dispatch(updateQuoteCost({ id: opp.id, costId, body: patch }));
+  const patchCostField = (costId, patch) => tracked(dispatch(updateQuoteCost({ id: opp.id, costId, body: patch })));
 
   const setCostDraftField = (costId, field, value) =>
     setCostDrafts((d) => ({ ...d, [costId]: { ...d[costId], [field]: value } }));
@@ -384,11 +446,66 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
 
   const removeCost = async (costId) => {
     try {
-      await dispatch(deleteQuoteCost({ id: opp.id, costId })).unwrap();
+      await tracked(dispatch(deleteQuoteCost({ id: opp.id, costId }))).unwrap();
     } catch (err) {
       notifyError(errText(err, "Could not remove the line."));
     }
   };
+
+  // ---- What is typed but not yet on the record ----
+  // The buffered fields, compared with the quote the server last returned.
+  // Items and costs save the moment they are added or edited in their modal,
+  // so only these fields can be pending.
+  const headerEdits = {};
+  if (projectDraft !== (quote.project || "")) headerEdits.project = projectDraft;
+  if (quote.projectType === "Other" && projectTypeOtherDraft !== (quote.projectTypeOther || "")) headerEdits.projectTypeOther = projectTypeOtherDraft;
+  if (quote.taxTreatment !== "no_gst" && (Number(gstRateDraft) || 0) !== quote.gstRatePct) headerEdits.gstRatePct = Number(gstRateDraft) || 0;
+  const costEdits = [];
+  for (const cost of quote.additionalCosts) {
+    const draft = costDrafts[cost.id];
+    if (!draft) continue;
+    const patch = {};
+    if (draft.value !== undefined && (Number(draft.value) || 0) !== cost.value) patch.value = Number(draft.value) || 0;
+    if (draft.description !== undefined && draft.description !== cost.description) patch.description = draft.description;
+    const otherType = COST_KINDS[costKind(cost)].otherType;
+    if (otherType && draft.otherName !== undefined) {
+      const next = String(draft.otherName ?? "").trim() || otherType;
+      if (next !== cost.costType) patch.costType = next;
+    }
+    if (Object.keys(patch).length) costEdits.push([cost.id, patch]);
+  }
+  const dirty = Object.keys(headerEdits).length > 0 || costEdits.length > 0;
+  const saveStatus = dirty ? "Unsaved changes" : savedAt ? `Saved ${timeAgo(savedAt)}` : "All changes saved";
+
+  /** Sends whatever is still buffered — one request for the header, one per cost — and says so. */
+  const saveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      const hadEdits = dirty;
+      await Promise.all([
+        ...(Object.keys(headerEdits).length ? [patchHeader(headerEdits).unwrap()] : []),
+        ...costEdits.map(([costId, patch]) => patchCostField(costId, patch).unwrap()),
+      ]);
+      setSavedAt(new Date());
+      notify(hadEdits ? "Draft saved" : "Draft saved — everything is already on the record");
+    } catch (err) {
+      notifyError(errText(err, "Could not save the draft."));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const saveButton = (
+    <button
+      type="button"
+      className={`btn btn-sm ${dirty ? "btn-primary" : "btn-ghost"}`}
+      onClick={saveDraft}
+      disabled={savingDraft}
+      title={dirty ? "Save what you have typed" : "Everything is saved — save again anyway"}
+    >
+      <Save size={14} /> {savingDraft ? "Saving…" : "Save draft"}
+    </button>
+  );
 
   /**
    * One of the three cost sections. They work the same way — only the cost
@@ -405,7 +522,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             {hint}
           </p>
         ) : null}
-        {canEdit ? (
+        {editable ? (
           <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={() => addCost(kind)}>
             <Plus size={14} /> {addLabel}
           </button>
@@ -421,7 +538,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                   <th>Value</th>
                   <th>{meta.deduction ? "Deducted" : "Calculated Amount"}</th>
                   <th>Description</th>
-                  {canEdit ? <th>Actions</th> : null}
+                  {editable ? <th>Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -434,7 +551,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                   return (
                     <tr key={cost.id}>
                       <td data-label={`${meta.label} type`}>
-                        {canEdit ? (
+                        {editable ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 180 }}>
                             <select
                               value={isOther ? otherType : cost.costType}
@@ -472,7 +589,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                         )}
                       </td>
                       <td data-label="Calculation Type">
-                        {canEdit ? (
+                        {editable ? (
                           <select value={cost.calcType} onChange={(e) => patchCostField(cost.id, { calcType: e.target.value })}>
                             <option value="fixed">Fixed Amount</option>
                             <option value="percentage">Percentage</option>
@@ -484,7 +601,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                         )}
                       </td>
                       <td data-label="Value">
-                        {canEdit ? (
+                        {editable ? (
                           <NumberInput
                             value={draft.value}
                             min={0}
@@ -502,7 +619,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                         {formatCurrency(additionalCostAmount(cost, items.total), { withCents: true })}
                       </td>
                       <td data-label="Description">
-                        {canEdit ? (
+                        {editable ? (
                           <input
                             type="text"
                             value={draft.description}
@@ -514,7 +631,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                           cost.description || "—"
                         )}
                       </td>
-                      {canEdit ? (
+                      {editable ? (
                         <td data-label="Actions">
                           <button
                             type="button"
@@ -539,7 +656,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     );
   };
 
-  /** Downloads one saved version as a PDF — there is no PDF of unsaved edits. */
+  /** Downloads one generated version as a PDF — there is no PDF of a draft. */
   const handleDownload = async (version) => {
     setDownloading(version.id);
     try {
@@ -551,28 +668,88 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     }
   };
 
-  /** Freezes the quote as it stands into a new version. */
-  const handleSaveVersion = async () => {
+  /**
+   * Generates the quote: frozen as the next version and locked. An unchanged
+   * new quote comes back locked onto the version it was started from — the
+   * server decides, so "cancel new quote" is this same call.
+   */
+  const handleGenerate = async () => {
     setSavingVersion(true);
     try {
       const snapshot = invoiceSnapshot({ opp, quote });
-      const saved = await dispatch(
+      const generated = await dispatch(
         saveQuoteVersion({
           id: opp.id,
           body: { quoteNumber: quote.quoteNumber, version: nextVersion, grandTotal: snapshot.grandTotal, snapshot },
         }),
       ).unwrap();
-      notify(`Version ${versionOf(saved) ?? nextVersion} saved`);
+      const number = versionOf(generated) ?? nextVersion;
+      if (savedMatch) notify(`New quote cancelled — ${quote.quoteNumber} stays at version ${number}`, "info");
+      else notify(`Version ${number} generated — the quote is now locked`);
     } catch (err) {
-      notifyError(errText(err, "Could not save the version."));
+      notifyError(errText(err, "Could not generate the quote."));
     } finally {
       setSavingVersion(false);
     }
   };
 
+  /** A new quote from the generated one: a draft again, pre-filled from it. */
+  const handleNewQuote = async () => {
+    setStartingDraft(true);
+    try {
+      await dispatch(startQuoteDraft(opp.id)).unwrap();
+      notify(`New quote started from version ${latestVersion} — edit it, then generate it as version ${latestVersion + 1}`, "info");
+    } catch (err) {
+      notifyError(errText(err, "Could not start a new quote."));
+    } finally {
+      setStartingDraft(false);
+    }
+  };
+
+  const generatedVersion = quote.generatedVersion ?? latest;
+
   return (
     <div className="section" style={{ marginTop: 20 }}>
       <SectionHead icon={<FileSpreadsheet size={13} />} title="Quote" />
+
+      {/* ---- Where the quote is in its life ----
+          Locked once generated; a draft saves as it is edited. */}
+      {locked ? (
+        <Alert tone="info" style={{ marginBottom: 16 }}>
+          <div className="quote-state">
+            <span className="quote-state-text">
+              <Lock size={14} />
+              <span>
+                <strong>Generated as version {versionOf(generatedVersion) ?? latestVersion}</strong>
+                {generatedVersion?.createdAt ? ` on ${formatDate(generatedVersion.createdAt, { withTime: true })}` : ""}
+                {generatedVersion?.createdByName ? ` by ${generatedVersion.createdByName}` : ""} — this quote is locked and cannot be edited.
+                {canEdit ? " To change anything, create a new quote: it starts from this one." : ""}
+              </span>
+            </span>
+            {canEdit ? (
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleNewQuote} disabled={startingDraft}>
+                <FilePlus size={14} /> {startingDraft ? "Starting…" : "Create new quote"}
+              </button>
+            ) : null}
+          </div>
+        </Alert>
+      ) : (
+        <div className="quote-state" style={{ marginBottom: 16 }}>
+          <p className="lede quote-state-text" style={{ margin: 0 }}>
+            <Badge tone="warning">Draft</Badge>
+            <span>
+              {versions.length ? `New quote from version ${latestVersion}. ` : ""}
+              Save the draft as you go — generate it when it is final to lock it as version {nextVersion}.
+            </span>
+          </p>
+          {editable ? (
+            <span className="save-bar">
+              <span className={`row-meta${dirty ? " is-dirty" : ""}`}>{saveStatus}</span>
+              {saveButton}
+            </span>
+          ) : null}
+        </div>
+      )}
 
       <div className="form-grid" style={{ marginBottom: 20 }}>
         <Field label="Quote No">
@@ -588,14 +765,14 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           <input
             type="text"
             value={projectDraft}
-            disabled={!canEdit}
+            disabled={!editable}
             placeholder="e.g. 100 kW Solar + 200 kWh Battery"
             onChange={(e) => setProjectDraft(e.target.value)}
             onBlur={blurProject}
           />
         </Field>
         <Field label="Project type">
-          <select value={quote.projectType} disabled={!canEdit} onChange={(e) => patchHeaderField("projectType", e.target.value)}>
+          <select value={quote.projectType} disabled={!editable} onChange={(e) => patchHeaderField("projectType", e.target.value)}>
             {PROJECT_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -608,7 +785,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             <input
               type="text"
               value={projectTypeOtherDraft}
-              disabled={!canEdit}
+              disabled={!editable}
               placeholder="e.g. EV Charging"
               onChange={(e) => setProjectTypeOtherDraft(e.target.value)}
               onBlur={blurProjectTypeOther}
@@ -619,13 +796,13 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           <input
             type="date"
             value={quote.quoteDate}
-            disabled={!canEdit}
+            disabled={!editable}
             onChange={(e) => patchHeaderField("quoteDate", e.target.value)}
           />
         </Field>
       </div>
 
-      {canEdit ? (
+      {editable ? (
         <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={() => setModal({ item: null })}>
           <Plus size={14} /> Add Item
         </button>
@@ -648,7 +825,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                 <th>Unit Price</th>
                 <th>Discount</th>
                 <th>Total</th>
-                {canEdit ? <th>Actions</th> : null}
+                {editable ? <th>Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -661,7 +838,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                   <td data-label="Unit Price">{formatCurrency(item.unitPrice, { withCents: true })}</td>
                   <td data-label="Discount">{item.discountPct}%</td>
                   <td data-label="Total">{formatCurrency(lineTotal(item), { withCents: true })}</td>
-                  {canEdit ? (
+                  {editable ? (
                     <td data-label="Actions">
                       <div style={{ display: "flex", gap: 6 }}>
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setModal({ item })} aria-label="Edit item">
@@ -700,7 +877,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             <Field label="Tax treatment">
               <select
                 value={quote.taxTreatment}
-                disabled={!canEdit}
+                disabled={!editable}
                 onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
               >
                 {TAX_TREATMENTS.map((t) => (
@@ -715,7 +892,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                 value={gstRateDraft}
                 min={0}
                 max={100}
-                disabled={!canEdit || quote.taxTreatment === "no_gst"}
+                disabled={!editable || quote.taxTreatment === "no_gst"}
                 onChange={setGstRateDraft}
                 onBlur={blurGstRate}
               />
@@ -789,35 +966,55 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         </div>
       </div>
 
-      {/* ---- Saving, and the PDFs that come out of it ----
-          A PDF is only ever of a saved version: there is nothing to preview or
-          download until the quote has been saved, and after an edit the buttons
-          stay on the version that was saved until it is saved again. */}
+      {/* ---- Generating, and the PDFs that come out of it ----
+          A PDF is only ever of a generated version: there is nothing to
+          preview or download until the quote has been generated, and on a new
+          quote the buttons stay on the version it came from until it is
+          generated again. */}
       {versionsError ? (
         <Alert tone="warning" style={{ marginTop: 16 }}>
-          Saved versions could not be loaded ({versionsError}).
+          Generated versions could not be loaded ({versionsError}).
         </Alert>
       ) : null}
 
       <div className="quote-version-bar">
         {versionsStatus === "loading" && !versions.length ? <LoadingState label="Loading versions…" /> : null}
 
-        {canEdit ? (
+        {editable ? saveButton : null}
+        {editable ? (
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={handleSaveVersion}
-            disabled={savingVersion || savedMatch || !quote.items.length}
+            onClick={handleGenerate}
+            disabled={savingVersion || savedMatch || dirty || !quote.items.length}
             title={
               !quote.items.length
-                ? "Add an item before saving the quote"
-                : savedMatch
-                  ? "Nothing has changed since the last saved version"
-                  : undefined
+                ? "Add an item before generating the quote"
+                : dirty
+                  ? "Save the draft first"
+                  : savedMatch
+                    ? `Nothing has changed since version ${latestVersion}`
+                    : undefined
             }
           >
-            <Save size={14} />{" "}
-            {savingVersion ? "Saving…" : versions.length ? `Save version ${nextVersion}` : "Save quote"}
+            <FileCheck size={14} />{" "}
+            {savingVersion ? "Generating…" : versions.length ? `Generate version ${nextVersion}` : "Generate quote"}
+          </button>
+        ) : null}
+        {editable && savedMatch && !dirty ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={handleGenerate}
+            disabled={savingVersion}
+            title={`Nothing has changed — lock the quote back onto version ${latestVersion}`}
+          >
+            <Undo2 size={14} /> Cancel new quote
+          </button>
+        ) : null}
+        {locked && canEdit ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={handleNewQuote} disabled={startingDraft}>
+            <FilePlus size={14} /> {startingDraft ? "Starting…" : "Create new quote"}
           </button>
         ) : null}
 
@@ -827,7 +1024,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
               <span className="row-title">{versionLabel(latest)}</span>
               <span className="row-meta">
                 {formatCurrency(latest.grandTotal ?? latest.snapshot?.grandTotal, { withCents: true })} ·{" "}
-                {savedMatch ? "the quote as it stands" : "edited since"}
+                {locked ? "generated — locked" : savedMatch ? "unchanged in the new quote" : "the new quote has changed"}
               </span>
             </span>
             <button
@@ -863,15 +1060,15 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       {!versions.length && versionsStatus !== "loading" ? (
         <p className="lede" style={{ marginTop: 10 }}>
           {quote.items.length
-            ? "Save the quote to get the PDF — preview and download come from a saved version."
-            : "Add the items, then save the quote to get the PDF."}
+            ? "Generate the quote to get the PDF — preview and download come from a generated version, and generating locks the quote."
+            : "Add the items, then generate the quote to get the PDF."}
         </p>
       ) : null}
 
       {history ? (
         <Modal
-          title="Saved versions"
-          body={`Every version of ${quote.quoteNumber} that was saved, exactly as it was then.`}
+          title="Generated versions"
+          body={`Every version of ${quote.quoteNumber} that was generated, exactly as it was then.`}
           confirmClose={false}
           onClose={() => setHistory(false)}
           actions={

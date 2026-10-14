@@ -24,7 +24,7 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
   const { hasPermission } = useAuth();
   const canApprove = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
   const [tab, setTab] = useState("approvals");
-  const { job, status, error, saveError, dismissSaveError, updateChecklist, updateItem, setRequired } = useApprovalJob(opp?.id);
+  const { job, status, error, saveError, dismissSaveError, updateChecklist, saveChecklist, checklistSaveState, updateItem, setRequired } = useApprovalJob(opp?.id);
   const notThereYet = Number(opp?.stage) < APPROVALS_STAGE.id;
 
   return (
@@ -66,6 +66,8 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
           canEdit={canApprove}
           embedded
           onChecklistChange={updateChecklist}
+          onSaveChecklist={saveChecklist}
+          checklistSaveState={checklistSaveState}
           onUpdateItem={async (type, body) => {
             const next = await updateItem(type, body);
             // The last approval moves the job on — the record is reloaded for the new stage.

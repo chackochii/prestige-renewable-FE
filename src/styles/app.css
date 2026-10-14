@@ -143,6 +143,8 @@
   .card {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
     transition: box-shadow var(--fast), transform var(--fast), border-color var(--fast);
+    /* Scrolled into view (a page change on a list), its title clears the sticky top bar. */
+    scroll-margin-top: calc(var(--top) + 12px);
   }
   .card.interactive { cursor: pointer; }
   .card.interactive:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); border-color: var(--line-strong); }
@@ -162,17 +164,24 @@
   .chart-bar { height: 100%; background: var(--brand-2); border-radius: 999px; min-width: 4px; }
   .chart-row.high .chart-bar { background: var(--accent); }
   .chart-value { font-size: 13px; font-weight: 600; text-align: right; }
-  .pipeline-row { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; }
-  .pipe-cell {
-    text-align: center; padding: 12px 4px 10px; border-radius: 12px; background: var(--surface-2); border: 0; cursor: pointer;
-    transition: background var(--fast), transform var(--fast); animation: popIn var(--med) backwards;
-    animation-delay: calc(var(--i, 0) * 35ms); display: flex; flex-direction: column; align-items: center;
+  /* Home → Pipeline by stage: one row per stage (label, bar scaled to the
+     busiest stage, count). A unit runs up to eleven stages and the card is
+     half the page wide, so a row of tiles never fits — rows always do. */
+  .stage-list { display: flex; flex-direction: column; gap: 2px; margin: 0 -10px; }
+  .stage-row {
+    display: grid; grid-template-columns: minmax(0, 118px) minmax(0, 1fr) 36px; gap: 12px; align-items: center;
+    width: 100%; padding: 8px 10px; border-radius: 10px; background: transparent; border: 0; cursor: pointer;
+    text-align: left; font: inherit; color: inherit; transition: background var(--fast);
+    animation: popIn var(--med) backwards; animation-delay: calc(var(--i, 0) * 35ms);
   }
-  .pipe-cell:hover { background: var(--accent-soft); transform: translateY(-2px); }
-  .pipe-cell strong { display: block; font-size: 18px; }
-  .pipe-cell span { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
-  .pipe-cell .pipe-bar { width: 100%; height: 4px; border-radius: 999px; background: var(--line); margin-top: 8px; overflow: hidden; }
-  .pipe-cell .pipe-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-2), var(--accent)); border-radius: 999px; transition: width var(--med); }
+  .stage-row:hover { background: var(--surface-2); }
+  .stage-row:hover .stage-label { color: var(--brand); }
+  .stage-label { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--fast); }
+  .stage-track { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .stage-track > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand-2), var(--accent)); transition: width var(--med); }
+  .stage-count { font-size: 14px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  /* "stage-empty", not "empty": .empty is the padded empty-state block. */
+  .stage-row.stage-empty .stage-label, .stage-row.stage-empty .stage-count { color: var(--muted); font-weight: 500; }
 
   /* ---- Tables ---------------------------------------------------------- */
   .table-wrap { width: 100%; overflow-x: auto; }
@@ -520,7 +529,15 @@
   .cost-deduction { margin-left: 8px; }
   .quote-version-link { background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
   .quote-version-link:disabled { cursor: not-allowed; opacity: 0.6; }
-  /* Save the quote, then the saved version with its preview and download. */
+  /* Where the quote is in its life (draft / generated), and the version bar:
+     generate the quote, then the generated version with preview and download. */
+  .quote-state { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .quote-state-text { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+  .quote-state-text > svg { flex-shrink: 0; margin-top: 3px; }
+  /* A Save button with where things stand ("Unsaved changes" / "Saved just
+     now") — the quote builder's draft and the stage checklists. */
+  .save-bar { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+  .save-bar .is-dirty { color: var(--warning); font-weight: 600; }
   .quote-version-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
   .quote-version-latest {
     display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px;
@@ -950,7 +967,7 @@
     .hero-forecast { padding: 22px 20px 20px; }
     .hero-value { font-size: 36px; }
 
-    .pipeline-row { grid-template-columns: repeat(3, 1fr); }
+    .stage-row { grid-template-columns: minmax(0, 96px) minmax(0, 1fr) 32px; gap: 10px; }
     .chart-row { grid-template-columns: 1fr; gap: 4px; }
     .chart-value { text-align: left; }
     .toast-host { left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: none; }
@@ -1011,7 +1028,6 @@
   }
 
   @media (max-width: 400px) {
-    .pipeline-row { grid-template-columns: repeat(2, 1fr); }
     .form-grid.auto { grid-template-columns: 1fr; }
     .landing-timeline { grid-template-columns: repeat(2, 1fr); }
     .brand-name { font-size: 16px; }
@@ -1020,7 +1036,7 @@
 
   /* Touch devices: no hover lifts (they stick after a tap). */
   @media (hover: none) {
-    .stat:hover, .card.interactive:hover, .kanban-card:hover, .pipe-cell:hover, .landing-feature-card:hover { transform: none; box-shadow: var(--shadow); }
+    .stat:hover, .card.interactive:hover, .kanban-card:hover, .landing-feature-card:hover { transform: none; box-shadow: var(--shadow); }
     .table.clickable tbody tr:hover td { background: transparent; color: inherit; }
   }
 }
@@ -1057,6 +1073,8 @@
 
 /* ---- Stage checklists (approvals CL-07/08/09, procurement CL-10 to CL-14) — components/ChecklistForm */
 .cl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.cl-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto; }
+.cl-foot { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .cl-title { display: flex; align-items: center; gap: 8px; font-size: 15px; }
 .cl-applies { margin: 0 0 12px; font-weight: 600; }
 .cl-lock { display: flex; align-items: center; gap: 8px; }
@@ -1090,7 +1108,6 @@
 .cl-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 .cl-slot { border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
 .cl-slot-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.cl-blockers { white-space: normal; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .cl-summary-row:hover { background: var(--surface-2); }
 
 /* The customer's proposal page (/proposal/:token): public, no app shell. */

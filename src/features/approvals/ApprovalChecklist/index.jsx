@@ -4,7 +4,8 @@
 // the auto-filled items show, and the conditions the rules need.
 //
 // `job` comes from useApprovalJob (its items carry their checklist answers);
-// `onChange(patch)` merges answers into this section.
+// `onChange(patch)` merges answers into this section. `actions` is the save
+// bar the workflow puts at the top and bottom of the checklist.
 
 import ChecklistForm from "@/components/ChecklistForm";
 import { answersOf, approvalContext, checklistOf, recordedNmi } from "@/helpers/approvalChecklist";
@@ -51,7 +52,7 @@ function approvalAutoRows(source, job, checklist) {
   }
 }
 
-export default function ApprovalChecklist({ section, job, canEdit = false, onChange }) {
+export default function ApprovalChecklist({ section, job, canEdit = false, onChange, actions = null }) {
   const checklist = checklistOf(job);
   return (
     <ChecklistForm
@@ -61,6 +62,7 @@ export default function ApprovalChecklist({ section, job, canEdit = false, onCha
       canEdit={canEdit}
       autoRows={(source) => approvalAutoRows(source, job, checklist)}
       onChange={onChange}
+      actions={actions}
     />
   );
 }

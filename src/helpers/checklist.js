@@ -98,8 +98,10 @@ export function itemDone(section, item, answers, ctx) {
     case "documents":
       return item.slots.every((slot) => hasFiles(answers?.documents?.[slot.key]));
     case "status": {
+      // The status is the coordinator's call: a finishing status is done
+      // whatever else is still open (those items stay open on their own).
       const status = statusOf(section, answers);
-      return Boolean(status?.done) && statusBlockers(section, answers, ctx, status.value).length === 0;
+      return Boolean(status?.done);
     }
     default:
       return answered(item, value, ctx);

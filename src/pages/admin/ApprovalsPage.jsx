@@ -21,8 +21,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { useApprovalJob } from "@/hooks/useApprovalJob";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePageParam } from "@/hooks/usePageParam";
+import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 import { approvalItems, approvalOutcome, approvalStatus, itemStatus } from "@/helpers/approvals";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
@@ -36,9 +36,9 @@ export default function ApprovalsPage() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
   const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.approvals);
-  const [search, setSearch] = useState("");
+  // The search and the page live in the URL, so Back returns to the board as it was.
+  const { search, setSearch, term } = useUrlSearch();
   const [selectedId, setSelectedId] = useState(null);
-  const term = useDebouncedValue(search.trim(), 300);
   const [page, setPage] = usePageParam(term);
   const boardKey = JSON.stringify(unitId ? { businessUnitId: unitId, search: term || undefined, page, pageSize: PAGE_SIZE } : null);
   const loading = boardStatus === "loading";
@@ -56,7 +56,8 @@ export default function ApprovalsPage() {
   // this reads it from the slice and asks the API for nothing. A change comes
   // back as the whole job and lands on its board row too, so the last
   // approval moving the job on reads as "ready for procurement" at once.
-  const { job: selected, status: jobStatus, error: jobError, saveError, dismissSaveError, updateChecklist, updateItem, setRequired } = useApprovalJob(selectedRow?.id);
+  const { job: selected, status: jobStatus, error: jobError, saveError, dismissSaveError, updateChecklist, saveChecklist, checklistSaveState, updateItem, setRequired } =
+    useApprovalJob(selectedRow?.id);
   // The last approval moves the job on and the counts on the cards with it, so
   // the board is asked again — only then.
   const afterItem = async (type, body) => {
@@ -168,6 +169,8 @@ export default function ApprovalsPage() {
               job={selected}
               canEdit={canEdit}
               onChecklistChange={updateChecklist}
+              onSaveChecklist={saveChecklist}
+              checklistSaveState={checklistSaveState}
               onUpdateItem={afterItem}
               onSetRequired={setRequired}
               saveError={saveError}

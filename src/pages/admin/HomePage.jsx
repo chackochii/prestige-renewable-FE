@@ -58,7 +58,8 @@ export default function HomePage() {
     const overdue = active.filter((o) => isOverdue(o.slaDueAt));
     const overdueValue = overdue.reduce((s, o) => s + oppValue(o), 0);
     const mine = active.filter((o) => owners(o).includes(user.id));
-    const since = periodStart(period);
+    // The week / month / quarter as the unit counts it, not the viewer's browser.
+    const since = periodStart(period, unit?.timezone);
     const closed = items.filter(
       (o) => ["Won", "Closed"].includes(o.lifecycle) && new Date(o.closedAt || o.updatedAt) >= since,
     );
@@ -250,20 +251,21 @@ export default function HomePage() {
       <div className="grid-2">
         <div>
           <Card title="Pipeline by stage" sub="Active records per stage — open the pipeline for the full board.">
-            <div className="pipeline-row">
+            <div className="stage-list">
               {data.byStage.map((s, i) => (
                 <button
                   key={s.id}
                   type="button"
-                  className="pipe-cell"
+                  className={`stage-row${s.count ? "" : " stage-empty"}`}
                   style={{ "--i": i }}
+                  title={`${s.label} · open in the pipeline`}
                   onClick={() => navigate(`/pipeline?stage=${s.id}`)}
                 >
-                  <strong>{s.count}</strong>
-                  <span>{s.short}</span>
-                  <span className="pipe-bar">
+                  <span className="stage-label">{s.short}</span>
+                  <span className="stage-track">
                     <i style={{ width: `${(s.count / maxStage) * 100}%` }} />
                   </span>
+                  <span className="stage-count">{s.count}</span>
                 </button>
               ))}
             </div>

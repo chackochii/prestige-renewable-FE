@@ -3,32 +3,36 @@
 // the URL clean.
 //
 //   const [page, setPage] = usePageParam(filtersKey);
+//   setPage(3);                      // a history step: Back returns to the page before
+//   setPage(2, { replace: true });   // a correction, not a step (Pagination's clamp)
 //
 // `resetKey` is whatever changes the list's meaning (its search and filters,
-// as a string): when it changes the list goes back to page 1. A page change is
-// a history step of its own, so Back returns to the previous page.
+// as a string): when it changes the list goes back to page 1. Writes go
+// through useSearchParamWriter, which keeps the scroll where it is (Pagination
+// brings the list into view itself) and merges with a search or filter
+// written in the same moment.
 
 import { useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useSearchParamWriter } from "./useSearchParamWriter";
 
 export function usePageParam(resetKey = "") {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const writeParams = useSearchParamWriter();
   const page = Math.max(1, Math.trunc(Number(params.get("page"))) || 1);
 
   const write = useCallback(
     (next, replace) =>
-      setParams(
-        (previous) => {
-          const updated = new URLSearchParams(previous);
+      writeParams(
+        (updated) => {
           if (next > 1) updated.set("page", String(next));
           else updated.delete("page");
-          return updated;
         },
         { replace },
       ),
-    [setParams],
+    [writeParams],
   );
-  const setPage = useCallback((next) => write(next, false), [write]);
+  const setPage = useCallback((next, { replace = false } = {}) => write(next, replace), [write]);
 
   // New filters, new list: back to the first page (but not on the first render,
   // so a link to page 3 stays on page 3).

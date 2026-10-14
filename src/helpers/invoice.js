@@ -40,7 +40,7 @@ import {
   quoteGstBreakdown,
 } from "@/helpers/quote";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { addDaysIso, formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { joinAddress } from "@/utils/text";
 
 const TAX_TREATMENT_LABEL = {
@@ -78,12 +78,13 @@ const linesOf = (text) =>
     .map((line) => line.replace(/^[-•*\s]+/, "").trim())
     .filter(Boolean);
 
-/** The date a proposal stops standing at its quoted price. */
+/**
+ * The date a proposal stops standing at its quoted price: the quote date plus
+ * the validity, counted in calendar days so it is the same in every browser
+ * and across a daylight-saving change.
+ */
 function validUntil(quoteDate) {
-  const from = quoteDate ? new Date(quoteDate) : new Date();
-  if (Number.isNaN(from.getTime())) return "";
-  from.setDate(from.getDate() + VALIDITY_DAYS);
-  return from.toISOString().slice(0, 10);
+  return addDaysIso(quoteDate || todayIso(), VALIDITY_DAYS);
 }
 
 // ---- Totals -----------------------------------------------------------------
@@ -397,7 +398,7 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
     cursor,
     `This proposal covers ${quote.project || systemName.toLowerCase()} for ${quote.customer || "the client"}` +
       `${site ? ` at ${site}` : ""}. It comprises ${quote.items.length} line ` +
-      `item${(quote.items.length || 0) === 1 ? "" : "s"} with a system price of ${money(gst.preTaxTotal + gst.rebatesTotal + gst.discountsTotal)}` +
+      `item${(quote.items.length || 0) === 1 ? "" : "s"} with a system price of ${money(gst.systemPrice)}` +
       `${gstNote}, and a net investment of ${money(gst.grandTotal)} after the rebates and discounts set out below.`,
   );
   paragraph(doc, cursor, TAX_TREATMENT_LABEL[quote.taxTreatment] || "", { colour: MUTED, italic: true });
@@ -407,7 +408,7 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
     head: [["System price", "Rebates & discounts", "Net investment", "Prepared"]],
     body: [
       [
-        `${money(gst.preTaxTotal + gst.rebatesTotal + gst.discountsTotal)}${gstNote}`,
+        `${money(gst.systemPrice)}${gstNote}`,
         money(gst.rebatesTotal + gst.discountsTotal),
         `${money(gst.grandTotal)}`,
         formatDate(quote.quoteDate),
@@ -440,7 +441,7 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
     cursor,
     {
       label: "SYSTEM PRICE",
-      value: money(gst.preTaxTotal + gst.rebatesTotal + gst.discountsTotal),
+      value: money(gst.systemPrice),
       note: gstNote ? "+ GST" : "no GST applies",
     },
     { label: "NET INVESTMENT", value: money(gst.grandTotal), note: "including GST where it applies" },

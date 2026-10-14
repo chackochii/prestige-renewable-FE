@@ -17,6 +17,7 @@ import {
 } from "@/features/leads/leadFormModel";
 import { DRAWING_CATEGORY, SITE_PHOTO_CATEGORY } from "@/constants/estimationInput";
 import { leadGateItems } from "@/helpers/stageTransition";
+import { clearLeadDraft, readLeadDraft, writeLeadDraft } from "@/helpers/leadDrafts";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
@@ -37,37 +38,8 @@ import { useNotifications } from "@/hooks/useNotifications";
 /** Everything raised from the lead pack is filed against stage 1. */
 const LEAD_STAGE = 1;
 
-// Keystrokes are kept in this browser, not sent to the API. Storage can be
-// unavailable (private browsing, full), so every access is allowed to fail
-// quietly — the form still works, it just has nothing to restore.
-const draftKey = (id) => `lead-draft:${id}`;
-
-const readDraft = (opp) => {
-  try {
-    const saved = JSON.parse(localStorage.getItem(draftKey(opp?.id)) || "null");
-    // Only restore a draft taken against the version of the record that is on
-    // screen now. Anything older is stale and would undo somebody else's edit.
-    return saved && saved.updatedAt === opp?.updatedAt ? saved.form : null;
-  } catch {
-    return null;
-  }
-};
-
-const writeDraft = (opp, form) => {
-  try {
-    localStorage.setItem(draftKey(opp?.id), JSON.stringify({ updatedAt: opp?.updatedAt, form }));
-  } catch {
-    // Not kept — the form still works.
-  }
-};
-
-const clearDraft = (id) => {
-  try {
-    localStorage.removeItem(draftKey(id));
-  } catch {
-    // Nothing to clear.
-  }
-};
+// Keystrokes are kept in this browser, not sent to the API, until the lead is
+// saved — and never past the end of the session (see helpers/leadDrafts.js).
 
 export default function LeadPackPanel({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
@@ -76,7 +48,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const referrersStatus = useAppSelector((s) => s.referrals.status);
   const attachments = useAppSelector((s) => s.leads.attachments);
   const { notify, error: notifyError } = useNotifications();
-  const [form, setForm] = useState(() => readDraft(opp) ?? leadToForm(opp));
+  const [form, setForm] = useState(() => readLeadDraft(opp) ?? leadToForm(opp));
   // The record the form was built from. Saves send only what differs from it,
   // so a field nobody touched on this screen is never written back over what
   // estimation (or anyone else) saved since.
@@ -148,7 +120,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   // Stamped with the version the form was built from: a draft is only
   // restored against that version, never over a newer one.
   useEffect(() => {
-    if (dirty) writeDraft(base, form);
+    if (dirty) writeLeadDraft(base, form);
   }, [form, base, dirty]);
 
   /**
@@ -186,7 +158,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
       const saved = await dispatch(updateLead({ id: opp.id, body })).unwrap();
       adoptSaved(saved, sent);
       await logNewFailedAttempts(previousAttemptCount);
-      clearDraft(opp.id);
+      clearLeadDraft(opp.id);
       setAutosaveState("saved");
       return true;
     } catch {
@@ -345,7 +317,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
 
       // Deliberately stays in edit mode: the checklist spans several tabs and
       // people save as they go.
-      clearDraft(opp.id);
+      clearLeadDraft(opp.id);
       notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
       setAdvanceTab((n) => n + 1);
       return true;

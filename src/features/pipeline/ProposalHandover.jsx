@@ -1,11 +1,12 @@
 // The last step of estimation: send the priced quote on to the proposal stage.
 //
 // It lists what the hand-over needs (estimation complete, a priced quote, the
-// quote saved as a version), shows what will go — quote number, version and
-// total — and takes an optional note to sales. "Send to Proposal" saves the
-// quote as a new version first when it has changed since the last one, then
-// moves the job on; the salesperson is notified that the quote is ready to
-// send to the customer (prestige-be estimationHandover.js).
+// quote generated), shows what will go — quote number, version and total —
+// and takes an optional note to sales. "Send to Proposal" generates the quote
+// first when it is still a draft (locking it as the next version, or back
+// onto the version it came from when nothing changed), then moves the job
+// on; the salesperson is notified that the quote is ready to send to the
+// customer (prestige-be estimationHandover.js).
 //
 // On a re-quote (`requote` — the open round sales sent back from proposal)
 // the same step returns the revised quote: it warns when the quote is still
@@ -86,22 +87,28 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
   const estimationMissing = estimationGateItems(opp);
   const quoteMissing = quoteGateItems(quote);
   const denied = advanceDeniedReason(user, ESTIMATION_STAGE);
-  const matching = quote ? versions.find((version) => matchesSnapshot({ opp, quote }, version)) : null;
+  // Generated: locked to a version, and that is what goes. A draft is
+  // generated on send — as the next version, or back onto the newest one
+  // when nothing changed (the server decides, same as the builder).
+  const locked = quote?.status === "generated";
+  const generated = locked ? (quote.generatedVersion ?? versions.find((v) => v.id === quote.generatedVersion?.id) ?? null) : null;
+  const matching = quote && !locked ? versions.find((version) => matchesSnapshot({ opp, quote }, version)) : null;
   const latestNumber = versions.reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0);
   const totals = quote?.items?.length ? invoiceTotals(quote) : null;
   // On a re-quote the note says what changed, and sales needs it.
   const noteMissing = Boolean(requote) && !note.trim();
   const ready = !estimationMissing.length && !inspectionMissing.length && !quoteMissing.length && !denied && opp.lifecycle === "Active";
   // The quote as it stands is the very version the customer asked to change.
-  const unchanged = Boolean(requote?.quoteVersion && matching && matching.id === requote.quoteVersion.id);
+  const goingVersion = generated ?? matching;
+  const unchanged = Boolean(requote?.quoteVersion && goingVersion && goingVersion.id === requote.quoteVersion.id);
 
   const send = async () => {
     setBusy(true);
     setError("");
     try {
-      // The proposal stage sends a saved version; save one now if the quote
-      // has changed since the last.
-      let version = matching;
+      // The proposal stage sends a generated version; generate the quote now
+      // if it is still a draft.
+      let version = generated;
       if (!version) {
         const snapshot = invoiceSnapshot({ opp, quote });
         version = await dispatch(
@@ -168,15 +175,25 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
           }
         />
         <CheckRow
-          done={Boolean(matching)}
+          done={Boolean(generated)}
           warn
-          title={matching ? `Saved as version ${versionOf(matching)}` : "Quote changed since the last saved version"}
+          title={
+            generated
+              ? `Generated as version ${versionOf(generated)} — locked`
+              : matching
+                ? `New quote, unchanged from version ${versionOf(matching)}`
+                : versions.length
+                  ? "New quote not generated yet"
+                  : "Quote not generated yet"
+          }
           detail={
-            matching
+            generated
               ? "This version is what sales will send to the customer."
               : quoteMissing.length
                 ? null
-                : `It will be saved as version ${latestNumber + 1} when you send it.`
+                : matching
+                  ? `Sending locks the quote back onto version ${versionOf(matching)} and sends that.`
+                  : `It will be generated as version ${latestNumber + 1} and locked when you send it.`
           }
         />
       </div>
