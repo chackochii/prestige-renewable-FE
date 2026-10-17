@@ -1,6 +1,6 @@
 // Superadmin → Business units: create, rename, retire. ADM only.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Building2, Plus } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import AdminNav from "@/components/AdminNav";
@@ -8,7 +8,6 @@ import Badge from "@/components/Badge";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import LoadMore from "@/components/LoadMore";
-import Alert from "@/components/Alert";
 import BusinessUnitFormModal from "@/features/admin/BusinessUnitFormModal";
 import { formatPercent } from "@/utils/formatCurrency";
 import { useAppDispatch } from "@/store";
@@ -24,6 +23,11 @@ export default function BusinessUnitsPage() {
   const { units, unit: current, error } = useBusinessUnit();
   const { notify } = useNotifications();
   const [modal, setModal] = useState(null); // "new" | { edit } | { delete }
+
+  // A failed load shows as a toast, not a box on the page.
+  useEffect(() => {
+    if (error) notify(error, "danger");
+  }, [error, notify]);
   // Shown a slice at a time. Every unit is still fetched — the same list feeds
   // the sidebar's unit switcher, so paging the request would leave units a
   // person can work in unreachable.
@@ -62,8 +66,6 @@ export default function BusinessUnitsPage() {
         }
       />
       <AdminNav />
-
-      {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <div className="card card-pad">
         {units.length === 0 ? (

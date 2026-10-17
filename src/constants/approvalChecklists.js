@@ -12,7 +12,9 @@
 // Item kinds:
 //   auto         — shown from the job record (source names the rows); the
 //                  coordinator ticks that it is right
-//   select       — a dropdown (options: [{ value, label, group? }])
+//   select       — a dropdown (options: [{ value, label, group? }]); an item
+//                  with `optionsFrom` gets its options from the API instead
+//                  (the stage's wrapper fills them in)
 //   yesno        — a Yes / No dropdown
 //   text, number, date, time, textarea — a single answer
 //   checkbox     — a tick
@@ -34,26 +36,6 @@
 // which items settle it.
 
 export const CHECKLIST_OWNER = "Operations Coordinator";
-
-/** Distribution networks by state. NSW first — that is where Sydpro installs. */
-export const DNSP_NETWORKS = [
-  { value: "Ausgrid", label: "Ausgrid", group: "NSW" },
-  { value: "Endeavour Energy", label: "Endeavour Energy", group: "NSW" },
-  { value: "Essential Energy", label: "Essential Energy", group: "NSW" },
-  { value: "Evoenergy", label: "Evoenergy", group: "ACT" },
-  { value: "Energex", label: "Energex", group: "QLD" },
-  { value: "Ergon Energy", label: "Ergon Energy", group: "QLD" },
-  { value: "CitiPower", label: "CitiPower", group: "VIC" },
-  { value: "Powercor", label: "Powercor", group: "VIC" },
-  { value: "Jemena", label: "Jemena", group: "VIC" },
-  { value: "United Energy", label: "United Energy", group: "VIC" },
-  { value: "AusNet Services", label: "AusNet Services", group: "VIC" },
-  { value: "SA Power Networks", label: "SA Power Networks", group: "SA" },
-  { value: "TasNetworks", label: "TasNetworks", group: "TAS" },
-  { value: "Western Power", label: "Western Power", group: "WA" },
-  { value: "Horizon Power", label: "Horizon Power", group: "WA" },
-  { value: "Power and Water", label: "Power and Water", group: "NT" },
-];
 
 export const DNSP_APPLICATION_TYPES = [
   { value: "basic_micro", label: "Basic micro-embedded generation (up to 30 kVA)" },
@@ -146,7 +128,13 @@ export const APPROVAL_CHECKLISTS = [
     tab: "DNSP application",
     track: "dnsp",
     items: [
-      { key: "network", label: "Correct DNSP or network identified for the installation address", kind: "select", options: DNSP_NETWORKS },
+      {
+        key: "network",
+        label: "Correct DNSP or network identified for the installation address",
+        kind: "select",
+        options: [],
+        optionsFrom: "dnspNetworks", // maintained under Superadmin → DNSP networks
+      },
       {
         key: "nmi",
         label: "NMI (National Meter Identifier) recorded",

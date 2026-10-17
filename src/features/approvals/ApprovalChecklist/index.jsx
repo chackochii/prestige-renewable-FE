@@ -3,11 +3,16 @@
 // ChecklistForm. This file supplies what comes from the job record: the rows
 // the auto-filled items show, and the conditions the rules need.
 //
+// The DNSP network dropdown (item 1 on CL-07) is filled from the list the
+// system administrator keeps under Superadmin → DNSP networks.
+//
 // `job` comes from useApprovalJob (its items carry their checklist answers);
 // `onChange(patch)` merges answers into this section. `actions` is the save
 // bar the workflow puts at the top and bottom of the checklist.
 
+import { useMemo } from "react";
 import ChecklistForm from "@/components/ChecklistForm";
+import { dnspNetworkOptions, useDnspNetworks } from "@/hooks/useDnspNetworks";
 import { answersOf, approvalContext, checklistOf, recordedNmi } from "@/helpers/approvalChecklist";
 import { formatCurrency } from "@/utils/formatCurrency";
 
@@ -52,12 +57,26 @@ function approvalAutoRows(source, job, checklist) {
   }
 }
 
+/** The section with its API-backed dropdowns filled in. */
+function withOptions(section, answers, networks) {
+  if (!section.items.some((item) => item.optionsFrom === "dnspNetworks")) return section;
+  return {
+    ...section,
+    items: section.items.map((item) =>
+      item.optionsFrom === "dnspNetworks" ? { ...item, options: dnspNetworkOptions(networks, answers[item.key]) } : item,
+    ),
+  };
+}
+
 export default function ApprovalChecklist({ section, job, canEdit = false, onChange, actions = null }) {
   const checklist = checklistOf(job);
+  const answers = answersOf(checklist, section.key);
+  const { networks } = useDnspNetworks();
+  const resolved = useMemo(() => withOptions(section, answers, networks), [section, answers, networks]);
   return (
     <ChecklistForm
-      section={section}
-      answers={answersOf(checklist, section.key)}
+      section={resolved}
+      answers={answers}
       ctx={approvalContext(checklist)}
       canEdit={canEdit}
       autoRows={(source) => approvalAutoRows(source, job, checklist)}

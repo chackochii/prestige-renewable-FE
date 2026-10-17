@@ -37,7 +37,7 @@ Everything is driven by data the API returns:
 - **Routes** are guarded with `RequirePage`, `RequirePermission` and `RequireRole` in `src/routes/routeGuards.jsx`. Inside a page, actions are hidden or disabled with `useAuth().hasPermission(code)`.
 - **Business units**: the units a person can work in come from `GET /business-units`; a person with several picks one after sign-in and can switch from the top bar. Every list is scoped to the current unit.
 
-Administration screens: `/admin` (users, multi-role assignment, unit membership), `/admin/roles` (grants editor + role/permission catalog), `/admin/pages` (registry + unit × page toggle matrix), `/admin/settings` (margin floor, stages, SLA days, billing split, commission tiers, approval types, site sub-stages), `/superadmin` (business units, ADM only).
+Administration screens: `/admin` (users, multi-role assignment, unit membership), `/admin/roles` (grants editor + role/permission catalog), `/admin/pages` (registry + unit × page toggle matrix), `/admin/settings` (margin floor, stages, SLA days, billing split, commission tiers, approval types, site sub-stages), `/superadmin` (business units, ADM only), `/superadmin/dnsp-networks` (the DNSP networks offered on the DNSP application, ADM only), `/superadmin/catalog` (the quote builder's items, brands and unit prices, ADM only).
 
 ## Layout
 
