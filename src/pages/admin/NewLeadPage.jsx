@@ -22,7 +22,7 @@ import { fetchReferrers } from "@/slices/referralsSlice";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
-import { formatDate } from "@/helpers/dateTimeHelpers";
+import { formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { isBlank } from "@/utils/validators";
 
 export default function NewLeadPage() {
@@ -67,7 +67,7 @@ export default function NewLeadPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    const found = validateLeadForm(form);
+    const found = validateLeadForm(form, { minDate: todayIso(unit?.timezone) });
     if (Object.keys(found).length) {
       setErrors(found);
       return;
@@ -190,6 +190,7 @@ export default function NewLeadPage() {
           sales={sales}
           referrers={referrers}
           unit={unit}
+          minDate={todayIso(unit?.timezone)}
           billFiles={billFiles.map((f, i) => ({ id: `bill-${i}`, filename: f.name }))}
           onUploadBills={addBills}
         />

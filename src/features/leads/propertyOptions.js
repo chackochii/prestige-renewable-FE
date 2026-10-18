@@ -8,6 +8,8 @@ export const SERVICE_REQUIREMENTS = [
   { key: "solar", label: "Solar" },
   { key: "battery", label: "Battery" },
   { key: "both", label: "Both — solar and battery" },
+  { key: "ev", label: "EV installation" },
+  { key: "other", label: "Other" },
 ];
 
 export const STOREY_OPTIONS = [
@@ -28,10 +30,21 @@ export const ELECTRICAL_PHASES = [
 
 export const INSTALL_TIMEFRAMES = [
   { key: "asap", label: "As soon as possible" },
+  { key: "1_2_weeks", label: "Within 1–2 weeks" },
+  { key: "2_4_weeks", label: "Within 2–4 weeks" },
+  { key: "4_8_weeks", label: "Within 4–8 weeks" },
+  { key: "8_weeks_plus", label: "More than 8 weeks away" },
+  { key: "undecided", label: "Not decided yet" },
+];
+
+/**
+ * The month-based timeframes leads carried before the list went to weeks.
+ * No longer offered, but a saved lead keeps its answer and still reads it.
+ */
+export const LEGACY_INSTALL_TIMEFRAMES = [
   { key: "1_3_months", label: "Within 1–3 months" },
   { key: "3_6_months", label: "Within 3–6 months" },
   { key: "6_months_plus", label: "More than 6 months away" },
-  { key: "undecided", label: "Not decided yet" },
 ];
 
 /** Whether finance assistance was discussed, and what the answer was. */
@@ -43,7 +56,13 @@ export const FINANCE_OPTIONS = [
 const label = (list, key) => list.find((o) => o.key === key)?.label || key || "—";
 
 export const serviceRequirementLabel = (key) => label(SERVICE_REQUIREMENTS, key);
+/**
+ * What a lead's service requirement reads as: "Other" shows the custom value
+ * typed for it (estimationInput.serviceRequirementOther).
+ */
+export const serviceRequirementText = (key, other) =>
+  key === "other" ? String(other ?? "").trim() || "Other" : serviceRequirementLabel(key);
 export const storeyLabel = (key) => label(STOREY_OPTIONS, key);
 export const roofTypeLabel = (key) => label(ROOF_TYPES, key);
 export const electricalPhaseLabel = (key) => label(ELECTRICAL_PHASES, key);
-export const installTimeframeLabel = (key) => label(INSTALL_TIMEFRAMES, key);
+export const installTimeframeLabel = (key) => label([...INSTALL_TIMEFRAMES, ...LEGACY_INSTALL_TIMEFRAMES], key);

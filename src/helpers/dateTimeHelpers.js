@@ -191,6 +191,15 @@ const pad2 = (n) => String(n).padStart(2, "0");
  * Today's date where the unit works, as "yyyy-mm-dd" — not the UTC date
  * (toISOString), which is still yesterday until 10 or 11 am in Australia.
  */
+/** The calendar day an instant falls on in the unit's timezone, as "yyyy-mm-dd" ("" when there is none). */
+export function dateIsoInZone(value, timeZone) {
+  if (!value) return "";
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return "";
+  const p = wallParts(instant, zoneOr(timeZone || displayZone));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
 export function todayIso(timeZone) {
   const p = wallParts(new Date(), zoneOr(timeZone || displayZone));
   return `${p.year}-${p.month}-${p.day}`;

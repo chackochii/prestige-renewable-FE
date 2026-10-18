@@ -159,7 +159,9 @@ export default function OpportunityPage() {
             <Badge tone={life.tone}>{life.label}</Badge>
             <Badge tone={sla.tone}>{sla.label}</Badge>
             {opp.variationPending ? <Badge tone="warning">Variation pending</Badge> : null}
-            {opp.referrer?.organisation ? <Badge tone="neutral">Referred by {opp.referrer.organisation}</Badge> : null}
+            {opp.referrer?.organisation || opp.referrerName ? (
+              <Badge tone="neutral">Referred by {opp.referrer?.organisation || opp.referrerName}</Badge>
+            ) : null}
           </div>
         </div>
         <div className="opp-hero-actions">
@@ -241,7 +243,7 @@ export default function OpportunityPage() {
               />
             </div>
           ) : viewing === 1 ? (
-            <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
+            <LeadPackPanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} onMoved={() => setViewStage(null)} />
           ) : viewing === 2 ? (
             <EstimationPanel key={opp.id} opp={opp} unit={unit} canEdit={canEditEstimation} onViewLead={() => setViewStage(1)} focusHandover={handoverAsk} onSent={() => setViewStage(null)} />
           ) : viewing === PROPOSAL_STAGE_ID ? (
@@ -253,6 +255,18 @@ export default function OpportunityPage() {
           ) : (
             <StagePanel stageId={viewing} opp={opp} unit={unit} canEdit={canEdit} />
           )}
+
+          {/* From proposal on, the stage panels save as they go — there is no
+              Save button to rename — so the step that ends the stage sits under
+              the work: Proceed to the next stage, once the stage can be left.
+              The lead pack and estimation's hand-over carry their own. */}
+          {!stageHidden && viewing === current && current > 2 && next !== null && opp.lifecycle === "Active" && canAdvanceFrom(user, current) && gate.canAdvance ? (
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn-primary" onClick={advance} disabled={advancing}>
+                {advancing ? "Moving…" : `Proceed to ${stageById(next).label}`} <ArrowRight size={16} />
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <HistoryTab opp={opp} timeZone={timeZone} canEdit={canEdit} />

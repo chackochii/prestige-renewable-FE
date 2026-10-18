@@ -43,7 +43,7 @@ export function leadCompletenessItems(opp) {
   if (isBlank(opp.energyAnnualKwh) && !opp.energyHasBills) missing.push("Energy usage or bills");
   if (isBlank(opp.preferredInstallTimeframe)) missing.push("Preferred installation timeframe");
   if (!opp.leadSource) missing.push("Lead source");
-  if (opp.leadSource === "referrer" && !opp.referrerId) missing.push("Referrer");
+  if (opp.leadSource === "referrer" && !opp.referrerId && !opp.referrerName) missing.push("Referrer");
   return missing;
 }
 

@@ -4,7 +4,7 @@
 export const REQUIREMENTS_CHECKLIST = [
   { key: "site_address", label: "Site address & access confirmed" },
   { key: "customer_contact", label: "Customer contact details verified" },
-  { key: "energy_usage", label: "Energy bills or annual usage (kWh) provided" },
+  { key: "energy_usage", label: "Energy bills or daily usage (kWh) provided" },
   { key: "site_evidence", label: "Site photo or sketch attached" },
   { key: "budget_indication", label: "Indicative budget / opportunity value from sales" },
   { key: "site_constraints", label: "Known site constraints noted (shading, roof type, three-phase, etc.)" },

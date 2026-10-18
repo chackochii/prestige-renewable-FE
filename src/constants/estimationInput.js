@@ -85,6 +85,8 @@ export const SITE_PHOTO_CATEGORY = "photo";
 export function emptyEstimationInput() {
   return {
     // Project & site
+    // The service requirement typed in when sales picks "Other" on the lead.
+    serviceRequirementOther: "",
     siteType: "",
     preSiteInspectionRequired: "",
     siteCrewAssigneeId: "",
@@ -228,7 +230,6 @@ export function estimationInputMissing(input, { drawingsCount = 0 } = {}) {
   if (blank(input.preSiteInspectionRequired)) missing.push("whether a pre-site inspection is required");
   // A required pre-site inspection brings back the visit and its photos itself,
   // so neither is asked for separately then.
-  if (blank(input.roofMeasurements)) missing.push("roof / site measurements");
   if (blank(input.existingElectrical)) missing.push("existing electrical system");
   if (blank(input.switchboardCondition)) missing.push("main switchboard / DB details");
   if (blank(input.switchboardUpgrade)) missing.push("switchboard upgrade requirement");

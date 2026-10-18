@@ -27,6 +27,7 @@ import {
   ELECTRICAL_PHASES,
   FINANCE_OPTIONS,
   INSTALL_TIMEFRAMES,
+  LEGACY_INSTALL_TIMEFRAMES,
   ROOF_TYPES,
   SERVICE_REQUIREMENTS,
   STOREY_OPTIONS,
@@ -140,6 +141,11 @@ export default function LeadForm({
   // Told which tab a save moves on to (its label), or null on the last one —
   // so the panel's Save button can say "Save & continue to …".
   onNextTabChange,
+  // "yyyy-mm-dd": the day the lead was created. Date fields cannot go earlier.
+  minDate = "",
+  // Told true when the Mark Potential tab is open and the lead could leave the
+  // stage on save (checklist complete, Potential, estimator chosen).
+  onReadyToProceedChange,
 }) {
   const err = (field) => errors[field];
   const hasSalesperson = !isBlank(form.salespersonId) && showChecklist;
@@ -270,14 +276,14 @@ export default function LeadForm({
   const siteAddressLine = [form.siteLine1, form.siteSuburb, `${form.siteState || ""} ${form.sitePostcode || ""}`.trim()]
     .filter((part) => !isBlank(part))
     .join(", ");
-  const doneService = !isBlank(form.serviceRequirement);
+  const doneService =
+    !isBlank(form.serviceRequirement) && (form.serviceRequirement !== "other" || !isBlank(form.serviceRequirementOther));
   const doneBilling =
     form.billingSameAsSite === "no"
       ? !isBlank(form.customerBillingAddress)
       : !isBlank(form.billingSameAsSite);
   const doneEmail = !isBlank(form.customerEmail);
   const donePhone = !isBlank(form.customerPhone);
-  const doneMeasurements = !isBlank(form.roofMeasurements);
   const doneStoreys = !isBlank(form.propertyStoreys);
   const doneRoof = !isBlank(form.roofType);
   const donePhase = !isBlank(form.electricalPhase);
@@ -320,20 +326,24 @@ export default function LeadForm({
     { label: "Customer details", done: doneCustomer, missing: customerMissing },
     { label: "Service requirement", done: doneService },
     { label: "Billing address", done: doneBilling },
-    { label: "Roof / site measurements", done: doneMeasurements },
     { label: "Building type", done: doneStoreys },
     { label: "Roof type", done: doneRoof },
     { label: "Electrical phase", done: donePhase },
     { label: "Electricity bills", done: doneBills },
-    { label: "Annual usage", done: doneUsage },
+    { label: "Daily usage", done: doneUsage },
     { label: "Finance assistance", done: doneFinance },
     { label: "Site requirements & extra costs", done: doneSiteRequirements },
     { label: "Preferred timeframe", done: doneTimeframe },
-    { label: "Preferred location", done: doneLocation },
+    { label: "Preferred battery location", done: doneLocation },
   ];
   const outstanding = requiredRows.filter((r) => !r.done);
   const doneCount = requiredRows.length - outstanding.length;
   const checklistComplete = outstanding.length === 0;
+  const readyToProceed =
+    activeTab === "decision" && checklistComplete && form.potential === "yes" && !isBlank(form.estimatorId);
+  useEffect(() => {
+    onReadyToProceedChange?.(readyToProceed);
+  }, [readyToProceed, onReadyToProceedChange]);
 
   return (
     <>
@@ -518,15 +528,32 @@ export default function LeadForm({
                 ) : null}
                 {form.leadSource === "referrer" ? (
                   <div className="form-grid" style={{ marginTop: 10 }}>
-                    <Field label="Referrer" required error={err("referrerId")}>
-                      <select value={form.referrerId} disabled={disabled} onChange={(e) => set("referrerId", e.target.value)}>
-                        <option value="">Select</option>
+                    <Field
+                      label="Referrer"
+                      required
+                      error={err("referrerId")}
+                      hint={form.referrerId ? "registered referrer — counts towards the referral program" : "type a name, or pick a registered referrer"}
+                    >
+                      {/* Free text, with the registered referrers offered as you
+                          type. A name that matches one links the lead to it. */}
+                      <input
+                        list="lf-referrers"
+                        value={form.referrerName}
+                        disabled={disabled}
+                        maxLength={200}
+                        placeholder="Who referred this lead"
+                        onChange={(e) => {
+                          const typed = e.target.value;
+                          const match = referrers.find((r) => r.organisation?.trim().toLowerCase() === typed.trim().toLowerCase());
+                          set("referrerName", typed);
+                          set("referrerId", match ? String(match.id) : "");
+                        }}
+                      />
+                      <datalist id="lf-referrers">
                         {referrers.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.organisation}
-                          </option>
+                          <option key={r.id} value={r.organisation} />
                         ))}
-                      </select>
+                      </datalist>
                     </Field>
                     <Field label="Involvement tier">
                       <select
@@ -534,6 +561,7 @@ export default function LeadForm({
                         disabled={disabled}
                         onChange={(e) => set("involvementTier", e.target.value)}
                       >
+                        <option value="none">None</option>
                         {tiers.map((t) => (
                           <option key={t.key} value={t.key}>
                             {t.label}
@@ -621,9 +649,18 @@ export default function LeadForm({
                               onChange={(e) => setAttempt(i, "method", e.target.value)}
                             />
                           </Field>
-                          <Field label="When" required>
+                          <Field
+                            label="When"
+                            required
+                            error={
+                              minDate && a.contactedAt && String(a.contactedAt).slice(0, 10) < minDate
+                                ? "Can't be before the lead was created"
+                                : undefined
+                            }
+                          >
                             <input
                               type="date"
+                              min={minDate || undefined}
                               value={a.contactedAt || ""}
                               disabled={disabled}
                               onChange={(e) => setAttempt(i, "contactedAt", e.target.value)}
@@ -710,6 +747,13 @@ export default function LeadForm({
                   error={err("serviceRequirement")}
                   onChange={(v) => set("serviceRequirement", v)}
                 />
+                {form.serviceRequirement === "other" ? (
+                  <div style={{ marginTop: 10 }}>
+                    <Field label="Service required" required error={err("serviceRequirementOther")}>
+                      {input("serviceRequirementOther", { placeholder: "e.g. Solar hot water, heat pump", maxLength: 120 })}
+                    </Field>
+                  </div>
+                ) : null}
               </ChecklistRow>
 
               {/* The site address is captured above — only billing is asked here. */}
@@ -779,12 +823,6 @@ export default function LeadForm({
                 </div>
               </ChecklistRow>
 
-              <ChecklistRow done={doneMeasurements} label="Roof / site measurements" required>
-              <Field hint="dimensions, usable area, tilt — what estimation sizes the system from">
-                {textarea("roofMeasurements")}
-              </Field>
-            </ChecklistRow>
-
             <ChecklistRow done={doneStoreys} label="Building type" required>
                 <ChoiceGroup
                   name="lf-storeys"
@@ -837,7 +875,7 @@ export default function LeadForm({
                 )}
               </ChecklistRow>
 
-              <ChecklistRow done={doneUsage} label="Annual usage (kWh)" required>
+              <ChecklistRow done={doneUsage} label="Daily usage (kWh)" required>
                 <Field error={err("energyAnnualKwh")}>
                   <NumberInput
                     value={form.energyAnnualKwh}
@@ -894,7 +932,11 @@ export default function LeadForm({
                     onChange={(e) => set("preferredInstallTimeframe", e.target.value)}
                   >
                     <option value="">When does the customer want it installed?</option>
-                    {INSTALL_TIMEFRAMES.map((t) => (
+                    {[
+                      ...INSTALL_TIMEFRAMES,
+                      // A lead saved under the old month-based list keeps its answer.
+                      ...LEGACY_INSTALL_TIMEFRAMES.filter((t) => t.key === form.preferredInstallTimeframe),
+                    ].map((t) => (
                       <option key={t.key} value={t.key}>
                         {t.label}
                       </option>
@@ -903,9 +945,9 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneLocation} label="Preferred location" required>
-                <Field hint="where on site the system goes" error={err("preferredInstallLocation")}>
-                  {input("preferredInstallLocation", { placeholder: "e.g. north-facing roof, garage wall for the battery" })}
+              <ChecklistRow done={doneLocation} label="Preferred battery location" required>
+                <Field hint="where on site the battery goes" error={err("preferredInstallLocation")}>
+                  {input("preferredInstallLocation", { placeholder: "e.g. garage wall, side of the house" })}
                 </Field>
               </ChecklistRow>
 
