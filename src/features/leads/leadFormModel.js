@@ -68,6 +68,8 @@ export function emptyLeadForm() {
     leadSource: "internal",
     leadSourceDetails: "",
     referrerId: "",
+    // The referrer as typed. When it matches a registered referrer, referrerId links it too.
+    referrerName: "",
     involvementTier: "lead_only",
     hasOwnerDiscount: false,
     ownerDiscountName: "",
@@ -156,6 +158,7 @@ export function leadToForm(opp) {
     leadSource: str(opp.leadSource) || "internal",
     leadSourceDetails: str(opp.leadSourceDetails),
     referrerId: str(opp.referrerId),
+    referrerName: str(opp.referrerName) || str(opp.referrer?.organisation),
     involvementTier: str(opp.involvementTier) || "lead_only",
     hasOwnerDiscount: Boolean(opp.hasOwnerDiscount),
     ownerDiscountName: str(opp.ownerDiscountName),
@@ -343,12 +346,17 @@ export function formToPayload(form) {
   if (!isAutomatedSource(form.leadSource)) {
     payload.leadSource = form.leadSource;
     payload.referrerId = form.leadSource === "referrer" ? idOrNull(form.referrerId) : null;
+    payload.referrerName = form.leadSource === "referrer" ? trim(form.referrerName) || null : null;
     payload.involvementTier = form.leadSource === "referrer" ? form.involvementTier || "lead_only" : null;
   }
   return payload;
 }
 
-export function validateLeadForm(form) {
+/**
+ * `minDate` ("yyyy-mm-dd"): the day the lead was created — nothing on it can
+ * be dated earlier (contact attempts).
+ */
+export function validateLeadForm(form, { minDate = "" } = {}) {
   const errors = {};
   // Type comes first on the form: it decides whether the customer is a
   // business (name + ABN) or a person.
@@ -376,13 +384,15 @@ export function validateLeadForm(form) {
   if (form.financeAssistance === "yes" && isBlank(form.financeNotes))
     errors.financeNotes = "Record what finance assistance the customer needs.";
   if (!form.leadSource) errors.leadSource = "Select a lead source.";
-  if (form.leadSource === "referrer" && isBlank(form.referrerId))
-    errors.referrerId = "Select the referrer who introduced this lead.";
+  if (form.leadSource === "referrer" && isBlank(form.referrerId) && isBlank(form.referrerName))
+    errors.referrerId = "Enter the referrer who introduced this lead.";
   const logged = (form.contactAttempts || []).filter(isLoggedAttempt);
   if (form.needsClientContact === "yes" && !logged.length)
     errors.contactAttempts = "Log at least one contact attempt — how you tried and when.";
   if (logged.some((a) => a.reached === false && isBlank(a.reason)))
     errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
+  if (minDate && logged.some((a) => String(a.contactedAt).slice(0, 10) < minDate))
+    errors.contactAttempts = "A contact attempt cannot be dated before the lead was created."; 
   if (!isBlank(form.customerBudget) && Number(form.customerBudget) < 0)
     errors.customerBudget = "A budget cannot be negative.";
   if (form.potential === "no" && isBlank(form.notPotentialReason))
@@ -393,7 +403,9 @@ export function validateLeadForm(form) {
     if (isBlank(form.estimatorId)) errors.estimatorId = "Assign an estimator for this potential client.";
     if (isBlank(form.needsClientContact))
       errors.needsClientContact = "Confirm whether the client had to be contacted for the mandatory details.";
-    if (isBlank(form.serviceRequirement)) errors.serviceRequirement = "Record whether they want solar, battery or both.";
+    if (isBlank(form.serviceRequirement)) errors.serviceRequirement = "Record the service they want.";
+    else if (form.serviceRequirement === "other" && isBlank(form.serviceRequirementOther))
+      errors.serviceRequirementOther = "Say what service they want.";
     if (isBlank(form.billingSameAsSite))
       errors.billingSameAsSite = "Confirm whether the site address is the billing address.";
     if (isBlank(form.customerComments)) errors.customerComments = "Record the initial customer requirements and comments.";
@@ -407,7 +419,7 @@ export function validateLeadForm(form) {
     if (isBlank(form.preferredInstallTimeframe))
       errors.preferredInstallTimeframe = "Confirm the preferred installation timeframe.";
     if (isBlank(form.preferredInstallLocation))
-      errors.preferredInstallLocation = "Confirm the preferred installation location.";
+      errors.preferredInstallLocation = "Confirm the preferred battery location.";
     if (!form.customerIntentConfirmed)
       errors.customerIntentConfirmed = "Confirm the customer is genuinely interested in proceeding.";
   }

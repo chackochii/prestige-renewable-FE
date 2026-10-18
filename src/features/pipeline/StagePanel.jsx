@@ -129,7 +129,7 @@ function StageFacts({ stageId, opp, unit }) {
         <>
           <Row label="Client feedback" value={opp.feedback} />
           <Row label="Future engagement" value={opp.closureFutureEngagement} />
-          <Row label="Referrer" value={opp.referrer?.organisation} />
+          <Row label="Referrer" value={opp.referrer?.organisation || opp.referrerName} />
         </>
       );
     case 11:

@@ -17,7 +17,7 @@ import {
   estimationInputFromOpp,
   isNothingToGive,
 } from "@/constants/estimationInput";
-import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementLabel, storeyLabel } from "@/features/leads/propertyOptions";
+import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementText, storeyLabel } from "@/features/leads/propertyOptions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
 import { formatNumber } from "@/utils/formatCurrency";
 import { joinAddress } from "@/utils/text";
@@ -59,20 +59,16 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     {
       key: "service",
       label: "Service requirement",
-      value: serviceRequirementLabel(opp.serviceRequirement),
-      done: filled(opp.serviceRequirement),
+      value: serviceRequirementText(opp.serviceRequirement, estimationInputFromOpp(opp).serviceRequirementOther),
+      done:
+        filled(opp.serviceRequirement) &&
+        (opp.serviceRequirement !== "other" || filled(estimationInputFromOpp(opp).serviceRequirementOther)),
     },
     {
       key: "billing",
       label: "Billing address",
       value: opp.billingSameAsSite === "yes" ? "Same as site" : opp.customerBillingAddress,
       done: filled(opp.billingSameAsSite),
-    },
-    {
-      key: "measurements",
-      label: "Roof / site measurements",
-      value: estimationInputFromOpp(opp).roofMeasurements,
-      done: filled(estimationInputFromOpp(opp).roofMeasurements),
     },
     { key: "storeys", label: "Building type", value: storeyLabel(opp.propertyStoreys), done: filled(opp.propertyStoreys) },
     { key: "roof", label: "Roof type", value: roofTypeLabel(opp.roofType), done: filled(opp.roofType) },
@@ -90,8 +86,8 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     },
     {
       key: "usage",
-      label: "Annual usage",
-      value: opp.energyAnnualKwh ? `${formatNumber(opp.energyAnnualKwh)} kWh` : "",
+      label: "Daily usage",
+      value: opp.energyAnnualKwh ? `${formatNumber(opp.energyAnnualKwh)} kWh / day` : "",
       done: filled(opp.energyAnnualKwh),
     },
     {
@@ -114,7 +110,7 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     },
     {
       key: "location",
-      label: "Preferred location",
+      label: "Preferred battery location",
       value: opp.preferredInstallLocation,
       done: filled(opp.preferredInstallLocation),
     },
@@ -198,6 +194,15 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       value: sitePhotoCount ? String(sitePhotoCount) : "",
       display: sitePhotoCount ? `${sitePhotoCount} attached` : "On file",
       done: Boolean(input.sitePhotosOnFile) || sitePhotoCount > 0,
+    },
+
+    {
+      // Optional on the lead — estimation records it here when sales left it out.
+      group: "Site & Inspection",
+      field: "roofMeasurements",
+      label: "Roof / site measurements",
+      type: "textarea",
+      value: input.roofMeasurements,
     },
 
     // ---- Technical & Electrical Specification ----

@@ -387,7 +387,7 @@ export default function RequestFormModal({
               <Field>
                 <input
                   value={field.label}
-                  placeholder="e.g. Annual usage (kWh)"
+                  placeholder="e.g. Daily usage (kWh)"
                   onChange={(e) => setField(i, "label", e.target.value)}
                 />
               </Field>

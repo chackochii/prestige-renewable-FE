@@ -22,6 +22,7 @@ import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   addOpportunityHistoryEntry,
+  advanceStage,
   assignEstimator,
   assignSalesperson,
   fetchOpportunityAttachments,
@@ -32,8 +33,11 @@ import {
 import { fetchReferrers } from "@/slices/referralsSlice";
 import { fetchOpportunityRequests } from "@/slices/collaborationSlice";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
-import { formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
+import { dateIsoInZone, formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useAuth } from "@/hooks/useAuth";
+import { nextStageFor, stageById } from "@/constants/stages";
+import { canAdvanceFrom } from "@/helpers/stageAccess";
 
 /** Everything raised from the lead pack is filed against stage 1. */
 const LEAD_STAGE = 1;
@@ -41,8 +45,10 @@ const LEAD_STAGE = 1;
 // Keystrokes are kept in this browser, not sent to the API, until the lead is
 // saved — and never past the end of the session (see helpers/leadDrafts.js).
 
-export default function LeadPackPanel({ opp, unit, canEdit }) {
+// onMoved: called once the lead has been moved on to the next stage from here.
+export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
   const dispatch = useAppDispatch();
+  const { user } = useAuth();
   const { estimators, sales, userName } = useUnitUsers();
   const referrers = useAppSelector((s) => s.referrals.items);
   const referrersStatus = useAppSelector((s) => s.referrals.status);
@@ -68,6 +74,11 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   const [advanceTab, setAdvanceTab] = useState(0);
   // The tab a save moves on to, as LeadForm reports it — named on the Save button.
   const [nextTabLabel, setNextTabLabel] = useState(null);
+  // The lead could leave the stage on this save — LeadForm says so from the Mark Potential tab.
+  const [readyToProceed, setReadyToProceed] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
+  // The day the lead was created, where the unit works — the earliest date anything on it can carry.
+  const leadCreatedOn = dateIsoInZone(opp?.createdAt, unit?.timezone);
 
   // A fresh record (after fetch or save) replaces any unsaved edits.
   const openedId = useRef(opp?.id);
@@ -234,7 +245,7 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
   };
 
   const save = async () => {
-    const found = validateLeadForm(form);
+    const found = validateLeadForm(form, { minDate: leadCreatedOn });
     if (Object.keys(found).length) {
       setErrors(found);
       return false;
@@ -340,6 +351,25 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
     setErrors({});
   };
   const gate = leadGateItems(opp);
+  // On the last tab, a lead that is ready saves and moves straight on.
+  const nextStage = nextStageFor(LEAD_STAGE, unit);
+  const canProceed =
+    readyToProceed && atLeadStage && opp.lifecycle === "Active" && nextStage !== null && canAdvanceFrom(user, LEAD_STAGE);
+  const saveAndProceed = async () => {
+    if (!(await save())) return;
+    setProceeding(true);
+    try {
+      const updated = await dispatch(advanceStage(opp.id)).unwrap();
+      notify(`Moved to ${stageById(updated?.stage ?? nextStage).label}`);
+      onMoved?.();
+    } catch (err) {
+      setSaveError(
+        `Saved, but it could not move on yet: ${typeof err === "string" ? err : err?.message || "the stage gate refused it."}`,
+      );
+    } finally {
+      setProceeding(false);
+    }
+  };
   const errorList = [...new Set(Object.values(errors))];
 
   return (
@@ -416,6 +446,8 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         onTabChange={handleTabChange}
         advanceTab={advanceTab}
         onNextTabChange={setNextTabLabel}
+        onReadyToProceedChange={setReadyToProceed}
+        minDate={leadCreatedOn}
         requestsPanel={
           <StageRequestsPanel
             opp={opp}
@@ -435,8 +467,21 @@ export default function LeadPackPanel({ opp, unit, canEdit }) {
         </p>
       ) : (
         <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : nextTabLabel ? `Save & continue to ${nextTabLabel}` : "Save lead details"}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={canProceed ? saveAndProceed : save}
+            disabled={saving || proceeding}
+          >
+            {saving
+              ? "Saving…"
+              : proceeding
+                ? "Moving…"
+                : canProceed
+                  ? `Save & proceed to ${stageById(nextStage).short}`
+                  : nextTabLabel
+                    ? `Save & continue to ${nextTabLabel}`
+                    : "Save lead details"}
           </button>
           <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={saving}>
             Cancel
