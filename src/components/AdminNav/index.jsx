@@ -20,9 +20,17 @@ export default function AdminNav() {
         </NavLink>
       ))}
       {isSuperAdmin ? (
-        <NavLink to="/superadmin" className={({ isActive }) => (isActive ? "active" : "")}>
-          Business units
-        </NavLink>
+        <>
+          <NavLink to="/superadmin" end className={({ isActive }) => (isActive ? "active" : "")}>
+            Business units
+          </NavLink>
+          <NavLink to="/superadmin/dnsp-networks" className={({ isActive }) => (isActive ? "active" : "")}>
+            DNSP networks
+          </NavLink>
+          <NavLink to="/superadmin/catalog" className={({ isActive }) => (isActive ? "active" : "")}>
+            Quote catalog
+          </NavLink>
+        </>
       ) : null}
     </div>
   );

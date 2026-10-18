@@ -7,12 +7,15 @@
 // everybody resents.
 //
 // Pass `confirmClose={false}` where there is nothing to lose: a preview, or a
-// dialog that is itself a confirmation.
+// dialog that is itself a confirmation. `confirmInline` asks in a popup of our
+// own over the dialog instead of the browser's confirm box (the superadmin
+// screens use it).
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 const CLOSE_WARNING = "Close this? Anything you have entered here will be lost.";
+const INLINE_WARNING = "Anything you have entered here will be lost.";
 
 export default function Modal({
   title,
@@ -22,20 +25,28 @@ export default function Modal({
   actions,
   className = "",
   confirmClose = true,
+  confirmInline = false,
   closeWarning = CLOSE_WARNING,
 }) {
+  const [confirming, setConfirming] = useState(false);
+
   const requestClose = useCallback(() => {
-    if (confirmClose && !window.confirm(closeWarning)) return;
-    onClose?.();
-  }, [confirmClose, closeWarning, onClose]);
+    if (!confirmClose) return onClose?.();
+    if (confirmInline) return setConfirming(true);
+    if (!window.confirm(closeWarning)) return undefined;
+    return onClose?.();
+  }, [confirmClose, confirmInline, closeWarning, onClose]);
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") requestClose();
+      if (e.key !== "Escape") return;
+      // Escape backs out of the close confirmation first, then asks to close.
+      if (confirming) setConfirming(false);
+      else requestClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [requestClose]);
+  }, [confirming, requestClose]);
 
   return (
     // No onClick here: a click outside the dialog does nothing on purpose.
@@ -53,6 +64,24 @@ export default function Modal({
         {children}
         {actions ? <div className="modal-actions">{actions}</div> : null}
       </div>
+      {confirming ? (
+        <div className="modal-back" role="presentation">
+          <div className="modal" role="alertdialog" aria-modal="true" aria-label="Close without saving?">
+            <h2>Close without saving?</h2>
+            <p className="lede" style={{ marginBottom: 16 }}>
+              {closeWarning === CLOSE_WARNING ? INLINE_WARNING : closeWarning}
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
+                Keep editing
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => onClose?.()}>
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

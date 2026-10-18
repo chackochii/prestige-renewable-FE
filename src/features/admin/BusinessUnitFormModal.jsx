@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Modal from "@/components/Modal";
 import Field from "@/components/Field";
-import Alert from "@/components/Alert";
 import { isBlank } from "@/utils/validators";
+import { useNotifications } from "@/hooks/useNotifications";
 import { TIMEZONES } from "@/constants/timezones";
 
 const STATUSES = ["active", "configured", "inactive"];
@@ -18,14 +18,14 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
     timezone: unit?.timezone || "Australia/Sydney",
     status: unit?.status || "configured",
   });
-  const [error, setError] = useState("");
+  // Problems show as a toast, not a box in the form.
+  const { error: showError } = useNotifications();
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (!editing && (isBlank(form.code) || form.code.length > 10)) return setError("Enter a code of up to 10 characters (e.g. PRS).");
-    if (isBlank(form.name)) return setError("Enter a name.");
+    if (!editing && (isBlank(form.code) || form.code.length > 10)) return showError("Enter a code of up to 10 characters (e.g. PRS).");
+    if (isBlank(form.name)) return showError("Enter a name.");
     setSaving(true);
-    setError("");
     try {
       const body = {
         name: form.name.trim(),
@@ -37,7 +37,7 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
       await onSave(body);
       onClose();
     } catch (err) {
-      setError(typeof err === "string" ? err : err?.message || "Could not save the business unit.");
+      showError(typeof err === "string" ? err : err?.message || "Could not save the business unit.");
     } finally {
       setSaving(false);
     }
@@ -46,6 +46,7 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
 
   return (
     <Modal
+      confirmInline
       title={editing ? `Edit ${unit.code}` : "New business unit"}
       body={
         editing
@@ -93,7 +94,6 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
           </select>
         </Field>
       </div>
-      {error ? <Alert tone="danger" style={{ marginTop: 12, marginBottom: 0 }}>{error}</Alert> : null}
     </Modal>
   );
 }

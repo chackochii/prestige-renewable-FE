@@ -21,7 +21,7 @@
 // while anything typed has not reached the record, and "Saved just now"
 // once it has. Generating waits until the draft is saved.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Trash2, Undo2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -68,7 +68,24 @@ const numericUnit = (value) => {
   return text !== "" && Number.isFinite(Number(text)) ? text : "";
 };
 
-function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
+/**
+ * The catalog as this line's pickers offer it. A saved line whose item or brand
+ * has since been retired from the catalog keeps it on offer, so the line can
+ * still be edited as it was priced.
+ */
+function catalogForLine(catalogItems, initial) {
+  if (!initial?.itemKey) return catalogItems;
+  const saved = { name: initial.brand, unitPrice: initial.unitPrice };
+  const listed = findCatalogItem(catalogItems, initial.itemKey);
+  if (!listed) {
+    return [...catalogItems, { key: initial.itemKey, name: initial.itemName || initial.itemKey, unit: initial.unit, brands: initial.brand ? [saved] : [], retired: true }];
+  }
+  if (!initial.brand || listed.brands.some((b) => b.name === initial.brand)) return catalogItems;
+  return catalogItems.map((item) => (item === listed ? { ...item, brands: [...item.brands, saved] } : item));
+}
+
+function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onClose }) {
+  const catalogItems = useMemo(() => catalogForLine(catalog, initial), [catalog, initial]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(() =>
     initial
@@ -162,7 +179,7 @@ function ItemModal({ initial, catalogItems, catalogLoading, onSave, onClose }) {
             <option value="">Select an item</option>
             {filtered.map((i) => (
               <option key={i.key} value={i.key}>
-                {i.name}
+                {i.retired ? `${i.name} (no longer in the catalog)` : i.name}
               </option>
             ))}
           </select>
