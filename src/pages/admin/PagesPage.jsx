@@ -65,6 +65,7 @@ function PageModal({ page, permissions, onClose, onSave }) {
 
   return (
     <Modal
+      confirmInline
       title={editing ? `Edit ${page.label}` : "New page"}
       body="A page only works once the frontend has a route for its path. Visibility follows the permission you choose; per-unit toggles are set in the matrix."
       onClose={onClose}
