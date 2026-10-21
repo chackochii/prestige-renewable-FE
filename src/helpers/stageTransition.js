@@ -4,6 +4,8 @@
 // is still missing.
 
 import { CLOSED_LIFECYCLES, LAST_STAGE } from "@/constants/stages";
+import { procurementChecklistOf } from "@/constants/procurementChecklists";
+import { answersOf, procurementContext, sectionComplete } from "@/helpers/procurementChecklist";
 import { advanceDeniedReason } from "@/helpers/stageAccess";
 import { isBlank } from "@/utils/validators";
 
@@ -74,7 +76,25 @@ export function quoteGateItems(quote) {
  * stage's own permission is checked too — moving a record on belongs to the
  * department that owns the stage being left (see helpers/stageAccess).
  */
-export function advanceState(opp, { quote, user } = {}) {
+/**
+ * What still stops a job leaving procurement (6) or construction (7), read off
+ * its procurement record — mirrors prestige-be procurementBlocker and
+ * constructionBlocker. Procurement ends at the PO release (CL-13); the
+ * material receipt (CL-14) and the Green Deal job (CL-10) are construction's.
+ */
+function procurementGateItems(stage, job) {
+  if (!job) return ["Open the procurement record (still loading)"];
+  const checklist = job.checklist ?? {};
+  const ctx = procurementContext(job, checklist);
+  const done = (key) => sectionComplete(procurementChecklistOf(key), answersOf(checklist, key), ctx);
+  if (stage === 6) return done("po") ? [] : ["Complete every item on PO release (CL-13)"];
+  const missing = [];
+  if (answersOf(checklist, "receipt").materialsReady !== true) missing.push("Materials confirmed ready (material receipt, CL-14)");
+  if (!done("jobCreation")) missing.push("Job created in Green Deal (job creation, CL-10)");
+  return missing;
+}
+
+export function advanceState(opp, { quote, user, procurementJob } = {}) {
   if (!opp) return { canAdvance: false, missing: ["No record"] };
   if (opp.lifecycle && CLOSED_LIFECYCLES.includes(opp.lifecycle))
     return { canAdvance: false, missing: [`Record is ${opp.lifecycle.toLowerCase()}`] };
@@ -93,7 +113,9 @@ export function advanceState(opp, { quote, user } = {}) {
               (Array.isArray(opp.requiredApprovals) && opp.requiredApprovals.length
                 ? ["Every required approval approved — the job then moves on to Procurement by itself"]
                 : [])
-            : [];
+            : stage === 6 || stage === 7
+              ? procurementGateItems(stage, procurementJob)
+              : [];
   // Listed last: the checklist tells them what the record still needs, this
   // tells them it is not theirs to move even once it is complete.
   const denied = user === undefined ? null : advanceDeniedReason(user, stage);

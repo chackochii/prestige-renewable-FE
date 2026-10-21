@@ -1,7 +1,7 @@
 // Opportunity detail: hero, stage stepper, stage work and history.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock, FileStack, Send } from "lucide-react";
 import Badge from "@/components/Badge";
 import Alert from "@/components/Alert";
@@ -16,6 +16,8 @@ import LeadPackPanel from "@/features/leads/LeadPackPanel";
 import EstimationPanel from "@/features/pipeline/EstimationPanel";
 import StagePanel from "@/features/pipeline/StagePanel";
 import ProcurementStagePanel from "@/features/procurement/ProcurementStagePanel";
+import ConstructionMaterialsPanel from "@/features/procurement/ConstructionMaterialsPanel";
+import { useProcurementJob } from "@/hooks/useProcurementJob";
 import ApprovalsStagePanel from "@/features/approvals/ApprovalsStagePanel";
 import { APPROVALS_STAGE } from "@/constants/approvals";
 import ProposalStagePanel from "@/features/proposals/ProposalStagePanel";
@@ -34,16 +36,25 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { useNotifications } from "@/hooks/useNotifications";
 
+const CONSTRUCTION_STAGE_ID = 7;
+
 export default function OpportunityPage() {
   const { id } = useParams();
+  // ?stage=5 opens a stage other than the current one — the approvals and
+  // procurement lists link straight to their own stage of the job.
+  const [searchParams] = useSearchParams();
+  const stageParam = Number(searchParams.get("stage")) || null;
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { user, hasPermission, isSuperAdmin } = useAuth();
   const { unit, units, switchUnit } = useBusinessUnit();
   const { notify } = useNotifications();
   const { selected: opp, selectedStatus, selectedError, quote } = useAppSelector((s) => s.leads);
+  // Procurement and construction are let go on the procurement record (PO
+  // release; then material receipt and Green Deal), so it is read here for the gate.
+  const procurementRecord = useProcurementJob(opp?.id, { enabled: [6, 7].includes(Number(opp?.stage)) });
   const [tab, setTab] = useState("work");
-  const [viewStage, setViewStage] = useState(null);
+  const [viewStage, setViewStage] = useState(stageParam);
   const [advanceError, setAdvanceError] = useState("");
   const [advancing, setAdvancing] = useState(false);
   // Bumped by the header's "Send to Proposal" to open estimation's hand-over step.
@@ -53,12 +64,13 @@ export default function OpportunityPage() {
   useEffect(() => {
     dispatch(fetchOpportunity(id));
     dispatch(fetchOpportunityQuote(id));
-    setViewStage(null);
+    setViewStage(stageParam);
     setTab("work");
     setAdvanceError("");
     return () => {
       dispatch(clearSelected());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a different record resets the view
   }, [id, dispatch]);
 
   // The record belongs to a unit the person can work in but is not currently
@@ -98,10 +110,11 @@ export default function OpportunityPage() {
   const canEditEstimation = hasPermission(PERMISSIONS.ESTIMATION_UPDATE);
   const canDelete = isSuperAdmin && Number(opp.stage) === 1;
   const current = Number(opp.stage);
-  const viewing = viewStage ?? current;
+  // A stage asked for that the job has not reached yet shows the current one.
+  const viewing = viewStage && viewStage <= current ? viewStage : current;
   const stage = stageById(current);
   const next = nextStageFor(current, unit);
-  const gate = advanceState(opp, { quote, user });
+  const gate = advanceState(opp, { quote, user, procurementJob: procurementRecord.job });
   const stageHidden = stageHiddenReason(user, viewing);
   const sla = slaStatus(opp.slaDueAt);
   const life = lifecycleMeta(opp.lifecycle);
@@ -155,7 +168,8 @@ export default function OpportunityPage() {
           <h1>{oppTitle(opp)}</h1>
           <div className="meta-row">
             <span>{joinAddress(opp.siteLine1, `${opp.siteSuburb || ""} ${opp.siteState || ""} ${opp.sitePostcode || ""}`.trim()) || "No site yet"}</span>
-            <span>{formatCurrency(value)}</span>
+            {/* acceptedValue / estimatedValue are stored without GST (prestige-be exGstTotalOf). */}
+            <span>{formatCurrency(value)} ex GST</span>
             <Badge tone={life.tone}>{life.label}</Badge>
             <Badge tone={sla.tone}>{sla.label}</Badge>
             {opp.variationPending ? <Badge tone="warning">Variation pending</Badge> : null}
@@ -249,11 +263,33 @@ export default function OpportunityPage() {
           ) : viewing === PROPOSAL_STAGE_ID ? (
             <ProposalStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} onMoved={() => dispatch(fetchOpportunity(opp.id))} />
           ) : viewing === APPROVALS_STAGE.id ? (
-            <ApprovalsStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
+            <ApprovalsStagePanel
+              key={opp.id}
+              opp={opp}
+              unit={unit}
+              canEdit={canEdit}
+              onMoved={() => {
+                dispatch(fetchOpportunity(opp.id));
+                setViewStage(null);
+              }}
+            />
           ) : viewing === PROCUREMENT_STAGE.id ? (
-            <ProcurementStagePanel key={opp.id} opp={opp} unit={unit} canEdit={canEdit} />
+            <ProcurementStagePanel
+              key={opp.id}
+              opp={opp}
+              unit={unit}
+              canEdit={canEdit}
+              onMoved={() => {
+                dispatch(fetchOpportunity(opp.id));
+                setViewStage(null);
+              }}
+            />
           ) : (
-            <StagePanel stageId={viewing} opp={opp} unit={unit} canEdit={canEdit} />
+            <>
+              {/* Construction receives the materials and creates the Green Deal job — moved here from procurement. */}
+              {viewing === CONSTRUCTION_STAGE_ID ? <ConstructionMaterialsPanel opp={opp} /> : null}
+              <StagePanel stageId={viewing} opp={opp} unit={unit} canEdit={canEdit} />
+            </>
           )}
 
           {/* From proposal on, the stage panels save as they go — there is no

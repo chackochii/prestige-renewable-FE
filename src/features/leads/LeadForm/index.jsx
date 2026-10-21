@@ -33,7 +33,7 @@ import {
   STOREY_OPTIONS,
   electricalPhaseLabel,
 } from "@/features/leads/propertyOptions";
-import { COMMON_LANGUAGES, DEFAULT_LANGUAGE } from "@/constants/languages";
+import { DEFAULT_LANGUAGE } from "@/constants/languages";
 import {
   BACKUP_OPTIONS,
   SITE_TYPES,
@@ -146,6 +146,11 @@ export default function LeadForm({
   // Told true when the Mark Potential tab is open and the lead could leave the
   // stage on save (checklist complete, Potential, estimator chosen).
   onReadyToProceedChange,
+  // Told which tab is open, so the panel's Save checks that tab (and earlier ones) only.
+  onActiveTabChange,
+  // Told what the open tab still needs, as one "a, b, c" string ("" when it
+  // is complete) — the panel's Continue button is disabled until it is.
+  onTabBlockersChange,
 }) {
   const err = (field) => errors[field];
   const hasSalesperson = !isBlank(form.salespersonId) && showChecklist;
@@ -167,6 +172,9 @@ export default function LeadForm({
   useEffect(() => {
     onNextTabChange?.(nextTabLabel);
   }, [nextTabLabel, onNextTabChange]);
+  useEffect(() => {
+    onActiveTabChange?.(activeTab);
+  }, [activeTab, onActiveTabChange]);
   // The checklist groups work as an accordion: one open at a time, starting
   // on the first (Mandatory information). Opening another folds the rest;
   // clicking the open one folds it too.
@@ -243,11 +251,11 @@ export default function LeadForm({
   const addCustomField = () => set("customFields", [...customFields, { label: "", value: "" }]);
   const removeCustomField = (i) => set("customFields", customFields.filter((_, idx) => idx !== i));
 
-  // "Other" stays open while the language is being typed, so the picker
-  // doesn't snap back to English on the first keystroke.
-  const languageListed = COMMON_LANGUAGES.includes(form.preferredLanguage);
+  // English, or Other with the language typed in. "Other" stays open while it
+  // is being typed, so the picker doesn't snap back to English on the first
+  // keystroke; any language already on the record reads as Other.
   const [languageOther, setLanguageOther] = useState(false);
-  const languageIsOther = languageOther || (!isBlank(form.preferredLanguage) && !languageListed);
+  const languageIsOther = languageOther || !isBlank(form.preferredLanguage);
 
   // Each attempt is typed straight into the lead. There is no draft to commit:
   // filling the boxes is logging the attempt, and anything half-typed is saved
@@ -321,8 +329,8 @@ export default function LeadForm({
   const requiredRows = [
     { label: "Where they got our details", done: doneSource },
     { label: "Initial requirements & comments", done: doneComments },
-    { label: "Genuine interest", done: doneIntent },
     { label: "Contact client", done: doneContact },
+    { label: "Genuine interest", done: doneIntent },
     { label: "Customer details", done: doneCustomer, missing: customerMissing },
     { label: "Service requirement", done: doneService },
     { label: "Billing address", done: doneBilling },
@@ -336,9 +344,25 @@ export default function LeadForm({
     { label: "Preferred timeframe", done: doneTimeframe },
     { label: "Preferred battery location", done: doneLocation },
   ];
+  // Everything the Potential gate needs, wherever it is asked.
   const outstanding = requiredRows.filter((r) => !r.done);
-  const doneCount = requiredRows.length - outstanding.length;
   const checklistComplete = outstanding.length === 0;
+  // Where they got our details, genuine interest and the contact question are
+  // asked on the Customer details tab; the Checklist tab counts its own rows.
+  const CUSTOMER_TAB_ROWS = ["Where they got our details", "Genuine interest", "Contact client"];
+  const checklistRows = requiredRows.filter((r) => !CUSTOMER_TAB_ROWS.includes(r.label));
+  const checklistOutstanding = checklistRows.filter((r) => !r.done);
+  const doneCount = checklistRows.length - checklistOutstanding.length;
+  // What the open tab still needs before moving on to the next one.
+  const tabBlockers =
+    activeTab === "customer"
+      ? [...customerMissing, ...outstanding.filter((r) => CUSTOMER_TAB_ROWS.includes(r.label)).map((r) => r.label)].join(", ")
+      : activeTab === "checklist"
+        ? checklistOutstanding.map((r) => r.label).join(", ")
+        : "";
+  useEffect(() => {
+    onTabBlockersChange?.(tabBlockers);
+  }, [tabBlockers, onTabBlockersChange]);
   const readyToProceed =
     activeTab === "decision" && checklistComplete && form.potential === "yes" && !isBlank(form.estimatorId);
   useEffect(() => {
@@ -356,7 +380,7 @@ export default function LeadForm({
                   key: "checklist",
                   label: "Checklist",
                   icon: <ClipboardCheck size={14} />,
-                  count: `${doneCount}/${requiredRows.length}`,
+                  count: `${doneCount}/${checklistRows.length}`,
                 },
                 { key: "decision", label: "Mark Potential", icon: <Check size={14} /> },
               ]
@@ -471,35 +495,11 @@ export default function LeadForm({
               </Field>
             ) : null}
           </div>
-        </div>
-      ) : null}
 
-      {activeTab === "requests" ? requestsPanel : null}
-
-      {activeTab === "checklist" ? (
-        <div className="section" id="lf-checklist">
-          <p className="lede" style={{ marginBottom: 16 }}>
-            The counted rows are needed before this lead can move forward. The optional rows below them travel to
-            estimation with the lead — fill in what you have.
-          </p>
-            <div className="checklist-progress">
-              <span className="cp-label">
-                {doneCount} of {requiredRows.length} complete
-              </span>
-              <div className="cp-track">
-                <i style={{ width: `${(doneCount / requiredRows.length) * 100}%` }} />
-              </div>
-            </div>
-
-              <div className="checklist" style={{ marginBottom: 20 }}>
-              <GroupHead
-                title="Mandatory information"
-                count={`${doneCount}/${requiredRows.length}`}
-                open={isOpen("mandatory")}
-                onToggle={() => toggleGroup("mandatory")}
-              />
-              {isOpen("mandatory") ? (
-              <>
+          {/* Asked on the first call with the customer, so they sit with the
+              customer's details rather than in the checklist. */}
+          <div className="checklist" style={{ marginTop: 20 }}>
+            <GroupHead title="Contact & interest" />
               <ChecklistRow done={doneSource} label="Where they got our details" required>
                 <Field hint="feeds the referral reward program" error={err("leadSource")}>
                   {automated ? (
@@ -570,32 +570,6 @@ export default function LeadForm({
                       </select>
                     </Field>
                   </div>
-                ) : null}
-              </ChecklistRow>
-
-              <ChecklistRow done={doneComments} label="Initial requirements & comments" required>
-                <Field
-                  hint="what they want from the system, anything else they asked for, financial options discussed"
-                  error={err("customerComments")}
-                >
-                  {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
-                </Field>
-              </ChecklistRow>
-
-              <ChecklistRow done={doneIntent} label="Genuine interest" required>
-                <label className="check" style={{ margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.customerIntentConfirmed}
-                    disabled={disabled}
-                    onChange={(e) => set("customerIntentConfirmed", e.target.checked)}
-                  />
-                  Customer confirmed they are genuinely interested in proceeding
-                </label>
-                {err("customerIntentConfirmed") ? (
-                  <p className="field-error" style={{ marginTop: 6 }}>
-                    {err("customerIntentConfirmed")}
-                  </p>
                 ) : null}
               </ChecklistRow>
 
@@ -713,6 +687,88 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
+              <ChecklistRow done={doneIntent} label="Genuine interest" required>
+                <label className="check" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.customerIntentConfirmed}
+                    disabled={disabled}
+                    onChange={(e) => set("customerIntentConfirmed", e.target.checked)}
+                  />
+                  Customer confirmed they are genuinely interested in proceeding
+                </label>
+                {err("customerIntentConfirmed") ? (
+                  <p className="field-error" style={{ marginTop: 6 }}>
+                    {err("customerIntentConfirmed")}
+                  </p>
+                ) : null}
+              </ChecklistRow>
+
+              {/* Optional: only recorded when the customer would rather not deal
+                  in English, so the lead can go to a native speaker. */}
+              <ChecklistRow done label="Preferred language">
+                <Field hint="optional — leave as English unless the customer asked otherwise">
+                  <select
+                    value={languageIsOther ? "__other" : ""}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      const other = e.target.value === "__other";
+                      setLanguageOther(other);
+                      set("preferredLanguage", "");
+                    }}
+                  >
+                    <option value="">{DEFAULT_LANGUAGE}</option>
+                    <option value="__other">Other</option>
+                  </select>
+                </Field>
+                {languageIsOther ? (
+                  <div style={{ marginTop: 10 }}>
+                    <Field label="Language">
+                      {input("preferredLanguage", { placeholder: "Type the language", autoFocus: true })}
+                    </Field>
+                  </div>
+                ) : null}
+              </ChecklistRow>
+
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "requests" ? requestsPanel : null}
+
+      {activeTab === "checklist" ? (
+        <div className="section" id="lf-checklist">
+          <p className="lede" style={{ marginBottom: 16 }}>
+            The counted rows are needed before this lead can move forward. The optional rows below them travel to
+            estimation with the lead — fill in what you have.
+          </p>
+            <div className="checklist-progress">
+              <span className="cp-label">
+                {doneCount} of {checklistRows.length} complete
+              </span>
+              <div className="cp-track">
+                <i style={{ width: `${(doneCount / checklistRows.length) * 100}%` }} />
+              </div>
+            </div>
+
+              <div className="checklist" style={{ marginBottom: 20 }}>
+              <GroupHead
+                title="Mandatory information"
+                count={`${doneCount}/${checklistRows.length}`}
+                open={isOpen("mandatory")}
+                onToggle={() => toggleGroup("mandatory")}
+              />
+              {isOpen("mandatory") ? (
+              <>
+              <ChecklistRow done={doneComments} label="Initial requirements & comments" required>
+                <Field
+                  hint="what they want from the system, anything else they asked for, financial options discussed"
+                  error={err("customerComments")}
+                >
+                  {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
+                </Field>
+              </ChecklistRow>
+
               {/* Name, phone and email are captured once, at the top of the form —
                   this row only confirms them, it never asks again. */}
               <ChecklistRow done={doneCustomer} label="Customer details" required>
@@ -773,37 +829,6 @@ export default function LeadForm({
                   <div style={{ marginTop: 10 }}>
                     <Field label="Billing address" required error={err("customerBillingAddress")}>
                       {input("customerBillingAddress", { placeholder: "Street, suburb, state and postcode" })}
-                    </Field>
-                  </div>
-                ) : null}
-              </ChecklistRow>
-
-              {/* Optional: only recorded when the customer would rather not deal
-                  in English, so the lead can go to a native speaker. */}
-              <ChecklistRow done label="Preferred language">
-                <Field hint="optional — leave as English unless the customer asked otherwise">
-                  <select
-                    value={languageIsOther ? "__other" : form.preferredLanguage}
-                    disabled={disabled}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setLanguageOther(value === "__other");
-                      set("preferredLanguage", value === "__other" ? "" : value);
-                    }}
-                  >
-                    <option value="">{DEFAULT_LANGUAGE}</option>
-                    {COMMON_LANGUAGES.map((language) => (
-                      <option key={language} value={language}>
-                        {language}
-                      </option>
-                    ))}
-                    <option value="__other">Other…</option>
-                  </select>
-                </Field>
-                {languageIsOther ? (
-                  <div style={{ marginTop: 10 }}>
-                    <Field label="Language">
-                      {input("preferredLanguage", { placeholder: "Type the language", autoFocus: true })}
                     </Field>
                   </div>
                 ) : null}

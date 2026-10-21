@@ -353,6 +353,30 @@ export function formToPayload(form) {
 }
 
 /**
+ * Which tab of the lead form each validated field sits on. Anything not listed
+ * is on the checklist. Saving from a tab checks that tab and the ones before
+ * it — not tabs the person has not reached — see errorsForTab.
+ */
+const CUSTOMER_TAB_FIELDS = new Set([
+  "leadType", "customerLegalName", "customerFirstName", "customerLastName",
+  "customerPhone", "customerEmail", "unassignedReason",
+  // Where they got our details, genuine interest and the contact attempts sit on the Customer details tab too.
+  "leadSource", "leadSourceDetails", "referrerId",
+  "customerIntentConfirmed", "needsClientContact", "contactAttempts",
+]);
+const DECISION_TAB_FIELDS = new Set(["estimatorId", "notPotentialReason"]);
+const TAB_ORDER = ["customer", "checklist", "decision"];
+const tabOfField = (field) =>
+  CUSTOMER_TAB_FIELDS.has(field) ? "customer" : DECISION_TAB_FIELDS.has(field) ? "decision" : "checklist";
+
+/** The errors a save from `tab` should stop on: that tab's and earlier tabs'. Unknown tabs check everything. */
+export function errorsForTab(errors, tab) {
+  const upTo = TAB_ORDER.indexOf(tab);
+  if (upTo < 0) return errors;
+  return Object.fromEntries(Object.entries(errors).filter(([field]) => TAB_ORDER.indexOf(tabOfField(field)) <= upTo));
+}
+
+/**
  * `minDate` ("yyyy-mm-dd"): the day the lead was created — nothing on it can
  * be dated earlier (contact attempts).
  */

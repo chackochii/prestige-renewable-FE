@@ -61,9 +61,9 @@ export const fetchJobApprovals = createAsyncThunk("approvals/job", async (opport
 });
 
 /** → the job's approvals, with the rows that follow the change already on it. */
-export const setRequiredApprovals = createAsyncThunk("approvals/setRequired", async ({ id, keys }, { rejectWithValue }) => {
+export const setRequiredApprovals = createAsyncThunk("approvals/setRequired", async ({ id, keys, custom }, { rejectWithValue }) => {
   try {
-    return await api.setRequiredApprovals(id, keys, { view: "approvals" });
+    return await api.setRequiredApprovals(id, keys, { view: "approvals", custom });
   } catch (err) {
     return reject(err, rejectWithValue);
   }

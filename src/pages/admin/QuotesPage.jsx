@@ -44,7 +44,7 @@ export default function QuotesPage() {
         />
         <StatCard
           icon={<CircleCheck size={17} />}
-          label="Accepted"
+          label="Accepted (ex GST)"
           value={formatCurrency(totals?.acceptedValue ?? 0)}
           hint={`${totals?.acceptedCount ?? 0} accepted`}
           style={{ "--i": 1 }}
@@ -63,7 +63,7 @@ export default function QuotesPage() {
                 <tr>
                   <th>Job</th>
                   <th>Stage</th>
-                  <th>Value</th>
+                  <th>Value (ex GST)</th>
                   <th>Status</th>
                   <th>Updated</th>
                 </tr>
@@ -77,7 +77,7 @@ export default function QuotesPage() {
                         <OppCell opp={o} />
                       </td>
                       <td data-label="Stage">{stageById(o.stage).label}</td>
-                      <td data-label="Value">{formatCurrency(Number(o.acceptedValue) || o.estimatedValue)}</td>
+                      <td data-label="Value (ex GST)">{formatCurrency(Number(o.acceptedValue) || o.estimatedValue)}</td>
                       <td data-label="Status">
                         <Badge tone={life.tone}>{life.label}</Badge>
                       </td>

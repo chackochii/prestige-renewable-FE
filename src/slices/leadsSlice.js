@@ -336,9 +336,10 @@ export const notifyEstimator = createAsyncThunk(
 /** Which approvals the job will need at stage 5 (keys from the unit's catalogue) → the opportunity. */
 export const updateRequiredApprovals = createAsyncThunk(
   "leads/requiredApprovals",
-  async ({ id, keys }, { rejectWithValue }) => {
+  // custom: [{ label }] — approvals the unit's list lacks, added to this job only.
+  async ({ id, keys, custom }, { rejectWithValue }) => {
     try {
-      return await putRequiredApprovals(id, keys);
+      return await putRequiredApprovals(id, keys, { custom });
     } catch (err) {
       return reject(err, rejectWithValue);
     }

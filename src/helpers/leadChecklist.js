@@ -15,7 +15,6 @@ import {
   SWITCHBOARD_CONDITIONS,
   VPP_OPTIONS,
   estimationInputFromOpp,
-  isNothingToGive,
 } from "@/constants/estimationInput";
 import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementText, storeyLabel } from "@/features/leads/propertyOptions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
@@ -167,15 +166,15 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       value: input.preSiteInspectionRequired,
       display: input.preSiteInspectionRequired,
     },
-    // Site visit completed and site photos are only asked when no pre-site
-    // inspection is required — when one is, the inspection request brings the
-    // visit and its photos back, so these two would only repeat it.
+    // Site visit completed and site photos only show while the pre-site
+    // inspection question is unanswered. Answered yes, the inspection request
+    // brings the visit and its photos back; answered no, there is no visit.
     {
       group: "Site & Inspection",
       field: "siteVisitCompleted",
       label: "Site visit completed",
       type: "checkbox",
-      onlyWhen: input.preSiteInspectionRequired !== "yes",
+      onlyWhen: !["yes", "no"].includes(input.preSiteInspectionRequired),
       value: input.siteVisitCompleted,
       display: input.siteVisitCompleted ? "Yes" : "",
     },
@@ -183,7 +182,7 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       group: "Site & Inspection",
       field: "__sitePhotos",
       label: "Site photos",
-      onlyWhen: input.preSiteInspectionRequired !== "yes",
+      onlyWhen: !["yes", "no"].includes(input.preSiteInspectionRequired),
       // Estimation can add these itself, so the row carries an upload slot
       // rather than just a count.
       type: "files",
@@ -419,13 +418,9 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
     .map((row) => ({
       ...row,
       // A row may settle its own done rule (the document rows do); otherwise
-      // it is done once it holds something — and "none" is not something. The
-      // answer still shows; it just does not tick the row green.
-      done:
-        row.done ??
-        (row.type === "checkbox"
-          ? Boolean(row.value)
-          : filled(row.value) && !isNothingToGive(row.field, row.value)),
+      // it is done once it holds anything — an explicit "no" or "none" included:
+      // "no special requirements" is an answer, not a blank.
+      done: row.done ?? (row.type === "checkbox" ? Boolean(row.value) : filled(row.value)),
       display: row.display ?? String(row.value ?? ""),
     }));
 }

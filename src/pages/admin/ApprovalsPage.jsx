@@ -5,7 +5,8 @@
 // job that reached approvals most recently first; the stat cards count the
 // whole board.
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlarmClock, CircleCheck, CornerUpLeft, Hourglass, Search, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -15,11 +16,7 @@ import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
 import StatCard from "@/components/StatCard";
-import ApprovalWorkflow from "@/features/approvals/ApprovalWorkflow";
 import { APPROVALS_STAGE } from "@/constants/approvals";
-import { PERMISSIONS } from "@/constants/permissions";
-import { useApprovalJob } from "@/hooks/useApprovalJob";
-import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { usePageParam } from "@/hooks/usePageParam";
 import { useUrlSearch } from "@/hooks/useUrlParam";
@@ -33,12 +30,10 @@ import { formatCurrency } from "@/utils/formatCurrency";
 export default function ApprovalsPage() {
   const dispatch = useAppDispatch();
   const { unitId } = useBusinessUnit();
-  const { hasPermission } = useAuth();
-  const canEdit = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
   const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.approvals);
   // The search and the page live in the URL, so Back returns to the board as it was.
   const { search, setSearch, term } = useUrlSearch();
-  const [selectedId, setSelectedId] = useState(null);
+  const navigate = useNavigate();
   const [page, setPage] = usePageParam(term);
   const boardKey = JSON.stringify(unitId ? { businessUnitId: unitId, search: term || undefined, page, pageSize: PAGE_SIZE } : null);
   const loading = boardStatus === "loading";
@@ -51,20 +46,9 @@ export default function ApprovalsPage() {
   // Counted by the API across the whole board, not just the page on screen.
   const counts = boardCounts ?? { pending: 0, approved: 0, rejected: 0, overdue: 0 };
 
-  const selectedRow = rows.find((job) => job.id === selectedId) ?? rows[0] ?? null;
-  // The board brought every job whole, so the selected one is already here:
-  // this reads it from the slice and asks the API for nothing. A change comes
-  // back as the whole job and lands on its board row too, so the last
-  // approval moving the job on reads as "ready for procurement" at once.
-  const { job: selected, status: jobStatus, error: jobError, saveError, dismissSaveError, updateChecklist, saveChecklist, checklistSaveState, updateItem, setRequired } =
-    useApprovalJob(selectedRow?.id);
-  // The last approval moves the job on and the counts on the cards with it, so
-  // the board is asked again — only then.
-  const afterItem = async (type, body) => {
-    const next = await updateItem(type, body);
-    if (next && Number(next.stage) !== Number(selectedRow?.stage)) dispatch(fetchApprovalsBoard(JSON.parse(boardKey)));
-    return next;
-  };
+  // A job opens on its own page, at the approvals stage — the whole record,
+  // with the approvals worked there rather than under this list.
+  const openJob = (job) => navigate(`/opportunities/${job.id}?stage=${APPROVALS_STAGE.id}`);
 
   return (
     <>
@@ -115,14 +99,13 @@ export default function ApprovalsPage() {
                 {rows.map((job) => {
                   const status = approvalStatus(job);
                   const sla = Number(job.stage) === APPROVALS_STAGE.id && approvalOutcome(job) === "pending" ? slaStatus(job.slaDueAt) : null;
-                  const isSelected = job.id === selectedRow?.id;
                   return (
-                    <tr key={job.id} className={isSelected ? "selected" : undefined} aria-selected={isSelected} onClick={() => setSelectedId(job.id)}>
+                    <tr key={job.id} onClick={() => openJob(job)}>
                       <td>
                         <div className="row-title">{job.number}</div>
                         <div className="row-meta">
                           {job.customer}
-                          {job.acceptedValue !== null && job.acceptedValue !== undefined ? ` · ${formatCurrency(job.acceptedValue)}` : ""}
+                          {job.acceptedValue !== null && job.acceptedValue !== undefined ? ` · ${formatCurrency(job.acceptedValue)} inc GST` : ""}
                         </div>
                       </td>
                       <td>
@@ -160,27 +143,6 @@ export default function ApprovalsPage() {
         <Pagination page={page} total={boardTotal} onPageChange={setPage} noun="jobs" loading={loading} />
       </Card>
 
-      {selectedRow ? (
-        <div style={{ marginTop: 20 }}>
-          {jobStatus === "failed" ? (
-            <Alert tone="danger">{jobError || "The job's approvals could not be loaded."}</Alert>
-          ) : selected ? (
-            <ApprovalWorkflow
-              job={selected}
-              canEdit={canEdit}
-              onChecklistChange={updateChecklist}
-              onSaveChecklist={saveChecklist}
-              checklistSaveState={checklistSaveState}
-              onUpdateItem={afterItem}
-              onSetRequired={setRequired}
-              saveError={saveError}
-              onDismissSaveError={dismissSaveError}
-            />
-          ) : (
-            <LoadingState label="Loading the job…" />
-          )}
-        </div>
-      ) : null}
     </>
   );
 }

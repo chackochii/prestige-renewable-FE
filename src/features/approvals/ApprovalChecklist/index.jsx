@@ -49,7 +49,7 @@ function approvalAutoRows(source, job, checklist) {
         ["Contact number", job.contact?.phone, NOT_RECORDED],
       ];
     case "proposal":
-      return [...systemRows, ["Total quoted amount", job.acceptedValue !== null && job.acceptedValue !== undefined ? formatCurrency(job.acceptedValue) : null, "No accepted proposal on the job"]];
+      return [...systemRows, ["Total quoted amount (inc GST)", job.acceptedValue !== null && job.acceptedValue !== undefined ? formatCurrency(job.acceptedValue) : null, "No accepted proposal on the job"]];
     case "nmi":
       return [["NMI", recordedNmi(checklist), "Not recorded yet — item 2 on the DNSP application"]];
     default:

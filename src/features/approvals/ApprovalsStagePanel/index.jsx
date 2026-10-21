@@ -18,10 +18,33 @@ import { stageById } from "@/constants/stages";
 import { useApprovalJob } from "@/hooks/useApprovalJob";
 import { useAuth } from "@/hooks/useAuth";
 import { requiredApprovalsLabel } from "@/helpers/requiredApprovals";
+import { canAdvanceFrom } from "@/helpers/stageAccess";
+import { useNotifications } from "@/hooks/useNotifications";
+import { advanceStage } from "@/slices/leadsSlice";
+import { useAppDispatch } from "@/store";
 
 export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMoved }) {
   const stage = stageById(APPROVALS_STAGE.id);
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const dispatch = useAppDispatch();
+  const { notify, error: notifyError } = useNotifications();
+  // Proceed to procurement from the last approval form. A job whose last
+  // approval moved it on already only needs the procurement stage opened.
+  const proceed = async () => {
+    if (Number(opp.stage) > APPROVALS_STAGE.id) {
+      onMoved?.();
+      return true;
+    }
+    try {
+      await dispatch(advanceStage(opp.id)).unwrap();
+      notify(`Moved to ${APPROVALS_STAGE.next.label}`);
+      onMoved?.();
+      return true;
+    } catch (err) {
+      notifyError(typeof err === "string" ? err : err?.message || "The job could not move on yet.");
+      return false;
+    }
+  };
   const canApprove = hasPermission(PERMISSIONS.APPROVALS_UPDATE);
   const [tab, setTab] = useState("approvals");
   const { job, status, error, saveError, dismissSaveError, updateChecklist, saveChecklist, checklistSaveState, updateItem, setRequired } = useApprovalJob(opp?.id);
@@ -74,6 +97,8 @@ export default function ApprovalsStagePanel({ opp, unit, canEdit = false, onMove
             if (next && Number(next.stage) !== Number(opp.stage)) onMoved?.();
           }}
           onSetRequired={setRequired}
+          onProceed={proceed}
+          canProceed={canAdvanceFrom(user, APPROVALS_STAGE.id)}
           saveError={saveError}
           onDismissSaveError={dismissSaveError}
         />

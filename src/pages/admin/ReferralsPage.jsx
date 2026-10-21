@@ -95,7 +95,7 @@ export default function ReferralsPage() {
                   <th>Opportunity</th>
                   <th>Referrer</th>
                   <th>Tier</th>
-                  <th>Accepted value</th>
+                  <th>Accepted value (ex GST)</th>
                   <th>Commission</th>
                 </tr>
               </thead>
@@ -113,7 +113,7 @@ export default function ReferralsPage() {
                       </td>
                       <td data-label="Referrer">{r?.organisation || "—"}</td>
                       <td data-label="Tier">{c.tier?.label || "—"}</td>
-                      <td data-label="Accepted value">{formatCurrency(o.acceptedValue)}</td>
+                      <td data-label="Accepted value (ex GST)">{formatCurrency(o.acceptedValue)}</td>
                       <td data-label="Commission">{c.basis ? formatCurrency(c.amount) : "—"}</td>
                     </tr>
                   );

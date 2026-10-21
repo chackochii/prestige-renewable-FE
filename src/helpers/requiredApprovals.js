@@ -12,13 +12,24 @@ export function catalogueOf(unit) {
 }
 
 /** The keys a record has ticked, as an array. */
+/**
+ * The approvals one job can need: the unit's catalogue, then any custom ones
+ * added to this job (opp.customApprovalTypes). Pass the result where a `unit`
+ * is expected — `{ approvalTypes }` is all the pickers read.
+ */
+export function jobApprovalUnit(unit, opp) {
+  const listed = catalogueOf(unit);
+  const custom = catalogueOf({ approvalTypes: opp?.customApprovalTypes }).filter((type) => !listed.some((t) => t.key === type.key));
+  return { ...unit, approvalTypes: [...listed, ...custom] };
+}
+
 export function requiredKeysOf(opp) {
   return Array.isArray(opp?.requiredApprovals) ? opp.requiredApprovals : [];
 }
 
 /** The ticked approvals with their labels, in catalogue order; keys the unit no longer lists keep their key as the label. */
 export function requiredApprovalsOf(opp, unit) {
-  const catalogue = catalogueOf(unit);
+  const catalogue = catalogueOf(jobApprovalUnit(unit, opp));
   const keys = requiredKeysOf(opp);
   const listed = catalogue.filter((type) => keys.includes(type.key));
   const unlisted = keys.filter((key) => !catalogue.some((type) => type.key === key)).map((key) => ({ key, label: key }));

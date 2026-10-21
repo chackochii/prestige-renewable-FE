@@ -151,8 +151,11 @@ export function useApprovalJob(opportunityId) {
   /** A plain approval recorded directly: { status?, authority?, reference?, submittedAt?, decidedAt?, note? }. */
   const updateItem = useCallback((type, body) => dispatch(updateApproval({ id, type, body })).unwrap(), [id, dispatch]);
 
-  /** Which approvals the job needs; the job comes back with its new rows in the same call. */
-  const setRequired = useCallback((keys) => dispatch(setRequiredApprovals({ id, keys })).unwrap(), [id, dispatch]);
+  /**
+   * Which approvals the job needs; the job comes back with its new rows in the
+   * same call. `custom` ([{ label }]) adds approvals the unit's list lacks.
+   */
+  const setRequired = useCallback((keys, custom) => dispatch(setRequiredApprovals({ id, keys, custom })).unwrap(), [id, dispatch]);
 
   const dismissSaveError = useCallback(() => (id ? dispatch(clearSaveError(id)) : null), [id, dispatch]);
 

@@ -167,22 +167,6 @@ const truthy = (value) =>
 const YES_NO_FIELDS = new Set(["preSiteInspectionRequired", "isRetrofit", "switchboardUpgrade"]);
 
 /**
- * A "no" on a field that wanted a description is not a description: sales is
- * saying there is nothing to give, not supplying it.
- *
- * It is still recorded and shown — the estimator wants to read what sales
- * said — but the row it belongs to does not tick, because the detail is not
- * in hand. Fields whose whole answer is yes or no are exempt: there, "no" is
- * the answer and settles the row.
- */
-const NOTHING_TO_GIVE = ["no", "n", "none", "n/a", "na", "nil", "nothing", "not applicable"];
-
-export function isNothingToGive(field, value) {
-  if (YES_NO_FIELDS.has(field)) return false;
-  return NOTHING_TO_GIVE.includes(String(value ?? "").trim().toLowerCase());
-}
-
-/**
  * The answers off a sales response, narrowed to the estimation-input fields
  * they belong to.
  *

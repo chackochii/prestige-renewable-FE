@@ -64,6 +64,29 @@ export function useProcurementJob(opportunityId, { enabled = true } = {}) {
     [id, dispatch],
   );
 
+  /**
+   * Submit: send a section's waiting answers now, rather than after the pause.
+   * Resolves once the API has them; a refusal puts the record back as the API
+   * holds it and rejects, so the caller can say so.
+   */
+  const submitChecklist = useCallback(
+    async (section) => {
+      clearTimeout(timers.current.get(section));
+      timers.current.delete(section);
+      const patch = pending.current.get(section);
+      pending.current.delete(section);
+      if (!patch || !id) return true;
+      try {
+        await dispatch(saveChecklist({ id, section, patch })).unwrap();
+        return true;
+      } catch (err) {
+        dispatch(fetchProcurementJob(id));
+        throw err;
+      }
+    },
+    [id, dispatch],
+  );
+
   const updateChecklist = useCallback(
     (section, patch) => {
       if (!id) return;
@@ -109,6 +132,7 @@ export function useProcurementJob(opportunityId, { enabled = true } = {}) {
     reload,
     clearError: useCallback(() => (id ? dispatch(clearJobError(id)) : null), [id, dispatch]),
     updateChecklist,
+    submitChecklist,
     upload,
     saveBoq: useCallback((body) => run(saveBoq({ id, body })), [id, run]),
     addQuote: useCallback((body) => run(addSupplierQuote({ id, body })), [id, run]),
