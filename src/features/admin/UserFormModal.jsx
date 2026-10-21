@@ -72,6 +72,7 @@ export default function UserFormModal({ user, roles, units, defaultUnitId, canAs
 
   return (
     <Modal
+      confirmInline
       className="wide"
       title={editing ? "Edit user" : "Add user"}
       body={
