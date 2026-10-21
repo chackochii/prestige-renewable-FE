@@ -9,6 +9,7 @@ import {
   LOCAL_UNTIL_SAVED,
   autosavePayload,
   changedPayload,
+  errorsForTab,
   hasChanges,
   idOrNull,
   isLoggedAttempt,
@@ -35,6 +36,7 @@ import { fetchOpportunityRequests } from "@/slices/collaborationSlice";
 import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { dateIsoInZone, formatDate as formatWhen } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
+import ContinueButton from "@/components/ContinueButton";
 import { useAuth } from "@/hooks/useAuth";
 import { nextStageFor, stageById } from "@/constants/stages";
 import { canAdvanceFrom } from "@/helpers/stageAccess";
@@ -76,6 +78,10 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
   const [nextTabLabel, setNextTabLabel] = useState(null);
   // The lead could leave the stage on this save — LeadForm says so from the Mark Potential tab.
   const [readyToProceed, setReadyToProceed] = useState(false);
+  // The tab open in the form — Save checks only that tab and the ones before it.
+  const [activeTab, setActiveTab] = useState("customer");
+  // What the open tab still needs ("" when complete) — the Continue button waits on it.
+  const [tabBlockers, setTabBlockers] = useState("");
   const [proceeding, setProceeding] = useState(false);
   // The day the lead was created, where the unit works — the earliest date anything on it can carry.
   const leadCreatedOn = dateIsoInZone(opp?.createdAt, unit?.timezone);
@@ -156,6 +162,23 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
    * exactly what needs keeping, so this never refuses — only the Save button
    * validates, and only when someone presses it.
    */
+  // Autosave: a pause in typing sends what changed. One save at a time.
+  const autosaving = useRef(false);
+  useEffect(() => {
+    if (!canEdit || !dirty || saving) return undefined;
+    const timer = setTimeout(async () => {
+      if (autosaving.current) return;
+      autosaving.current = true;
+      try {
+        await persist();
+      } finally {
+        autosaving.current = false;
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-armed by each edit; persist reads the latest form
+  }, [form, canEdit, dirty, saving]);
+
   const persist = async () => {
     const body = autosavePayload(form, base);
     if (!Object.keys(body).length) {
@@ -245,7 +268,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
   };
 
   const save = async () => {
-    const found = validateLeadForm(form, { minDate: leadCreatedOn });
+    const found = errorsForTab(validateLeadForm(form, { minDate: leadCreatedOn }), activeTab);
     if (Object.keys(found).length) {
       setErrors(found);
       return false;
@@ -447,6 +470,8 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
         advanceTab={advanceTab}
         onNextTabChange={setNextTabLabel}
         onReadyToProceedChange={setReadyToProceed}
+        onActiveTabChange={setActiveTab}
+        onTabBlockersChange={setTabBlockers}
         minDate={leadCreatedOn}
         requestsPanel={
           <StageRequestsPanel
@@ -467,22 +492,31 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
         </p>
       ) : (
         <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={canProceed ? saveAndProceed : save}
-            disabled={saving || proceeding}
-          >
-            {saving
-              ? "Saving…"
-              : proceeding
+          {/* Every tab with one after it ends in "Save & continue to …": shown
+              always, disabled (with what is missing on hover) until the tab is
+              complete. Saving sends it to the API; the form then moves on. */}
+          {!canProceed && nextTabLabel ? (
+            <ContinueButton
+              verb="Save & continue"
+              nextLabel={nextTabLabel}
+              blockers={tabBlockers ? tabBlockers.split(", ") : []}
+              onContinue={save}
+              className="btn btn-primary"
+            />
+          ) : (
+            // Ready to move on (Lead stage, checklist complete, Potential, estimator
+            // chosen): the one button saves and moves the lead to the next stage.
+            // Otherwise it only saves. Autosave keeps the edits either way.
+            <button type="button" className="btn btn-primary" onClick={canProceed ? saveAndProceed : save} disabled={saving || proceeding}>
+              {proceeding
                 ? "Moving…"
-                : canProceed
-                  ? `Save & proceed to ${stageById(nextStage).short}`
-                  : nextTabLabel
-                    ? `Save & continue to ${nextTabLabel}`
+                : saving
+                  ? "Saving…"
+                  : canProceed
+                    ? `Proceed to ${stageById(nextStage).short}`
                     : "Save lead details"}
-          </button>
+            </button>
+          )}
           <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={saving}>
             Cancel
           </button>

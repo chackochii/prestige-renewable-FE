@@ -645,6 +645,13 @@
   .input-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line-strong); margin-bottom: 2px; }
   .input-group-head h4 { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-2); }
   .input-group-head span { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  /* SearchSelect: a select you can type into. */
+  .search-select { position: relative; }
+  .search-select-list { position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px); max-height: 240px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-lift); }
+  .search-select-list li { padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--ink); }
+  .search-select-list li.is-active { background: var(--surface-2); }
+  .search-select-list li.is-selected { font-weight: 700; color: var(--brand-2); }
+  .search-select-list li.search-select-empty { cursor: default; color: var(--muted); }
   .input-group-head .group-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--brand-2); cursor: pointer; font: inherit; }
   .input-group-head .group-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
   /* The expand / collapse chevron, as a highlighted chip so it reads as a control. */

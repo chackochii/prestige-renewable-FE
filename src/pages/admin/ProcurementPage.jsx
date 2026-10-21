@@ -7,7 +7,8 @@
 // reached procurement most recently first. Each job comes whole, so picking one
 // asks the API for nothing; the stat cards count the whole board.
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { BellRing, Leaf, PackageSearch, Search, Send } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
@@ -17,15 +18,11 @@ import LoadingState from "@/components/LoadingState";
 import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
 import StatCard from "@/components/StatCard";
-import ProcurementWorkflow from "@/features/procurement/ProcurementWorkflow";
-import { PERMISSIONS } from "@/constants/permissions";
 import { PROCUREMENT_STAGE } from "@/constants/procurement";
-import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { usePageParam } from "@/hooks/usePageParam";
 import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
-import { useProcurementJob } from "@/hooks/useProcurementJob";
 import { procurementStatus } from "@/helpers/procurement";
 import { formatDate, slaStatus } from "@/helpers/dateTimeHelpers";
 import { fetchProcurementBoard } from "@/slices/procurementSlice";
@@ -35,11 +32,10 @@ import { formatCurrency } from "@/utils/formatCurrency";
 export default function ProcurementPage() {
   const dispatch = useAppDispatch();
   const { unitId } = useBusinessUnit();
-  const { hasPermission } = useAuth();
   const { board: rows, boardTotal, boardCounts, boardStatus, boardError } = useAppSelector((state) => state.procurement);
   // The search and the page live in the URL, so Back returns to the board as it was.
   const { search, setSearch, term } = useUrlSearch();
-  const [selectedId, setSelectedId] = useState(null);
+  const navigate = useNavigate();
   const [page, setPage] = usePageParam(term);
   const boardKey = JSON.stringify(unitId ? { businessUnitId: unitId, search: term || undefined, page, pageSize: PAGE_SIZE } : null);
   const loading = boardStatus === "loading";
@@ -52,9 +48,9 @@ export default function ProcurementPage() {
   // Counted by the API across the whole board, not just the page on screen.
   const counts = boardCounts ?? { inStage: 0, awaitingApproval: 0, purchaseOrders: 0, greenDeal: 0 };
 
-  const selectedRow = rows.find((job) => job.id === selectedId) ?? rows[0] ?? null;
-  // The board brought every job whole, so this reads the selected one from the slice.
-  const procurement = useProcurementJob(selectedRow?.id);
+  // A job opens on its own page, at the procurement stage — the whole record,
+  // with procurement worked there rather than under this list.
+  const openJob = (job) => navigate(`/opportunities/${job.id}?stage=${PROCUREMENT_STAGE.id}`);
 
   return (
     <>
@@ -107,7 +103,7 @@ export default function ProcurementPage() {
                   <th>Job</th>
                   <th>Entered</th>
                   <th>SLA</th>
-                  <th>Value</th>
+                  <th>Value (inc GST)</th>
                   <th>Where it is</th>
                 </tr>
               </thead>
@@ -116,9 +112,8 @@ export default function ProcurementPage() {
                   const status = procurementStatus(job);
                   const atThisStage = Number(job.stage) === PROCUREMENT_STAGE.id;
                   const sla = atThisStage ? slaStatus(job.slaDueAt) : null;
-                  const isSelected = job.id === selectedRow?.id;
                   return (
-                    <tr key={job.id} className={isSelected ? "selected" : undefined} aria-selected={isSelected} onClick={() => setSelectedId(job.id)}>
+                    <tr key={job.id} onClick={() => openJob(job)}>
                       <td>
                         <div className="row-title">{job.number}</div>
                         <div className="row-meta">{job.customer}</div>
@@ -147,31 +142,6 @@ export default function ProcurementPage() {
         <Pagination page={page} total={boardTotal} onPageChange={setPage} noun="jobs" loading={loading} />
       </Card>
 
-      {selectedRow ? (
-        <div style={{ marginTop: 20 }}>
-          {procurement.status === "failed" && !procurement.job ? (
-            <Alert tone="danger">{procurement.error || "The job's procurement record could not be loaded."}</Alert>
-          ) : procurement.job ? (
-            <ProcurementWorkflow
-              job={procurement.job}
-              canEdit={hasPermission(PERMISSIONS.PROCUREMENT_UPDATE)}
-              canApprove={hasPermission(PERMISSIONS.PROCUREMENT_APPROVE)}
-              error={procurement.error}
-              onClearError={procurement.clearError}
-              onChecklistChange={procurement.updateChecklist}
-              onUpload={procurement.upload}
-              onSaveBoq={procurement.saveBoq}
-              onAddQuote={procurement.addQuote}
-              onRemoveQuote={procurement.removeQuote}
-              onCreatePurchaseOrder={procurement.createPurchaseOrder}
-              onUpdatePurchaseOrder={procurement.updatePurchaseOrder}
-              onDeletePurchaseOrder={procurement.deletePurchaseOrder}
-            />
-          ) : (
-            <LoadingState label="Loading the job…" />
-          )}
-        </div>
-      ) : null}
     </>
   );
 }

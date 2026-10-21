@@ -29,6 +29,7 @@ import Field from "@/components/Field";
 import LoadingState from "@/components/LoadingState";
 import Modal from "@/components/Modal";
 import NumberInput from "@/components/NumberInput";
+import SearchSelect from "@/components/SearchSelect";
 import SectionHead from "@/components/SectionHead";
 import { COST_KINDS, PROJECT_TYPES, TAX_TREATMENTS, costKind } from "@/constants/catalog";
 import {
@@ -61,13 +62,6 @@ import { useNotifications } from "@/hooks/useNotifications";
 
 const emptyItemForm = () => ({ itemKey: "", brand: "", quantity: 1, unit: "", unitPrice: "", discountPct: 0 });
 
-// The Unit field takes numbers only. A catalog or saved unit that is a word
-// ("unit", "panel") starts the field empty rather than putting text in it.
-const numericUnit = (value) => {
-  const text = String(value ?? "").trim();
-  return text !== "" && Number.isFinite(Number(text)) ? text : "";
-};
-
 /**
  * The catalog as this line's pickers offer it. A saved line whose item or brand
  * has since been retired from the catalog keeps it on offer, so the line can
@@ -86,14 +80,13 @@ function catalogForLine(catalogItems, initial) {
 
 function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onClose }) {
   const catalogItems = useMemo(() => catalogForLine(catalog, initial), [catalog, initial]);
-  const [search, setSearch] = useState("");
   const [form, setForm] = useState(() =>
     initial
       ? {
           itemKey: initial.itemKey,
           brand: initial.brand,
           quantity: initial.quantity,
-          unit: numericUnit(initial.unit),
+          unit: initial.unit ?? "",
           unitPrice: initial.unitPrice,
           discountPct: initial.discountPct,
         }
@@ -102,14 +95,13 @@ function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onC
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const filtered = catalogItems.filter((i) => i.name.toLowerCase().includes(search.trim().toLowerCase()));
   const selectedItem = findCatalogItem(catalogItems, form.itemKey);
   const brands = selectedItem?.brands || [];
 
   const selectItem = (key) => {
     const item = findCatalogItem(catalogItems, key);
     const brand = item?.brands?.[0];
-    setForm((f) => ({ ...f, itemKey: key, unit: numericUnit(item?.unit), brand: brand?.name || "", unitPrice: brand?.unitPrice ?? "" }));
+    setForm((f) => ({ ...f, itemKey: key, unit: item?.unit || "", brand: brand?.name || "", unitPrice: brand?.unitPrice ?? "" }));
   };
 
   const selectBrand = (name) => {
@@ -126,10 +118,6 @@ function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onC
     }
     if (!form.brand) {
       setError("Select a brand.");
-      return;
-    }
-    if (String(form.unit ?? "").trim() !== "" && !Number.isFinite(Number(form.unit))) {
-      setError("Unit must be a number.");
       return;
     }
     if (!(Number(form.quantity) > 0)) {
@@ -171,18 +159,15 @@ function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onC
       }
     >
       <div className="form-grid">
-        <Field label="Search items" className="span-2">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name…" />
-        </Field>
-        <Field label="Item" className="span-2" hint={catalogLoading ? "loading catalog…" : undefined}>
-          <select value={form.itemKey} disabled={catalogLoading} onChange={(e) => selectItem(e.target.value)}>
-            <option value="">Select an item</option>
-            {filtered.map((i) => (
-              <option key={i.key} value={i.key}>
-                {i.retired ? `${i.name} (no longer in the catalog)` : i.name}
-              </option>
-            ))}
-          </select>
+        <Field label="Item" className="span-2" hint={catalogLoading ? "loading catalog…" : "type to search"}>
+          <SearchSelect
+            value={form.itemKey}
+            disabled={catalogLoading}
+            placeholder="Type an item name…"
+            emptyText="No items match"
+            options={catalogItems.map((i) => ({ value: i.key, label: i.retired ? `${i.name} (no longer in the catalog)` : i.name }))}
+            onChange={selectItem}
+          />
         </Field>
         <Field label="Brand">
           <select value={form.brand} disabled={!selectedItem} onChange={(e) => selectBrand(e.target.value)}>
@@ -194,11 +179,17 @@ function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onC
             ))}
           </select>
         </Field>
-        <Field label="Unit" hint="numbers only">
-          <NumberInput value={form.unit} min={0} step="any" onChange={(v) => setForm((f) => ({ ...f, unit: v }))} />
-        </Field>
         <Field label="Quantity">
           <NumberInput value={form.quantity} min={0} onChange={(v) => setForm((f) => ({ ...f, quantity: v }))} />
+        </Field>
+        <Field label="Unit" hint="unit of measure — from the item, editable">
+          <input
+            type="text"
+            value={form.unit}
+            maxLength={30}
+            placeholder="e.g. panel, unit, m, hr"
+            onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+          />
         </Field>
         <Field label="Unit price" hint="auto from item + brand, editable">
           <NumberInput value={form.unitPrice} min={0} onChange={(v) => setForm((f) => ({ ...f, unitPrice: v }))} />

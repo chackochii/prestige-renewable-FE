@@ -37,6 +37,7 @@ import {
   Send,
 } from "lucide-react";
 import Alert from "@/components/Alert";
+import ContinueButton from "@/components/ContinueButton";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import EmptyState from "@/components/EmptyState";
@@ -57,7 +58,8 @@ import { isRequoteOpen } from "@/helpers/proposals";
 import { leadMandatoryItems } from "@/helpers/leadChecklist";
 import { DRAWING_CATEGORY } from "@/constants/estimationInput";
 import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicker";
-import { approvalHints, requiredKeysOf } from "@/helpers/requiredApprovals";
+import AddCustomApproval from "@/features/approvals/AddCustomApproval";
+import { approvalHints, jobApprovalUnit, requiredKeysOf } from "@/helpers/requiredApprovals";
 import { estimationInputFromOpp } from "@/constants/estimationInput";
 import { estimationState } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
@@ -264,6 +266,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   // Which approvals the job will need at stage 5 — estimation marks the list
   // (the lead form no longer asks sales). Stage 5 tracks only these.
   const saveRequiredApprovals = (keys) => run(() => dispatch(updateRequiredApprovals({ id: opp.id, keys })).unwrap());
+  // A custom approval: added to this job's list and ticked at once.
+  const addCustomApproval = (label) =>
+    run(() => dispatch(updateRequiredApprovals({ id: opp.id, keys: requiredKeysOf(opp), custom: [{ label }] })).unwrap());
 
 
   const answerPreSite = (required) => {
@@ -338,13 +343,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   // on the record until the revised quote is handed back.
   const requote = isRequoteOpen(opp.requote) ? opp.requote : null;
 
-  // Open on the first step that still needs work — the quote, on a re-quote.
-  const [tab, setTab] = useState(() => {
-    if (requote && showQuoteBuilder) return "quote";
-    if (!requirementsDone) return "requirements";
-    if (showSiteVisit && !siteVisitDone) return "site-visit";
-    return showQuoteBuilder ? "quote" : "requirements";
-  });
+  // Estimation always opens on its first tab, Requirements — the Continue
+  // buttons lead on from there. A re-quote opens on the quote it is about.
+  const [tab, setTab] = useState(() => (requote && showQuoteBuilder ? "quote" : "requirements"));
 
   useEffect(() => {
     if (focusHandover) setTab("handover");
@@ -355,8 +356,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
     { key: "requirements", label: "Requirements", icon: tabIcon(requirementsDone, <ClipboardList size={14} />) },
     { key: "site-visit", label: "Pre-site visit", icon: tabIcon(siteVisitDone, <HardHat size={14} />) },
     { key: "quote", label: "Quote", icon: tabIcon(quoteDone, <Receipt size={14} />) },
-    { key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> },
     { key: "handover", label: requote ? "Send revised quote" : "Send to proposal", icon: tabIcon(Number(opp.stage) > 2, <Send size={14} />) },
+    { key: "requests", label: "Request / Response", icon: <HandHelping size={14} /> },
   ];
 
   // Why the checklist and site-visit tabs are closed, depending on how far
@@ -452,12 +453,17 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             {approvalsOpen ? (
               <div style={{ marginTop: 12 }}>
             <RequiredApprovalsPicker
-              unit={unit}
+              unit={jobApprovalUnit(unit, opp)}
               value={requiredKeysOf(opp)}
               onChange={saveRequiredApprovals}
               disabled={!canEdit || saving}
               hints={approvalHints(opp)}
             />
+            {canEdit ? (
+              <div style={{ marginTop: 10 }}>
+                <AddCustomApproval onAdd={addCustomApproval} disabled={saving} />
+              </div>
+            ) : null}
             <div style={{ marginTop: 12 }}>
               <Field label="Permit / approval notes" hint="reference numbers, who is lodging, what is outstanding">
                 <textarea
@@ -465,6 +471,10 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                   value={permitNotes}
                   disabled={!canEdit || saving}
                   onChange={(e) => setPermitNotes(e.target.value)}
+                  // Autosave: the notes go when the box is left.
+                  onBlur={() => {
+                    if (canEdit && permitNotes !== estimationInputFromOpp(opp).permitNotes) saveInput("permitNotes", permitNotes);
+                  }}
                 />
               </Field>
               {canEdit && permitNotes !== estimationInputFromOpp(opp).permitNotes ? (
@@ -483,15 +493,12 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             ) : null}
           </div>
 
-          {requirementsDone ? (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => setTab(needsInspection && !preSiteResolved ? "site-visit" : "quote")}
-            >
-              Continue to {needsInspection && !preSiteResolved ? "Pre-site visit" : "Quote"}
-            </button>
-          ) : null}
+          <ContinueButton
+            style={{ marginTop: 16 }}
+            nextLabel={needsInspection && !preSiteResolved ? "Pre-site visit" : "Quote"}
+            blockers={leadRows.filter((row) => !row.done).map((row) => row.label)}
+            onDone={() => setTab(needsInspection && !preSiteResolved ? "site-visit" : "quote")}
+          />
         </>
       ) : null}
 
@@ -607,11 +614,20 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
               </>
             ) : null}
 
-            {showQuoteBuilder ? (
-              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("quote")}>
-                Continue to Quote
-              </button>
-            ) : null}
+            <ContinueButton
+              style={{ marginTop: 16 }}
+              nextLabel="Quote"
+              blockers={
+                showQuoteBuilder
+                  ? []
+                  : !requirementsChecklistComplete
+                    ? ["the requirements checklist"]
+                    : inspectionMissing.length
+                      ? inspectionMissing
+                      : ["estimation to be ready"]
+              }
+              onDone={() => setTab("quote")}
+            />
           </div>
         ) : (
           estimatorLocked
@@ -622,11 +638,12 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
         showQuoteBuilder ? (
           <>
             <QuoteBuilder opp={opp} unit={unit} canEdit={canEdit} />
-            {quoteDone ? (
-              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setTab("handover")}>
-                Continue to {requote ? "Send revised quote" : "Send to proposal"}
-              </button>
-            ) : null}
+            <ContinueButton
+              style={{ marginTop: 16 }}
+              nextLabel={requote ? "Send revised quote" : "Send to proposal"}
+              blockers={quoteDone ? [] : ["at least one item on the quote"]}
+              onDone={() => setTab("handover")}
+            />
           </>
         ) : (
           <LockedStep

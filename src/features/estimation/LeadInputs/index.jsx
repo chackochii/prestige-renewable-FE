@@ -56,18 +56,26 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(row.value ?? "");
 
-  const commit = async () => {
-    await onSave(row.field, row.type === "checkbox" ? Boolean(value) : value);
+  // Autosave: a typed answer saves when the field is left, a choice or a tick
+  // the moment it is made. Nothing changed, nothing sent.
+  const commit = async (next = value) => {
+    const answer = row.type === "checkbox" ? Boolean(next) : next;
+    const before = row.type === "checkbox" ? Boolean(row.value) : (row.value ?? "");
+    if (String(answer) !== String(before)) await onSave(row.field, answer);
     setEditing(false);
+  };
+  const choose = (next) => {
+    setValue(next);
+    commit(next);
   };
 
   const control = () => {
     if (row.type === "textarea")
-      return <textarea rows={2} value={value} onChange={(e) => setValue(e.target.value)} />;
-    if (row.type === "number") return <NumberInput value={value} min={0} onChange={setValue} />;
+      return <textarea rows={2} value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => commit()} autoFocus />;
+    if (row.type === "number") return <NumberInput value={value} min={0} onChange={setValue} onBlur={() => commit()} />;
     if (row.type === "yesno")
       return (
-        <select value={value} onChange={(e) => setValue(e.target.value)}>
+        <select value={value} onChange={(e) => choose(e.target.value)}>
           <option value="">Select</option>
           <option value="yes">Yes</option>
           <option value="no">No</option>
@@ -75,7 +83,7 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
       );
     if (row.type === "select")
       return (
-        <select value={value} onChange={(e) => setValue(e.target.value)}>
+        <select value={value} onChange={(e) => choose(e.target.value)}>
           <option value="">Select</option>
           {row.options.map((o) => (
             <option key={o.key} value={o.key}>
@@ -87,11 +95,11 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
     if (row.type === "checkbox")
       return (
         <label className="check" style={{ margin: 0 }}>
-          <input type="checkbox" checked={Boolean(value)} onChange={(e) => setValue(e.target.checked)} />
+          <input type="checkbox" checked={Boolean(value)} onChange={(e) => choose(e.target.checked)} />
           Confirmed
         </label>
       );
-    return <input type="text" value={value} onChange={(e) => setValue(e.target.value)} />;
+    return <input type="text" value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => commit()} autoFocus />;
   };
 
   // While estimation is picking what to ask sales, every row is a checkbox.
@@ -156,12 +164,13 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
         </span>
         <span className="lead-input-label">{row.label}</span>
         <span className="lead-input-value">
-          <Field hint="collected from the client">{control()}</Field>
+          <Field hint="saves as you go — collected from the client">{control()}</Field>
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <button type="button" className="btn btn-primary btn-sm" onClick={commit} disabled={saving}>
+            {/* mousedown keeps the field from blurring first, so Save sends once and Cancel sends nothing. */}
+            <button type="button" className="btn btn-primary btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={() => commit()} disabled={saving}>
               {saving ? "Saving…" : "Save"}
             </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>
+            <button type="button" className="btn btn-ghost btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={() => setEditing(false)} disabled={saving}>
               Cancel
             </button>
           </div>

@@ -14,14 +14,41 @@ import { PROCUREMENT_STAGE } from "@/constants/procurement";
 import { stageById } from "@/constants/stages";
 import { useAuth } from "@/hooks/useAuth";
 import { useProcurementJob } from "@/hooks/useProcurementJob";
+import { useNotifications } from "@/hooks/useNotifications";
+import { canAdvanceFrom } from "@/helpers/stageAccess";
+import { nextStageFor } from "@/constants/stages";
+import { advanceStage } from "@/slices/leadsSlice";
+import { useAppDispatch } from "@/store";
 
-export default function ProcurementStagePanel({ opp, unit, canEdit = false }) {
+const PROCUREMENT_TABS = ["boq", "quote", "variation", "approvals", "po", "history", "requests"];
+
+// onMoved: called once the job has moved on to the next stage from here.
+export default function ProcurementStagePanel({ opp, unit, canEdit = false, onMoved }) {
   const stage = stageById(PROCUREMENT_STAGE.id);
   const requests = <StageRequestsPanel opp={opp} stage={stage.id} unit={unit} canEdit={canEdit} />;
   const slaDays = unit?.slaDays?.[stage.id];
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const notThereYet = Number(opp?.stage) < PROCUREMENT_STAGE.id;
   const procurement = useProcurementJob(opp?.id, { enabled: !notThereYet });
+  const dispatch = useAppDispatch();
+  const { notify, error: notifyError } = useNotifications();
+  const nextStage = nextStageFor(PROCUREMENT_STAGE.id, unit);
+  // Proceed from PO release: the API checks CL-13 too (procurementBlocker).
+  const proceed = async () => {
+    if (Number(opp.stage) > PROCUREMENT_STAGE.id) {
+      onMoved?.();
+      return true;
+    }
+    try {
+      const updated = await dispatch(advanceStage(opp.id)).unwrap();
+      notify(`Moved to ${stageById(updated?.stage ?? nextStage).label}`);
+      onMoved?.();
+      return true;
+    } catch (err) {
+      notifyError(typeof err === "string" ? err : err?.message || "The job could not move on yet.");
+      return false;
+    }
+  };
 
   return (
     <div className="card card-pad">
@@ -67,6 +94,12 @@ export default function ProcurementStagePanel({ opp, unit, canEdit = false }) {
           onUpdatePurchaseOrder={procurement.updatePurchaseOrder}
           onDeletePurchaseOrder={procurement.deletePurchaseOrder}
           requests={requests}
+          onSubmitChecklist={procurement.submitChecklist}
+          onProceed={nextStage !== null && opp.lifecycle === "Active" ? proceed : null}
+          proceedLabel={nextStage !== null ? stageById(nextStage).label : ""}
+          canProceed={canAdvanceFrom(user, PROCUREMENT_STAGE.id)}
+          // Material receipt and job creation are worked in construction (ConstructionMaterialsPanel).
+          tabKeys={PROCUREMENT_TABS}
           embedded
         />
       )}

@@ -47,5 +47,23 @@ export function useBoqDrafts(job, onSave) {
   const sent = () => setDrafts({});
   const save = () => submit({ lines: changed }, sent);
 
+  // Autosave: a pause in typing sends what changed. The Save button stays for
+  // anyone who wants it now; adding, removing and revising lines carry the
+  // drafts with them as before.
+  useEffect(() => {
+    if (!changed.length || busy || !onSave) return undefined;
+    const timer = setTimeout(() => {
+      // Only what went out is cleared: anything typed while the save was on its way stays, for the next one.
+      const snapshot = drafts;
+      submit({ lines: changed }, () =>
+        setDrafts((current) =>
+          Object.fromEntries(Object.entries(current).filter(([key, fields]) => JSON.stringify(fields) !== JSON.stringify(snapshot[key]))),
+        ),
+      );
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-armed by each edit
+  }, [drafts, busy]);
+
   return { edit, valueOf, changed, forget, submit, sent, save, busy, error, setError };
 }

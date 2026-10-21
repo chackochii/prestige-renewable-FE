@@ -6,7 +6,8 @@
 //
 // `job` comes from useApprovalJob (its checklist-driven approvals already read
 // from their answers); `onChecklistChange(sectionKey, patch)`,
-// `onUpdateItem(type, body)` and `onSetRequired(keys)` change it.
+// `onUpdateItem(type, body)` and `onSetRequired(keys, custom?)` change it —
+// `custom` ([{ label }]) adds approvals the unit's list does not have.
 // `canEdit` — the person may work the approvals (approvals.update).
 //
 // Checklist answers save by themselves a moment after they are given; the
@@ -19,8 +20,9 @@
 // opportunity page's stage-5 panel already has a heading of its own.
 
 import { useEffect, useState } from "react";
-import { Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, Save, SquareCheckBig } from "lucide-react";
+import { Building2, ClipboardCheck, Clock, Landmark, ListChecks, Plug, Plus, Save, SquareCheckBig } from "lucide-react";
 import Alert from "@/components/Alert";
+import ContinueButton from "@/components/ContinueButton";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
 import ChecklistOverview from "@/components/ChecklistOverview";
@@ -32,7 +34,11 @@ import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicke
 import ProcurementHistory from "@/features/procurement/ProcurementHistory";
 import { APPROVALS_STAGE } from "@/constants/approvals";
 import { approvalContext, checklistOf, sectionOf } from "@/helpers/approvalChecklist";
-import { approvalItems, approvalStatus, isOverdue } from "@/helpers/approvals";
+import { applicableItems, approvalItems, approvalStatus, isOverdue } from "@/helpers/approvals";
+import { catalogueOf } from "@/helpers/requiredApprovals";
+
+// The "+ Add approval" choice that types a name instead of picking from the unit's list.
+const CUSTOM_APPROVAL = "__custom";
 import { checklistSummary } from "@/helpers/checklist";
 import { formatDate, slaStatus, timeAgo } from "@/helpers/dateTimeHelpers";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -56,10 +62,17 @@ export default function ApprovalWorkflow({
   saveError = null,
   onDismissSaveError,
   embedded = false,
+  // Proceed to procurement from the last approval form; `canProceed` — may this person move the job on.
+  onProceed = null,
+  canProceed = false,
 }) {
   const { notify, error: notifyError } = useNotifications();
   const [tab, setTab] = useState("overview");
   const [choosing, setChoosing] = useState(false);
+  // "+ Add approval": one approval from the unit's list, added to the job.
+  const [adding, setAdding] = useState(false);
+  const [addKey, setAddKey] = useState("");
+  const [customName, setCustomName] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingChecklist, setSavingChecklist] = useState(false);
   const [error, setError] = useState("");
@@ -90,16 +103,56 @@ export default function ApprovalWorkflow({
     { key: "history", label: "History", icon: <Clock size={14} />, count: (job.history ?? []).length || undefined },
   ];
   const section = checklists.find(({ section: candidate }) => candidate.key === tab)?.section ?? null;
+  // The unit's approval types this job does not have yet — what "+ Add approval" offers.
+  const catalogue = catalogueOf({ approvalTypes: job.catalogue });
+  const requiredKeys = Array.isArray(job.requiredApprovals) ? job.requiredApprovals : [];
+  const addable = catalogue.filter((type) => !requiredKeys.includes(type.key));
 
-  const saveRequired = async (keys) => {
+  const saveRequired = async (keys, custom) => {
     setSaving(true);
     setError("");
     try {
-      await onSetRequired?.(keys);
+      await onSetRequired?.(keys, custom);
+      return true;
     } catch (err) {
       setError(typeof err === "string" ? err : err?.message || "The approvals required could not be changed.");
+      return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Proceed to procurement, from the last approval form: open once every
+  // approval checklist is complete and every required approval is approved —
+  // what the API's gate asks (a job that got there has usually moved on by
+  // itself already; then this only opens procurement).
+  const proceedBlockers = movedOn
+    ? []
+    : [
+        ...checklists.filter(({ summary }) => summary.applies !== false && summary.done < summary.total).map(({ section: s, summary }) => `${s.tab} checklist (${summary.total - summary.done} left)`),
+        ...applicableItems(job).filter((item) => item.status !== "approved").map((item) => `${item.label} approved`),
+        ...(canProceed ? [] : ["permission to move jobs out of Approvals"]),
+      ];
+  const proceedButton = onProceed ? (
+    <ContinueButton verb="Proceed" nextLabel={APPROVALS_STAGE.next.label} blockers={proceedBlockers} onContinue={onProceed} />
+  ) : null;
+
+  // The approval checklist after the open one, in tab order — each is independent, so it is always reachable.
+  const checklistAt = checklists.findIndex(({ section: candidate }) => candidate.key === tab);
+  const nextChecklist = checklistAt >= 0 ? (checklists[checklistAt + 1] ?? null) : null;
+  /** Submit: send this approval's answers now. Resolves false when they could not be saved. */
+  const submitChecklist = async () => {
+    if (!section || !onSaveChecklist) return true;
+    setSavingChecklist(true);
+    try {
+      await onSaveChecklist(section.key);
+      notify(`${section.tab} submitted`);
+      return true;
+    } catch (err) {
+      notifyError(typeof err === "string" ? err : err?.message || "The checklist could not be saved.");
+      return false;
+    } finally {
+      setSavingChecklist(false);
     }
   };
 
@@ -163,9 +216,8 @@ export default function ApprovalWorkflow({
       <div className="panel">
         {tab === "overview" ? (
           <>
-            <ApprovalBoard job={job} canEdit={canEdit} onOpenChecklist={setTab} onUpdateItem={onUpdateItem} />
-
-            <div style={{ marginTop: 20 }}>
+            {/* First on the overview, so adding an approval is the first thing in reach. */}
+            <div>
               <SectionHead icon={<ListChecks size={13} />} title="Approvals required" />
               <p className="row-meta" style={{ whiteSpace: "normal", marginBottom: 8 }}>
                 Ticked by sales on the lead or by estimation — the approvals tracked above.
@@ -184,6 +236,7 @@ export default function ApprovalWorkflow({
                   </button>
                 </>
               ) : (
+                <>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {job.requiredApprovals?.length ? (
                     job.requiredApprovals.map((key) => (
@@ -195,12 +248,80 @@ export default function ApprovalWorkflow({
                     <span className="row-meta">None marked as required.</span>
                   )}
                   {canEdit && !movedOn ? (
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChoosing(true)}>
-                      Change
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => {
+                          setAddKey("");
+                          setCustomName("");
+                          setAdding(true);
+                        }}
+                        disabled={adding}
+                      >
+                        <Plus size={14} /> Add approval
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChoosing(true)}>
+                        Change
+                      </button>
+                    </>
                   ) : null}
                 </div>
+                {adding ? (
+                  <div className="decision-card" style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={addKey} onChange={(e) => setAddKey(e.target.value)} disabled={saving} aria-label="Approval to add" style={{ minWidth: 220 }}>
+                      <option value="">Choose an approval</option>
+                      {addable.map((type) => (
+                        <option key={type.key} value={type.key}>
+                          {type.label}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_APPROVAL}>Other (custom approval)…</option>
+                    </select>
+                    {addKey === CUSTOM_APPROVAL ? (
+                      <input
+                        type="text"
+                        value={customName}
+                        maxLength={120}
+                        placeholder="Name the approval, e.g. Strata approval"
+                        aria-label="Custom approval name"
+                        onChange={(e) => setCustomName(e.target.value)}
+                        style={{ minWidth: 240 }}
+                        autoFocus
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={!addKey || (addKey === CUSTOM_APPROVAL && !customName.trim()) || saving}
+                      onClick={async () => {
+                        const custom = addKey === CUSTOM_APPROVAL;
+                        const keys = custom ? requiredKeys : catalogue.map((type) => type.key).filter((key) => key === addKey || requiredKeys.includes(key));
+                        const added = await saveRequired(keys, custom ? [{ label: customName.trim() }] : undefined);
+                        if (added) {
+                          notify(`${custom ? customName.trim() : (catalogue.find((type) => type.key === addKey)?.label ?? "Approval")} added`);
+                          setAdding(false);
+                        }
+                      }}
+                    >
+                      {saving ? "Adding…" : "Add"}
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAdding(false)} disabled={saving}>
+                      Cancel
+                    </button>
+                    {error ? (
+                      <Alert tone="danger" style={{ marginTop: 6, width: "100%" }}>
+                        {error}
+                      </Alert>
+                    ) : null}
+                  </div>
+                ) : null}
+                </>
               )}
+            </div>
+
+            <div style={{ marginTop: 20 }}>
+              <ApprovalBoard job={job} canEdit={canEdit} onOpenChecklist={setTab} onUpdateItem={onUpdateItem} />
             </div>
 
             {checklists.length ? (
@@ -211,9 +332,35 @@ export default function ApprovalWorkflow({
                 <ChecklistOverview rows={checklists} onOpen={setTab} />
               </div>
             ) : null}
+
+            {checklists.length ? (
+              <ContinueButton style={{ marginTop: 16 }} nextLabel={checklists[0].section.tab} onDone={() => setTab(checklists[0].section.key)} />
+            ) : proceedButton ? (
+              // No approval needs a checklist: the overview is the last form.
+              <div style={{ marginTop: 16 }}>{proceedButton}</div>
+            ) : null}
           </>
         ) : section ? (
-          <ApprovalChecklist section={section} job={job} canEdit={checklistEditable} onChange={(patch) => onChecklistChange?.(section.key, patch)} actions={saveBar} />
+          <>
+            <ApprovalChecklist section={section} job={job} canEdit={checklistEditable} onChange={(patch) => onChecklistChange?.(section.key, patch)} actions={saveBar} />
+            {/* Each approval is its own form: Submit sends it, and the next one
+                opens whether or not this one is finished. */}
+            <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {nextChecklist ? (
+                <ContinueButton verb={checklistEditable ? "Submit & continue" : "Continue"} nextLabel={nextChecklist.section.tab} onContinue={checklistEditable ? submitChecklist : undefined} onDone={() => setTab(nextChecklist.section.key)} />
+              ) : (
+                <>
+                  {checklistEditable ? (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={submitChecklist} disabled={savingChecklist}>
+                      {savingChecklist ? "Submitting…" : `Submit ${section.tab}`}
+                    </button>
+                  ) : null}
+                  {/* The last approval form: the stage's way out. */}
+                  {proceedButton}
+                </>
+              )}
+            </div>
+          </>
         ) : (
           <ProcurementHistory job={job} />
         )}
@@ -227,7 +374,7 @@ export default function ApprovalWorkflow({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
           <span className="row-meta">
             {job.number} · {job.customer}
-            {job.acceptedValue !== null && job.acceptedValue !== undefined ? ` · ${formatCurrency(job.acceptedValue)} accepted` : ""}
+            {job.acceptedValue !== null && job.acceptedValue !== undefined ? ` · ${formatCurrency(job.acceptedValue)} inc GST accepted` : ""}
           </span>
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
@@ -240,7 +387,7 @@ export default function ApprovalWorkflow({
     <Card
       title={`${job.number} · ${job.customer}`}
       icon={<SquareCheckBig size={16} />}
-      sub={[job.site, job.acceptedValue !== null && job.acceptedValue !== undefined ? `${formatCurrency(job.acceptedValue)} accepted` : null, job.salesperson?.name ? `${job.salesperson.name} (sales)` : null]
+      sub={[job.site, job.acceptedValue !== null && job.acceptedValue !== undefined ? `${formatCurrency(job.acceptedValue)} inc GST accepted` : null, job.salesperson?.name ? `${job.salesperson.name} (sales)` : null]
         .filter(Boolean)
         .join(" · ")}
       actions={<Badge tone={status.tone}>{status.label}</Badge>}

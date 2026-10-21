@@ -34,8 +34,10 @@ export async function getJobApprovals(opportunityId) {
  * opportunity, or with `view: "approvals"` the job's approvals, so the
  * approvals screens get the new rows back in the same round trip.
  */
-export async function setRequiredApprovals(opportunityId, keys, { view } = {}) {
-  return unwrap(await apiClient.put(`/opportunities/${opportunityId}/required-approvals`, { keys }, { params: view ? { view } : undefined }));
+export async function setRequiredApprovals(opportunityId, keys, { view, custom } = {}) {
+  // custom: [{ label }] — approvals the unit's list does not have, added to this job only.
+  const body = custom?.length ? { keys, custom } : { keys };
+  return unwrap(await apiClient.put(`/opportunities/${opportunityId}/required-approvals`, body, { params: view ? { view } : undefined }));
 }
 
 /**
