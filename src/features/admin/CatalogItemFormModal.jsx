@@ -57,7 +57,6 @@ export default function CatalogItemFormModal({ item, onClose, onSave }) {
 
   return (
     <Modal
-      confirmInline
       className="wide"
       title={editing ? `Edit ${item.name}` : "New catalog item"}
       body={

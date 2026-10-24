@@ -20,6 +20,7 @@ import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import Field from "@/components/Field";
+import Modal from "@/components/Modal";
 import { documentTypeLabel, siteVisitStatusMeta, siteVisitTask } from "@/constants/collaboration";
 import { SITE_PHOTOS_KEY, requesterItems } from "@/constants/inspectionReport";
 import InspectionReportView from "@/features/collaboration/InspectionReportView";
@@ -86,6 +87,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(null);
 
   const answers = task?.response?.fields || {};
   /** What came back for one item, or "" while the form is still out. */
@@ -107,15 +109,16 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
   const addExtra = () => setExtras([...extras, blankItem()]);
   const removeExtra = (i) => setExtras(extras.filter((_, n) => n !== i));
 
-  /** Deleting a photo is not undoable, so it asks once. */
+  /** Deleting a photo is not undoable, so it asks once (confirmingDelete holds the file). */
   const remove = async (file) => {
-    if (!window.confirm(`Delete ${file.filename}? The site member's upload is removed for good.`)) return;
     setRemoving(file.id);
     setError("");
     try {
       await onDeletePhoto(file.id);
+      setConfirmingDelete(null);
     } catch (err) {
       setError(errText(err, "Could not delete that photo."));
+      setConfirmingDelete(null);
     } finally {
       setRemoving(null);
     }
@@ -410,7 +413,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
                             type="button"
                             className="btn btn-ghost btn-sm"
                             disabled={removing === file.id}
-                            onClick={() => remove(file)}
+                            onClick={() => setConfirmingDelete(file)}
                           >
                             <Trash2 size={13} /> {removing === file.id ? "Removing…" : "Delete"}
                           </button>
@@ -427,6 +430,25 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
             </p>
           )}
         </div>
+      ) : null}
+
+      {confirmingDelete ? (
+        <Modal
+          title="Delete photo"
+          confirmClose={false}
+          body={`Delete ${confirmingDelete.filename}? The site member's upload is removed for good.`}
+          onClose={() => setConfirmingDelete(null)}
+          actions={
+            <>
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmingDelete(null)} disabled={removing === confirmingDelete.id}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => remove(confirmingDelete)} disabled={removing === confirmingDelete.id}>
+                {removing === confirmingDelete.id ? "Deleting…" : "Delete"}
+              </button>
+            </>
+          }
+        />
       ) : null}
     </div>
   );

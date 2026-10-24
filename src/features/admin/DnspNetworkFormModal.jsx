@@ -39,7 +39,6 @@ export default function DnspNetworkFormModal({ network, onClose, onSave }) {
 
   return (
     <Modal
-      confirmInline
       title={editing ? `Edit ${network.name}` : "New DNSP network"}
       body={
         editing

@@ -57,7 +57,6 @@ function RoleModal({ roles, onClose, onSave }) {
   };
   return (
     <Modal
-      confirmInline
       title="New role"
       body="Codes are permanent (they live on user accounts). Everything else can change later."
       onClose={onClose}
@@ -119,7 +118,6 @@ function PermissionModal({ categories, onClose, onSave }) {
   };
   return (
     <Modal
-      confirmInline
       title="New permission"
       body="Custom permissions can be granted to roles and checked by future features. Codes are permanent."
       onClose={onClose}

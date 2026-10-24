@@ -46,7 +46,6 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
 
   return (
     <Modal
-      confirmInline
       title={editing ? `Edit ${unit.code}` : "New business unit"}
       body={
         editing

@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   APPROVALS_READ: "approvals.read",
   APPROVALS_UPDATE: "approvals.update",
 
+  PROCUREMENT_READ: "procurement.read",
   PROCUREMENT_UPDATE: "procurement.update",
   PROCUREMENT_APPROVE: "procurement.approve",
 
