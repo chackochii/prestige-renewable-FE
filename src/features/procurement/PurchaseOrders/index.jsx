@@ -106,9 +106,9 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
           {quotesReceived(job) ? `${held} approve${pendingApprovals(job).length === 1 ? "s" : ""} the price variation` : "every line is quoted"}.
         </Alert>
       ) : sent.length === 0 ? (
-        <Alert tone="info">Cleared to order — procurement can start sending purchase orders. Each one is recorded in the history tab.</Alert>
+        <Alert tone="info">Cleared to order - procurement can start sending purchase orders. Each one is recorded in the history tab.</Alert>
       ) : allDelivered(job) ? (
-        <Alert tone="success">Every order has been received on site — materials are ready for the construction crew.</Alert>
+        <Alert tone="success">Every order has been received on site - materials are ready for the construction crew.</Alert>
       ) : (
         <Alert tone="info">
           {delivered.length} of {sent.length} orders received. Deliveries are scheduled with the site coordinator so the crew
@@ -221,7 +221,7 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
                       {order.deliveredAt ? (
                         <>
                           <div>{formatDate(order.deliveredAt)}</div>
-                          <div className="row-meta">received by {order.receivedBy || "—"}</div>
+                          <div className="row-meta">received by {order.receivedBy || "-"}</div>
                         </>
                       ) : order.scheduledFor ? (
                         <>
@@ -234,7 +234,7 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
                           <div className="row-meta">supplier ETA</div>
                         </>
                       ) : (
-                        <span className="row-meta">—</span>
+                        <span className="row-meta">-</span>
                       )}
                     </td>
                     <td>

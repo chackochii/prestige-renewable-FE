@@ -107,7 +107,7 @@ export default function NotificationsPage() {
       }
     } catch {
       // Fall through to the record: better than a dead click.
-      notifyError("Could not open that request — showing the job instead.");
+      notifyError("Could not open that request - showing the job instead.");
     }
 
     if (notification.opportunityId) navigate(`/opportunities/${notification.opportunityId}`);

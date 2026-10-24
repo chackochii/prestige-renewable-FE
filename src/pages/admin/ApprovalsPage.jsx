@@ -54,12 +54,12 @@ export default function ApprovalsPage() {
     <>
       <PageHeader
         title={APPROVALS_STAGE.label}
-        description="Only the approvals each job needs — DNSP, DA, finance and any other it was marked for — run side by side and worked through by the Operations Coordinator. When every one is in, the job moves to procurement by itself; if one is not given, it goes back to its salesperson."
+        description="Only the approvals each job needs - DNSP, DA, finance and any other it was marked for - run side by side and worked through by the Operations Coordinator. When every one is in, the job moves to procurement by itself; if one is not given, it goes back to its salesperson."
       />
 
       <div className="stats">
         <StatCard label="Waiting on approvals" value={counts.pending} icon={<Hourglass size={14} />} hint="Still with an authority or lender" />
-        <StatCard label="Ready for procurement" value={counts.approved} icon={<CircleCheck size={14} />} hint="Every approval received — last 30 days" />
+        <StatCard label="Ready for procurement" value={counts.approved} icon={<CircleCheck size={14} />} hint="Every approval received - last 30 days" />
         <StatCard label="Back with sales" value={counts.rejected} icon={<CornerUpLeft size={14} />} hint="An approval was not given" />
         <StatCard label="Past the timeline" value={counts.overdue} icon={<AlarmClock size={14} />} hint="Stage SLA from the unit settings" />
       </div>

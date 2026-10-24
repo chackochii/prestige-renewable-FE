@@ -30,7 +30,7 @@ export const PROCUREMENT_CHECKLISTS = [
     code: "CL-11",
     title: "BOQ vs Site Requirement",
     tab: "BOQ vs site",
-    completeText: "The BOQ is confirmed against the site — quotes can be sought on it.",
+    completeText: "The BOQ is confirmed against the site - quotes can be sought on it.",
     items: [
       { key: "boqMatches", label: "BOQ matches site requirements", kind: "checkbox" },
       { key: "materialsIncluded", label: "Required materials are included", kind: "checkbox" },
@@ -39,7 +39,7 @@ export const PROCUREMENT_CHECKLISTS = [
         key: "siteRequirementsIncluded",
         label: "Additional site requirements are included",
         kind: "checkbox",
-        note: "Matches PRC-02 — items discovered on site beyond the original quote.",
+        note: "Matches PRC-02 - items discovered on site beyond the original quote.",
       },
       {
         key: "changesApproved",
@@ -51,7 +51,7 @@ export const PROCUREMENT_CHECKLISTS = [
         detailsLabel: "What changed",
         detailsHint: "write “no changes” if the BOQ stands as proposed",
         detailsRequired: true,
-        placeholder: "e.g. Rail 54 → 60 to the site measure — approved 20 Sept",
+        placeholder: "e.g. Rail 54 → 60 to the site measure - approved 20 Sept",
         note: "Covers scope or quantity changes to the BOQ itself, discovered at this stage.",
       },
     ],
@@ -61,7 +61,7 @@ export const PROCUREMENT_CHECKLISTS = [
     code: "CL-12",
     title: "Supplier Quote",
     tab: "Supplier quote",
-    completeText: "The supplier quote is confirmed and on record — the purchase order can be raised on it.",
+    completeText: "The supplier quote is confirmed and on record - the purchase order can be raised on it.",
     items: [
       {
         key: "quoteCurrent",
@@ -125,7 +125,7 @@ export const PROCUREMENT_CHECKLISTS = [
     code: "CL-13",
     title: "Purchase Order Release",
     tab: "PO release",
-    completeText: "The purchase order is released and on record — materials are on their way.",
+    completeText: "The purchase order is released and on record - materials are on their way.",
     conditions: {
       variationNeedsApproval: {
         whenTrue: "only when the quoted cost varies from the proposal",
@@ -165,8 +165,8 @@ export const PROCUREMENT_CHECKLISTS = [
         kind: "group",
         onlyIf: "variationNeedsApproval",
         waitingOn: ["variationChecked"],
-        notNeeded: "Not needed — the quoted cost matches the proposal.",
-        note: "Below 5%: the sales manager approves. 5% or more: the business owner and the sales manager. Taken from the Approvals tab — each approver decides on their own approval request, so it cannot be ticked here.",
+        notNeeded: "Not needed - the quoted cost matches the proposal.",
+        note: "Below 5%: the sales manager approves. 5% or more: the business owner and the sales manager. Taken from the Approvals tab - each approver decides on their own approval request, so it cannot be ticked here.",
         fields: [{ key: "__variationApprovals", label: "Approvals", kind: "auto", source: "variationApprovals" }],
       },
       {
@@ -204,7 +204,7 @@ export const PROCUREMENT_CHECKLISTS = [
         key: "poReleased",
         label: "PO released to supplier",
         kind: "group",
-        action: { icon: "send", label: "Send to supplier", title: "Available once the purchase-order service is connected", note: "Purchase-order service not connected — send the PO and tick it here." },
+        action: { icon: "send", label: "Send to supplier", title: "Available once the purchase-order service is connected", note: "Purchase-order service not connected - send the PO and tick it here." },
         fields: [
           { key: "poReleasedConfirmed", label: "PO released to the supplier", kind: "checkbox" },
           { key: "poReleasedOn", label: "Released on", kind: "date", optional: true },
@@ -218,7 +218,7 @@ export const PROCUREMENT_CHECKLISTS = [
     code: "CL-14",
     title: "Material Receipt",
     tab: "Material receipt",
-    completeText: "Materials are received and confirmed ready — installation can be booked.",
+    completeText: "Materials are received and confirmed ready - installation can be booked.",
     conditions: {
       hasDiscrepancy: {
         items: ["discrepancies"],
@@ -249,7 +249,7 @@ export const PROCUREMENT_CHECKLISTS = [
         kind: "checkbox",
         onlyIf: "hasDiscrepancy",
         waitingOn: ["discrepancies"],
-        notNeeded: "Not needed — everything arrived as ordered.",
+        notNeeded: "Not needed - everything arrived as ordered.",
       },
       {
         key: "replacementArranged",
@@ -257,7 +257,7 @@ export const PROCUREMENT_CHECKLISTS = [
         kind: "checkbox",
         onlyIf: "hasDiscrepancy",
         waitingOn: ["discrepancies"],
-        notNeeded: "Not needed — everything arrived as ordered.",
+        notNeeded: "Not needed - everything arrived as ordered.",
       },
       {
         key: "materialsReady",
@@ -281,13 +281,13 @@ export const PROCUREMENT_CHECKLISTS = [
     tab: "Job creation",
     // Opens once the price-variation approval (CL-13) and material receipt (CL-14) are complete.
     afterMaterials: true,
-    completeText: "Job created in Green Deal and checked against the signed quote — ready for construction & commissioning.",
+    completeText: "Job created in Green Deal and checked against the signed quote - ready for construction & commissioning.",
     items: [
       {
         key: "greenDealJob",
         label: "Job created in Green Deal",
         kind: "group",
-        action: { icon: "leaf", label: "Create in Green Deal", title: "Available once the Green Deal API is connected", note: "Green Deal API not connected — create the job in Green Deal and record it here." },
+        action: { icon: "leaf", label: "Create in Green Deal", title: "Available once the Green Deal API is connected", note: "Green Deal API not connected - create the job in Green Deal and record it here." },
         note: "Automatic if the Green Deal API supports it; otherwise a manual action. Opens once the price-variation approval (PO release) and material receipt are both complete.",
         fields: [
           { key: "greenDealJobId", label: "Green Deal job ID", kind: "text" },
@@ -300,13 +300,13 @@ export const PROCUREMENT_CHECKLISTS = [
         kind: "auto",
         source: "greenDeal",
         confirmLabel: "These details are in Green Deal",
-        note: "Already on the job record from Leads, Estimation, Approvals and Procurement — pushed automatically when the Green Deal API supports it, not re-entered.",
+        note: "Already on the job record from Leads, Estimation, Approvals and Procurement - pushed automatically when the Green Deal API supports it, not re-entered.",
       },
       {
         key: "matchConfirmed",
         label: "Job creation in Green Deal confirmed to match the signed quote and approved scope",
         kind: "checkbox",
-        note: "A human check that the sync landed correctly — kept even when the transfer is automatic.",
+        note: "A human check that the sync landed correctly - kept even when the transfer is automatic.",
       },
     ],
   },

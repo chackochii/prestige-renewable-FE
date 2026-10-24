@@ -38,7 +38,7 @@ export async function downloadBoqOrderList(job, { approvedDetails = "" } = {}) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(...INK);
-  doc.text("BOQ & BOS — items to get quotes for", MARGIN, y);
+  doc.text("BOQ & BOS - items to get quotes for", MARGIN, y);
   y += 16;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -53,11 +53,11 @@ export async function downloadBoqOrderList(job, { approvedDetails = "" } = {}) {
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 130 } },
     margin: { left: MARGIN, right: MARGIN },
     body: [
-      ["Job", job?.number || "—"],
-      ["Customer", job?.customer || "—"],
-      ["Site", job?.site || "—"],
-      ["Operations Coordinator", job?.coordinator || "—"],
-      ["BOQ changes approved", approvedDetails || "—"],
+      ["Job", job?.number || "-"],
+      ["Customer", job?.customer || "-"],
+      ["Site", job?.site || "-"],
+      ["Operations Coordinator", job?.coordinator || "-"],
+      ["BOQ changes approved", approvedDetails || "-"],
       ["Generated", formatDate(new Date().toISOString())],
     ],
   });
@@ -73,7 +73,7 @@ export async function downloadBoqOrderList(job, { approvedDetails = "" } = {}) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(...MUTED);
-      doc.text("Nothing to quote — every line is in our inventory.", MARGIN, y + 10);
+      doc.text("Nothing to quote - every line is in our inventory.", MARGIN, y + 10);
       y += 30;
       return;
     }
@@ -85,13 +85,13 @@ export async function downloadBoqOrderList(job, { approvedDetails = "" } = {}) {
       columnStyles: { 0: { cellWidth: 28 }, 3: { cellWidth: 70, halign: "right" }, 4: { cellWidth: 50 } },
       margin: { left: MARGIN, right: MARGIN },
       head: [["#", itemHead, "Brand", "Qty", "Unit"]],
-      body: lines.map((line, index) => [index + 1, line.item, line.brand || "—", formatNumber(line.siteQty), line.unit || "ea"]),
+      body: lines.map((line, index) => [index + 1, line.item, line.brand || "-", formatNumber(line.siteQty), line.unit || "ea"]),
     });
     y = doc.lastAutoTable.finalY + 22;
   };
 
-  section(`Materials (BOQ) — ${materials.length} line${materials.length === 1 ? "" : "s"}`, materials, "Item");
-  section(`Services (BOS) — ${services.length} line${services.length === 1 ? "" : "s"}`, services, "Service");
+  section(`Materials (BOQ) - ${materials.length} line${materials.length === 1 ? "" : "s"}`, materials, "Item");
+  section(`Services (BOS) - ${services.length} line${services.length === 1 ? "" : "s"}`, services, "Service");
 
   doc.save(orderListFileName(job));
 }

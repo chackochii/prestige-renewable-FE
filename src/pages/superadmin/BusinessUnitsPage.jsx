@@ -101,7 +101,7 @@ export default function BusinessUnitsPage() {
                     </td>
                     <td data-label="Timezone">{u.timezone}</td>
                     <td data-label="Margin floor">{formatPercent(u.marginFloor, 0)}</td>
-                    <td data-label="Stages">{Array.isArray(u.enabledStages) ? `${u.enabledStages.length} of 9` : "—"}</td>
+                    <td data-label="Stages">{Array.isArray(u.enabledStages) ? `${u.enabledStages.length} of 9` : "-"}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setModal({ edit: u })}>
                         Edit
@@ -126,7 +126,7 @@ export default function BusinessUnitsPage() {
         <Modal
           title="Delete business unit"
           confirmClose={false}
-          body={`Delete ${modal.delete.name} (${modal.delete.code})? Only units with no opportunities can be removed — otherwise set the status to inactive.`}
+          body={`Delete ${modal.delete.name} (${modal.delete.code})? Only units with no opportunities can be removed - otherwise set the status to inactive.`}
           onClose={() => setModal(null)}
           actions={
             <>

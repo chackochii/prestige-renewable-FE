@@ -37,13 +37,13 @@ export function proposalStatus(proposal) {
   if (!proposal) return { label: "Not sent yet", tone: "neutral" };
   switch (proposal.status) {
     case "issued":
-      return proposal.expired ? { label: "Link expired", tone: "danger" } : { label: "Sent — not opened yet", tone: "info" };
+      return proposal.expired ? { label: "Link expired", tone: "danger" } : { label: "Proposal Sent · Not Opened Yet", tone: "info" };
     case "presented":
-      return proposal.expired ? { label: "Link expired", tone: "danger" } : { label: "Opened — awaiting answer", tone: "warning" };
+      return proposal.expired ? { label: "Link expired", tone: "danger" } : { label: "Opened - awaiting answer", tone: "warning" };
     case "negotiation":
       return { label: "Customer wants changes", tone: "warning" };
     case "accepted":
-      return { label: "Accepted — to Approvals", tone: "success" };
+      return { label: "Accepted - to Approvals", tone: "success" };
     case "rejected":
       return { label: "Declined", tone: "danger" };
     case "re-estimated":
@@ -62,8 +62,8 @@ export function proposalStatus(proposal) {
  */
 export function boardStatus(row) {
   const { proposal, requote } = row ?? {};
-  if (isRequoteOpen(requote)) return { label: `With ${requote.estimator?.name || "the estimator"} — re-quote`, tone: "warning" };
-  if (proposal?.status === "re-estimated" && requote?.status === "completed") return { label: "Revised quote ready — send it", tone: "info" };
+  if (isRequoteOpen(requote)) return { label: `With ${requote.estimator?.name || "the estimator"} - re-quote`, tone: "warning" };
+  if (proposal?.status === "re-estimated" && requote?.status === "completed") return { label: "Revised quote ready - send it", tone: "info" };
   return proposalStatus(proposal && proposal.status !== "withdrawn" ? proposal : null);
 }
 
@@ -108,14 +108,13 @@ export function boardBucket(row) {
  * proposalEmailBody adds the greeting ("Hi Alex,"), the link and the sign-off.
  */
 export const DEFAULT_MESSAGE = [
-  "Thank you for the opportunity to quote. Your proposal is ready — you can view and download it from the link below, and accept it online when you are happy to go ahead.",
-  "",
-  "If you would like anything changed, use the same link to let us know and we will revise it for you.",
+  "Thank you for the opportunity to quote. Your proposal is ready to view and download using the link below, and you can accept it online when you’re ready to go ahead.",
+  "If you’d like any changes, just let us know through the same link and we’ll revise it for you.",
 ].join("\n");
 
 /** The same, for a proposal sent after the customer asked for changes. */
 export const REVISED_MESSAGE = [
-  "Thank you for your feedback. We have revised your proposal as requested — you can view and download the updated version from the link below, and accept it online when you are happy to go ahead.",
+  "Thank you for your feedback. We have revised your proposal as requested - you can view and download the updated version from the link below, and accept it online when you are happy to go ahead.",
   "",
   "If anything else needs changing, use the same link to let us know.",
 ].join("\n");
@@ -137,7 +136,7 @@ export function proposalEmailBody({ customerFirstName, message, link, proposal, 
     "",
     `From the link you can also download the PDF, ask us for changes, or decline.${proposal?.expiresAt ? ` The link is valid until ${formatDate(proposal.expiresAt)}.` : ""}`,
     "",
-    "Kind regards,",
+    "Best Regards,",
     [senderName, businessName].filter(Boolean).join("\n"),
   ].join("\n");
 }

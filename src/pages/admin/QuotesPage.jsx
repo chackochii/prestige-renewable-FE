@@ -33,7 +33,7 @@ export default function QuotesPage() {
 
   return (
     <>
-      <PageHeader title="Quotes" description="Every opportunity that has reached proposal, one row per job, newest first. Open a record to see its stage work." />
+      <PageHeader title="Quotes" description="Every opportunity that has reached proposal, one row per job, newest first. Open a record to see its stage tasks." />
       <div className="stats">
         <StatCard
           icon={<Receipt size={17} />}

@@ -22,9 +22,9 @@ export default function Deliveries({ job }) {
   return (
     <div style={{ marginBottom: 20 }}>
       {sent.length === 0 ? (
-        <Alert tone="info">Nothing to receive yet — no purchase order has gone to a supplier. The checklist below is worked as deliveries arrive.</Alert>
+        <Alert tone="info">Nothing to receive yet - no purchase order has gone to a supplier. The checklist below is worked as deliveries arrive.</Alert>
       ) : allDelivered(job) ? (
-        <Alert tone="success">Every order has been received on site — check it against the purchase orders below.</Alert>
+        <Alert tone="success">Every order has been received on site - check it against the purchase orders below.</Alert>
       ) : (
         <Alert tone="info">
           {delivered.length} of {sent.length} orders received so far.

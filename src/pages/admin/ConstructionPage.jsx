@@ -55,8 +55,8 @@ export default function ConstructionPage() {
                           ? `${formatDate(o.installWindowStart)} → ${formatDate(o.installWindowEnd)}`
                           : "Not booked"}
                       </td>
-                      <td data-label="Electrical">{o.electricalContractor || "—"}</td>
-                      <td data-label="Civil">{o.civilContractor || "—"}</td>
+                      <td data-label="Electrical">{o.electricalContractor || "-"}</td>
+                      <td data-label="Civil">{o.civilContractor || "-"}</td>
                       <td data-label="SLA">
                         <Badge tone={sla.tone}>{sla.label}</Badge>
                       </td>

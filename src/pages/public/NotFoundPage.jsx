@@ -14,7 +14,7 @@ export default function NotFoundPage({ standalone = false }) {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = "Page not found — Prestige Renewable";
+    document.title = "Page not found - Prestige Renewable";
     return () => {
       document.title = previous;
     };

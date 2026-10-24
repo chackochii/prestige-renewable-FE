@@ -24,7 +24,7 @@ import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 
 /** How to reach the customer — captured on every lead, so always worth showing. */
-const contactSummary = (o) => [o.customerPhone, o.customerEmail].filter(Boolean).join(" · ") || "—";
+const contactSummary = (o) => [o.customerPhone, o.customerEmail].filter(Boolean).join(" · ") || "-";
 
 export default function LeadsPage() {
   const navigate = useNavigate();
@@ -120,7 +120,7 @@ export default function LeadsPage() {
                       </td>
                       <td data-label="Source">{leadSourceLabel(o.leadSource)}</td>
                       <td data-label="Contact">{contactSummary(o)}</td>
-                      <td data-label="Next action">{o.nextAction || "—"}</td>
+                      <td data-label="Next action">{o.nextAction || "-"}</td>
                       <td data-label="SLA">
                         <Badge tone={sla.tone}>{sla.label}</Badge>
                       </td>

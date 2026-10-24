@@ -52,15 +52,15 @@ function contactProgress(opp, timeZone) {
   const when = formatDate(last.contactedAt, { timeZone });
   const tally = attempts.length > 1 ? ` · ${attempts.length} attempts` : "";
   return last.reached === false
-    ? `Contacted ${when} — not reached${tally}`
-    : `Client contacted ${when} — details not received${tally}`;
+    ? `Contacted ${when} - not reached${tally}`
+    : `Client contacted ${when} - details not received${tally}`;
 }
 
 /** Who operations has put on the site visit, and how far that got. */
 function siteVisitProgress(opp, userName) {
-  if (opp.estimationSiteVisitCompleted === true) return "Site visit completed — findings pending";
+  if (opp.estimationSiteVisitCompleted === true) return "Site visit completed - findings pending";
   const assignee = opp.estimationSiteVisitAssigneeId ? userName?.(opp.estimationSiteVisitAssigneeId) : null;
-  if (assignee) return `Assigned to ${assignee} — visit not completed`;
+  if (assignee) return `Assigned to ${assignee} - visit not completed`;
   const coordinator = opp.operationalCoordinatorId ? userName?.(opp.operationalCoordinatorId) : null;
   if (coordinator) return `${coordinator} is assigning a site team member`;
   return "No operations coordinator assigned yet";
@@ -71,12 +71,12 @@ function contactTimeline(opp, timeZone) {
   return (Array.isArray(opp.contactAttempts) ? opp.contactAttempts : []).map((a, i) => ({
     id: `attempt-${i}`,
     title: `Attempt ${i + 1} · ${a.method || "Contact"}`,
-    detail: `${formatDate(a.contactedAt, { timeZone })}${a.reached === false ? ` — not reached${a.reason ? `: ${a.reason}` : ""}` : " — reached"}`,
+    detail: `${formatDate(a.contactedAt, { timeZone })}${a.reached === false ? ` - not reached${a.reason ? `: ${a.reason}` : ""}` : " - reached"}`,
     tone: a.reached === false ? "failed" : "done",
   }));
 }
 
-const fact = (label, value) => ({ label, value: value || "—" });
+const fact = (label, value) => ({ label, value: value || "-" });
 
 /**
  * The handoffs on one job. A job can be waiting on more than one team at
@@ -190,7 +190,7 @@ function itemFromRequest(request, user, timeZone) {
     request,
     requestId: requestCode(request),
     oppId: request.opportunityId,
-    number: request.opportunityNumber || "—",
+    number: request.opportunityNumber || "-",
     customer: request.opportunityName || "",
     team: request.department,
     title: request.title,

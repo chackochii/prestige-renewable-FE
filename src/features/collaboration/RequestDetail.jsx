@@ -133,7 +133,7 @@ function Fact({ label, value }) {
     <div className="list-row">
       <span className="row-title">{label}</span>
       <span className="row-meta" style={{ textAlign: "right", maxWidth: "62%" }}>
-        {value || "—"}
+        {value || "-"}
       </span>
     </div>
   );
@@ -239,7 +239,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
       await dispatch(addProgress({ id: request.id, body: { status: request.status, scheduledFor } })).unwrap();
     }
     await dispatch(saveSiteVisitTask({ id: request.id, body })).unwrap();
-    notify("Site-visit form saved — copy the link and send it over");
+    notify("Site-visit form saved - copy the link and send it over");
   };
 
   /**
@@ -282,7 +282,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
           ? decidingFindings
             ? "Findings approved"
             : filled
-              ? `Response accepted — ${filled} item${filled === 1 ? "" : "s"} filled in on the job`
+              ? `Response accepted - ${filled} item${filled === 1 ? "" : "s"} filled in on the job`
               : "Response accepted"
           : decidingFindings
             ? "Sent back to operations"
@@ -388,7 +388,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
           </div>
           <div>
             <dt>Raised by</dt>
-            <dd>{request.createdByName || "—"}</dd>
+            <dd>{request.createdByName || "-"}</dd>
           </div>
           <div>
             <dt>Assigned to</dt>
@@ -401,7 +401,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
           <div>
             <dt>Due</dt>
             <dd>
-              {request.dueAt ? formatDate(request.dueAt, { withTime: hasClockTime(request.dueAt), timeZone }) : "—"}
+              {request.dueAt ? formatDate(request.dueAt, { withTime: hasClockTime(request.dueAt), timeZone }) : "-"}
             </dd>
           </div>
           {request.kind === "assignment" ? (
@@ -442,7 +442,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
         {/* ---- An approval request: the decision, or the approver's form ---- */}
         {request.kind === "approval" && canApprove(request, user) ? (
           <div className="decision-card" style={{ marginTop: 18 }}>
-            <Field label="Notes" hint="required to reject — the requester and the procurement approvals tab show this">
+            <Field label="Notes" hint="required to reject - the requester and the procurement approvals tab show this">
               <textarea rows={3} value={approvalNote} onChange={(e) => setApprovalNote(e.target.value)} />
             </Field>
             <div className="decision-actions" style={{ marginTop: 12, display: "flex", gap: 8 }}>
@@ -466,7 +466,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
               <div className="list-stack">
                 <Fact
                   label={statusMeta("approval", request.status).label}
-                  value={`${response.submittedByName || "—"} · ${formatDate(response.submittedAt, { withTime: true, timeZone })}`}
+                  value={`${response.submittedByName || "-"} · ${formatDate(response.submittedAt, { withTime: true, timeZone })}`}
                 />
                 {response.note ? <Fact label="Notes" value={response.note} /> : null}
               </div>
@@ -481,7 +481,7 @@ export default function RequestDetail({ request: opened, onClose, timeZone }) {
             <h3>Information requested</h3>
             <p className="lede" style={{ marginBottom: 10 }}>
               {response?.submittedAt
-                ? `Submitted by ${response.submittedByName || "—"} on ${formatDate(response.submittedAt, { withTime: true, timeZone })}`
+                ? `Submitted by ${response.submittedByName || "-"} on ${formatDate(response.submittedAt, { withTime: true, timeZone })}`
                 : `Waiting on ${request.assigneeName || departmentLabel(request.department)}.`}
             </p>
             <div className="list-stack">

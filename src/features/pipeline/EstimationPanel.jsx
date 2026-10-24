@@ -381,7 +381,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
       {requote ? (
         <Alert tone="warning" style={{ marginBottom: 12 }}>
-          <strong>Re-quote requested — the customer wants changes.</strong> On the Quote tab, create a new quote from the generated one, revise
+          <strong>Re-quote requested - the customer wants changes.</strong> On the Quote tab, create a new quote from the generated one, revise
           it and generate it as the next version, then hand it back with a note on what changed; sales sends the revised proposal.
           <div style={{ marginTop: 10 }}>
             <RequoteSummary requote={requote} timeZone={unit?.timezone} />
@@ -389,17 +389,11 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
         </Alert>
       ) : null}
 
-      {onViewLead ? (
-        <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }} onClick={onViewLead}>
-          Review the lead pack sales collected
-        </button>
-      ) : null}
-
       {leadChanged ? (
         <Alert tone="warning" style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <span>
-              Some information changed — sales edited the lead pack on{" "}
+              Some information changed - sales edited the lead pack on{" "}
               {formatDate(opp.leadEditedAt, { withTime: true, timeZone: unit?.timezone })}. Check it before you price
               the job.
             </span>
@@ -422,7 +416,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
       {tab === "requirements" ? (
         <>
           <div className="section">
-            <SectionHead icon={<ListChecks size={13} />} title="Requirements checklist" />
             <LeadInputs
               opp={opp}
               canEdit={canEdit}
@@ -548,12 +541,12 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                       ) : null}
                       {findingsIn && !findingsApproved ? (
                         <Alert tone="info" style={{ marginTop: 10, marginBottom: 0 }}>
-                          The visit is back. Read the findings and approve them — the quote opens once you do.
+                          The visit is back. Read the findings and approve them - the quote opens once you do.
                         </Alert>
                       ) : null}
                       {findingsApproved ? (
                         <Alert tone="success" style={{ marginTop: 10, marginBottom: 0 }}>
-                          Findings approved — the quote is open.
+                          Findings approved - the quote is open.
                         </Alert>
                       ) : null}
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
@@ -576,7 +569,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                       </div>
                       {inspections.length > 1 ? (
                         <p className="row-meta" style={{ marginTop: 8 }}>
-                          {inspections.length} raised on this job — the latest is shown; the rest are on the Request /
+                          {inspections.length} raised on this job - the latest is shown; the rest are on the Request /
                           Response tab.
                         </p>
                       ) : null}
@@ -584,8 +577,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                   ) : (
                     <>
                       <p className="lede" style={{ marginBottom: 12 }}>
-                        Raise a request so operations can assign a crew member and schedule the visit. You will be
-                        notified as they schedule it, complete it and submit their report.
+                        Request a site visit and Operations will assign a crew member and schedule it. You’ll be
+                        notified when it’s scheduled, completed and the report is submitted.
                       </p>
                       {canEdit ? (
                         <button type="button" className="btn btn-primary btn-sm" onClick={() => setRequestingInspection(true)}>
@@ -599,7 +592,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
                 <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
                   <SectionHead icon={<FileCheck2 size={13} />} title="Site photos, drawings & documents" />
                   <p className="lede" style={{ marginBottom: 12 }}>
-                    Anything from the visit — access, electrical conditions, constraints, sketches and reports.
+                    Anything from the visit - access, electrical conditions, constraints, sketches and reports.
                   </p>
                   <h3>Photos</h3>
                   <FileDropzone files={sitePhotos} onSelect={uploadSitePhotos} disabled={!canEdit} uploading={uploadingPhotos} />
@@ -652,10 +645,10 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
               !requirementsChecklistComplete
                 ? "The quote opens once the requirements checklist on the first tab is complete."
                 : findingsIn && !findingsApproved
-                  ? "The pre-site inspection findings are in — approve them on the pre-site visit tab and the quote opens."
+                  ? "The pre-site inspection findings are in - approve them on the pre-site visit tab and the quote opens."
                   : needsInspection && !inspection
-                    ? "This job needs a pre-site inspection — request it on the pre-site visit tab. The quote opens once its findings are approved."
-                    : "The quote opens once estimation is ready — requirements confirmed and, if one is needed, the pre-site inspection approved."
+                    ? "This job needs a pre-site inspection - request it on the pre-site visit tab. The quote opens once its findings are approved."
+                    : "The quote opens once estimation is ready - requirements confirmed and, if one is needed, the pre-site inspection approved."
             }
           />
         )
@@ -672,12 +665,6 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
         )
       ) : null}
 
-      {state === "ready" ? (
-        <Alert tone="success" style={{ marginTop: 24 }}>
-          Estimation is ready to proceed — requirements and client input confirmed
-          {preSiteInspectionRequired ? ", pre-site inspection required" : ""}.
-        </Alert>
-      ) : null}
 
       {requestingInspection ? (
         <RequestFormModal
@@ -692,7 +679,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             await dispatch(
               createRequest({ opportunityId: opp.id, body: { ...body, title: body.title || "Pre-site inspection" } }),
             ).unwrap();
-            notify("Pre-site inspection requested — operations is notified");
+            notify("Pre-site inspection requested - operations is notified");
           }}
         />
       ) : null}

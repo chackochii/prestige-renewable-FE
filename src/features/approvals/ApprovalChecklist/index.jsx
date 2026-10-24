@@ -40,7 +40,7 @@ function approvalAutoRows(source, job, checklist) {
     case "council":
       return [
         ["Property address", job.site, NOT_RECORDED],
-        ["Local council", job.council, "Not captured on the lead — confirm it from the address"],
+        ["Local council", job.council, "Not captured on the lead - confirm it from the address"],
       ];
     case "contact":
       return [
@@ -51,7 +51,7 @@ function approvalAutoRows(source, job, checklist) {
     case "proposal":
       return [...systemRows, ["Total quoted amount (inc GST)", job.acceptedValue !== null && job.acceptedValue !== undefined ? formatCurrency(job.acceptedValue) : null, "No accepted proposal on the job"]];
     case "nmi":
-      return [["NMI", recordedNmi(checklist), "Not recorded yet — item 2 on the DNSP application"]];
+      return [["NMI", recordedNmi(checklist), "Not recorded yet - item 2 on the DNSP application"]];
     default:
       return [];
   }

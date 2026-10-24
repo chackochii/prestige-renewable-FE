@@ -141,7 +141,7 @@ export default function UnitSettingsPage() {
     <>
       <PageHeader
         title="Unit settings"
-        description={`The parameters ${unit?.name} runs on — margin floor, stages, SLA days, billing split and commission tiers.`}
+        description={`The parameters ${unit?.name} runs on - margin floor, stages, SLA days, billing split and commission tiers.`}
         actions={
           canEdit && form ? (
             <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>

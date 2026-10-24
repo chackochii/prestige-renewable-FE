@@ -87,6 +87,8 @@ export function emptyEstimationInput() {
     // Project & site
     // The service requirement typed in when sales picks "Other" on the lead.
     serviceRequirementOther: "",
+    // A commercial building's type in words (warehouse, shopping complex).
+    buildingTypeDetails: "",
     siteType: "",
     preSiteInspectionRequired: "",
     siteCrewAssigneeId: "",

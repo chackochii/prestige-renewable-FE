@@ -23,7 +23,6 @@ import {
   X,
 } from "lucide-react";
 import { useMemo } from "react";
-import UnitBrandMark from "@/components/UnitBrandMark";
 import { useAppSelector } from "@/store";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
@@ -52,7 +51,16 @@ export default function SidebarNav({ open, onClose, onSearch }) {
   const { user } = useAuth();
   const { unit } = useBusinessUnit();
   const pages = useAppSelector((s) => s.pages.items);
-  const items = useMemo(() => buildNav({ pages, user, unit }), [pages, user, unit]);
+  // The pipeline is the Jobs Board, straight under Home (UAT, Oct 2026).
+  const items = useMemo(() => {
+    const built = buildNav({ pages, user, unit }).map((item) => (item.code === "pipeline" ? { ...item, label: "Jobs Board" } : item));
+    const board = built.find((item) => item.code === "pipeline");
+    if (!board) return built;
+    const rest = built.filter((item) => item !== board);
+    const home = rest.findIndex((item) => item.code === "home");
+    rest.splice(home + 1, 0, board);
+    return rest;
+  }, [pages, user, unit]);
 
   return (
     <aside className={`sidebar ${open ? "open" : ""}`.trim()}>
@@ -61,14 +69,8 @@ export default function SidebarNav({ open, onClose, onSearch }) {
       </button>
 
       <div className="brand">
-        <UnitBrandMark unit={unit} size={36} />
-        <div>
-          <div className="brand-name">
-            {/* Prestige */}
-            {unit?.code ? <span className="brand-tag">{unit.code}</span> : null}
-          </div>
-          <div className="brand-sub">{unit?.name || "Lead to service"}</div>
-        </div>
+        {/* The unit's name, once. */}
+        <div className="brand-name">{unit?.name || "Prestige Portal"}</div>
       </div>
 
       <button type="button" className="sidebar-search" onClick={onSearch}>
@@ -89,10 +91,6 @@ export default function SidebarNav({ open, onClose, onSearch }) {
         })}
       </nav>
 
-      <div className="sidebar-foot">
-        {unit?.name || "No business unit selected"}
-        {unit?.legalName ? <div>{unit.legalName}</div> : null}
-      </div>
     </aside>
   );
 }

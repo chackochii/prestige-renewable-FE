@@ -38,15 +38,15 @@ export function blockedOn(opp, userName) {
     if (crew) return `Assigned to ${crew} for the pre-site inspection`;
     const coordinator = name(opp.operationalCoordinatorId);
     if (coordinator) return `Assigned to ${coordinator} (operations coordinator) for the pre-site inspection`;
-    return "Assigned to operations for the pre-site inspection — no coordinator yet";
+    return "Assigned to operations for the pre-site inspection - no coordinator yet";
   }
 
   // Sales is chasing the client for what estimation cannot price without.
   if (stage === ESTIMATION_STAGE && opp.estimationClientInfoNeeded === true) {
     const salesperson = name(opp.salespersonId);
     return salesperson
-      ? `Assigned to ${salesperson} — waiting on client information`
-      : "Assigned to sales — waiting on client information";
+      ? `Assigned to ${salesperson} - waiting on client information`
+      : "Assigned to sales - waiting on client information";
   }
 
   return null;
@@ -85,7 +85,7 @@ export function jobStatus(opp, { userName } = {}) {
       key: "requote",
       label: "Re-quote",
       tone: "warning",
-      title: "Sent back by sales — the customer asked for changes to their proposal",
+      title: "Sent back by sales - the customer asked for changes to their proposal",
     };
 
   if (isNewLead(opp))
@@ -93,7 +93,7 @@ export function jobStatus(opp, { userName } = {}) {
       key: "new",
       label: "New",
       tone: "info",
-      title: "Captured with the basic details only — no salesperson assigned yet",
+      title: "Captured with the basic details only - no salesperson assigned yet",
     };
 
   if (opp?.variationPending)

@@ -44,7 +44,7 @@ export default function ApprovalGate({ items = [], outcome, yes, no, question = 
           <div className="approval-gate-exit waiting">
             <Hourglass size={14} />
             <span className="row-meta">
-              {decided} of {items.length} approved — waiting on{" "}
+              {decided} of {items.length} approved - waiting on{" "}
               {items
                 .filter((item) => item.status !== "approved")
                 .map((item) => item.short || item.label)

@@ -111,10 +111,10 @@ export default function ReferralsPage() {
                           <div className="row-meta">{o.number}</div>
                         </Link>
                       </td>
-                      <td data-label="Referrer">{r?.organisation || "—"}</td>
-                      <td data-label="Tier">{c.tier?.label || "—"}</td>
+                      <td data-label="Referrer">{r?.organisation || "-"}</td>
+                      <td data-label="Tier">{c.tier?.label || "-"}</td>
                       <td data-label="Accepted value (ex GST)">{formatCurrency(o.acceptedValue)}</td>
-                      <td data-label="Commission">{c.basis ? formatCurrency(c.amount) : "—"}</td>
+                      <td data-label="Commission">{c.basis ? formatCurrency(c.amount) : "-"}</td>
                     </tr>
                   );
                 })}

@@ -16,7 +16,7 @@ export function isBusinessLead(leadType) {
 }
 
 export function leadTypeLabel(key) {
-  return LEAD_TYPES.find((t) => t.key === key)?.label || key || "—";
+  return LEAD_TYPES.find((t) => t.key === key)?.label || key || "-";
 }
 
 export const MANUAL_LEAD_SOURCES = [
@@ -35,7 +35,7 @@ export const AUTOMATED_LEAD_SOURCES = [
 export const LEAD_SOURCES = [...MANUAL_LEAD_SOURCES, ...AUTOMATED_LEAD_SOURCES];
 
 export function leadSourceLabel(key) {
-  return LEAD_SOURCES.find((s) => s.key === key)?.label || key || "—";
+  return LEAD_SOURCES.find((s) => s.key === key)?.label || key || "-";
 }
 
 // Fallback referrer commission tiers when a unit has no commissionTiers config.

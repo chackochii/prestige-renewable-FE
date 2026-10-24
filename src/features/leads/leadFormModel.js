@@ -65,7 +65,8 @@ export function emptyLeadForm() {
     customerComments: "",
     businessOffers: "",
     customerBudget: "",
-    leadSource: "internal",
+    // No default: the lead source is an explicit choice ("Select lead source").
+    leadSource: "",
     leadSourceDetails: "",
     referrerId: "",
     // The referrer as typed. When it matches a registered referrer, referrerId links it too.
@@ -361,7 +362,7 @@ const CUSTOMER_TAB_FIELDS = new Set([
   "leadType", "customerLegalName", "customerFirstName", "customerLastName",
   "customerPhone", "customerEmail", "unassignedReason",
   // Where they got our details, genuine interest and the contact attempts sit on the Customer details tab too.
-  "leadSource", "leadSourceDetails", "referrerId",
+  "leadSource", "leadSourceDetails", "referrerId", "customerComments",
   "customerIntentConfirmed", "needsClientContact", "contactAttempts",
 ]);
 const DECISION_TAB_FIELDS = new Set(["estimatorId", "notPotentialReason"]);
@@ -405,14 +406,12 @@ export function validateLeadForm(form, { minDate = "" } = {}) {
   if (!isBlank(form.energyAnnualKwh) && Number(form.energyAnnualKwh) < 0) errors.energyAnnualKwh = "Usage cannot be negative.";
   if (form.billingSameAsSite === "no" && isBlank(form.customerBillingAddress))
     errors.customerBillingAddress = "Enter the billing address.";
-  if (form.financeAssistance === "yes" && isBlank(form.financeNotes))
-    errors.financeNotes = "Record what finance assistance the customer needs.";
   if (!form.leadSource) errors.leadSource = "Select a lead source.";
   if (form.leadSource === "referrer" && isBlank(form.referrerId) && isBlank(form.referrerName))
     errors.referrerId = "Enter the referrer who introduced this lead.";
   const logged = (form.contactAttempts || []).filter(isLoggedAttempt);
   if (form.needsClientContact === "yes" && !logged.length)
-    errors.contactAttempts = "Log at least one contact attempt — how you tried and when.";
+    errors.contactAttempts = "Log at least one contact attempt - how you tried and when.";
   if (logged.some((a) => a.reached === false && isBlank(a.reason)))
     errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
   if (minDate && logged.some((a) => String(a.contactedAt).slice(0, 10) < minDate))
@@ -427,8 +426,8 @@ export function validateLeadForm(form, { minDate = "" } = {}) {
     if (isBlank(form.estimatorId)) errors.estimatorId = "Assign an estimator for this potential client.";
     if (isBlank(form.needsClientContact))
       errors.needsClientContact = "Confirm whether the client had to be contacted for the mandatory details.";
-    if (isBlank(form.serviceRequirement)) errors.serviceRequirement = "Record the service they want.";
-    else if (form.serviceRequirement === "other" && isBlank(form.serviceRequirementOther))
+    if (isBlank(form.serviceRequirement)) errors.serviceRequirement = "Tick at least one job requirement.";
+    else if (form.serviceRequirement.split(",").includes("other") && isBlank(form.serviceRequirementOther))
       errors.serviceRequirementOther = "Say what service they want.";
     if (isBlank(form.billingSameAsSite))
       errors.billingSameAsSite = "Confirm whether the site address is the billing address.";

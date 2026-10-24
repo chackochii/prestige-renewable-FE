@@ -70,7 +70,7 @@ export function viewableStages(user, stages = []) {
 /** Who works a stage this person cannot see, for the notice shown in its place. */
 export function stageHiddenReason(user, stage) {
   if (canViewStage(user, stage)) return null;
-  return `${stageById(stage).label} is worked by another team — your role does not include ${viewPermissionFor(stage)}`;
+  return `${stageById(stage).label} is worked by another team - your role does not include ${viewPermissionFor(stage)}`;
 }
 
 /** Can this person move a record out of `stage`? */

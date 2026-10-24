@@ -37,7 +37,7 @@ export const PROCUREMENT_STEPS = [
     key: "matching",
     short: "Matching",
     label: "Proposal BOQ vs actual site BOQ",
-    description: "Where the two agree, procurement starts getting quotes. Where they differ, the BOQ is revised to the site figures — a new round.",
+    description: "Where the two agree, procurement starts getting quotes. Where they differ, the BOQ is revised to the site figures - a new round.",
   },
   {
     key: "variation",
@@ -76,7 +76,7 @@ export const APPROVAL_TIERS = {
     key: "none",
     label: "No variation",
     approvers: [],
-    rule: "The quoted cost matches the proposal — procurement can start sending purchase orders.",
+    rule: "The quoted cost matches the proposal - procurement can start sending purchase orders.",
     tone: "success",
   },
   below: {

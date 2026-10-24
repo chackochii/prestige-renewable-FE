@@ -124,7 +124,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
   const save = async () => {
     if (!assigneeId) return setError("Say who is attending.");
     if (typedName && isBlank(assigneeName)) return setError("Enter the name of the person attending.");
-    if (!requestedCount) return setError("Ask for at least one piece of information or one photo — see Details.");
+    if (!requestedCount) return setError("Ask for at least one piece of information or one photo - see Details.");
 
     setSaving(true);
     setError("");
@@ -185,7 +185,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
                   <div className="list-row" key={field.key}>
                     <span className="row-title">{field.label}</span>
                     <span className={answer ? "row-title answer-filled" : "row-meta"}>
-                      {answer || `Waiting — ${KIND_HINT[field.kind] || "short answer"}`}
+                      {answer || `Waiting - ${KIND_HINT[field.kind] || "short answer"}`}
                     </span>
                   </div>
                 );
@@ -193,7 +193,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
             </div>
           </>
         ) : (
-          <p className="lede">The requester did not tick anything — ask for whatever this visit needs below.</p>
+          <p className="lede">The requester did not tick anything - ask for whatever this visit needs below.</p>
         )}
 
         <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
@@ -259,7 +259,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
         onClick={() => setScreen("details")}
       >
         <ListChecks size={14} />
-        Details Required — {requestedCount} item{requestedCount === 1 ? "" : "s"}
+        Details Required - {requestedCount} item{requestedCount === 1 ? "" : "s"}
         {asked.length ? ` (${asked.length} from the requester)` : ""}
       </button>
 
@@ -273,7 +273,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
                 {person.title ? ` · ${person.title}` : ""}
               </option>
             ))}
-            <option value="__other">Someone else — type their name</option>
+            <option value="__other">Someone else - type their name</option>
           </select>
         </Field>
         {typedName ? (
@@ -281,7 +281,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
             <Field label="Name" className="span-2" required hint="electrician, site member or contractor">
               <input value={assigneeName} onChange={(e) => setAssigneeName(e.target.value)} />
             </Field>
-            <Field label="Email" hint="optional — where to send the link">
+            <Field label="Email" hint="optional - where to send the link">
               <input type="email" value={assigneeEmail} onChange={(e) => setAssigneeEmail(e.target.value)} />
             </Field>
             <Field label="Phone" hint="optional">
@@ -319,7 +319,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
               value={link}
               label="Copy the link"
               copiedLabel="Link copied"
-              toast="Site-visit link copied — send it to whoever is attending"
+              toast="Site-visit link copied - send it to whoever is attending"
             />
             {/* An anchor, not a button that routes: the form is a public page
                 outside the app, and the coordinator opening it to check must
@@ -346,7 +346,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
             <div className="list-row">
               <span className="row-title">Submitted by</span>
               <span className="row-meta">
-                {[response?.name, response?.email, response?.phone].filter(Boolean).join(" · ") || "—"}
+                {[response?.name, response?.email, response?.phone].filter(Boolean).join(" · ") || "-"}
               </span>
             </div>
             {task?.submittedAt ? (
@@ -386,7 +386,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
                       href={file.url}
                       target="_blank"
                       rel="noreferrer"
-                      title={`Open ${file.filename}${slot ? ` — asked for as ${documentTypeLabel(slot.type)}` : ""}`}
+                      title={`Open ${file.filename}${slot ? ` - asked for as ${documentTypeLabel(slot.type)}` : ""}`}
                     >
                       {isImage && file.url ? (
                         <img src={file.url} alt={slot?.label || file.filename} loading="lazy" />
@@ -423,7 +423,7 @@ export default function SiteVisitTaskForm({ request, people = [], onSave, onDele
             </div>
           ) : (
             <p className="dropzone-empty" style={{ margin: 0 }}>
-              {submitted ? "No photos were uploaded." : "Nothing uploaded yet — photos appear here as they are taken."}
+              {submitted ? "No photos were uploaded." : "Nothing uploaded yet - photos appear here as they are taken."}
             </p>
           )}
         </div>

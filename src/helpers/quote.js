@@ -168,7 +168,7 @@ export function quoteVariations(quote, catalogItems = []) {
 
   const costLine = (cost) => ({
     key: `cost-${cost.id}`,
-    label: cost.description ? `${cost.costType} — ${cost.description}` : cost.costType,
+    label: cost.description ? `${cost.costType} - ${cost.description}` : cost.costType,
     detail: cost.calcType === "percentage" ? `${cost.value}% of items` : "Fixed amount",
     amount: Math.abs(additionalCostAmount(cost, itemsTotal)),
   });

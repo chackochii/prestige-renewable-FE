@@ -51,7 +51,7 @@ export default function UnitSelectGate({ children }) {
             <h2>No business units yet</h2>
             <p className="lede" style={{ marginBottom: 16 }}>
               {user?.name}, nothing can be captured until this platform has a business unit. Create the first one to
-              get started — everything else (people, pages, leads) hangs off it.
+              get started - everything else (people, pages, leads) hangs off it.
             </p>
             <div style={{ display: "flex", gap: 8 }}>
               <Link to="/superadmin" className="btn btn-primary">

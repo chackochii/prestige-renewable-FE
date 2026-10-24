@@ -50,7 +50,7 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
       title={editing ? `Edit ${unit.code}` : "New business unit"}
       body={
         editing
-          ? "Codes are permanent — opportunity numbers key off them. Workflow settings are edited per unit under Admin → Unit settings."
+          ? "Codes are permanent - opportunity numbers key off them. Workflow settings are edited per unit under Admin → Unit settings."
           : "A new unit starts with the default solar workflow: all nine stages, 20 / 40 / 40 billing and a 20% margin floor."
       }
       onClose={onClose}

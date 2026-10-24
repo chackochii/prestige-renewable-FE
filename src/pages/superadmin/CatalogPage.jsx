@@ -18,7 +18,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 /** "$180 – $320" across an item's brands, or the one price. */
 function priceRange(brands) {
   const prices = brands.map((b) => b.unitPrice);
-  if (!prices.length) return "—";
+  if (!prices.length) return "-";
   const low = Math.min(...prices);
   const high = Math.max(...prices);
   return low === high ? formatCurrency(low, { withCents: true }) : `${formatCurrency(low, { withCents: true })} – ${formatCurrency(high, { withCents: true })}`;
@@ -120,7 +120,7 @@ export default function CatalogPage() {
                         className="btn btn-danger btn-sm"
                         onClick={() => setModal({ delete: i })}
                         disabled={i.isSystem}
-                        title={i.isSystem ? "The approvals' system summary reads this item — set it to inactive instead" : undefined}
+                        title={i.isSystem ? "The approvals' system summary reads this item - set it to inactive instead" : undefined}
                       >
                         Delete
                       </button>

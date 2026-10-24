@@ -167,7 +167,7 @@ function PricingRow({ line, canEdit, valueOf, onEdit, suppliersListId }) {
             aria-label={`Supplier for ${line.item}`}
           />
         ) : (
-          line.supplier || <span className="row-meta">—</span>
+          line.supplier || <span className="row-meta">-</span>
         )}
       </td>
       <td>
@@ -195,8 +195,8 @@ function PricingRow({ line, canEdit, valueOf, onEdit, suppliersListId }) {
         {estimated ? (
           formatCurrency(line.proposalUnitCost, { withCents: true })
         ) : (
-          <span className="row-meta" title="Added in procurement — not on the estimation BOQ">
-            —
+          <span className="row-meta" title="Added in procurement - not on the estimation BOQ">
+            -
           </span>
         )}
       </td>
@@ -218,7 +218,7 @@ function PricingRow({ line, canEdit, valueOf, onEdit, suppliersListId }) {
           <span className="row-meta">awaiting quote</span>
         )}
       </td>
-      <td>{hasValue(quoted) ? formatCurrency(qty(quoted) * qty(line.siteQty), { withCents: true }) : <span className="row-meta">—</span>}</td>
+      <td>{hasValue(quoted) ? formatCurrency(qty(quoted) * qty(line.siteQty), { withCents: true }) : <span className="row-meta">-</span>}</td>
     </tr>
   );
 }

@@ -165,7 +165,7 @@ export default function RequestsPage() {
                         ) : null}
                       </td>
                       <td data-label="Project">
-                        <div className="row-title">{request.opportunityNumber || "—"}</div>
+                        <div className="row-title">{request.opportunityNumber || "-"}</div>
                         <div className="row-meta">{request.opportunityName}</div>
                       </td>
                       <td data-label={tab === "assigned" ? "Raised by" : "Assigned to"}>
@@ -173,7 +173,7 @@ export default function RequestsPage() {
                           departmentLabel(request.department)}
                       </td>
                       <td data-label="Due">
-                        {request.dueAt ? formatDate(request.dueAt, { timeZone: unit?.timezone }) : "—"}
+                        {request.dueAt ? formatDate(request.dueAt, { timeZone: unit?.timezone }) : "-"}
                       </td>
                       <td data-label="Status">
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>

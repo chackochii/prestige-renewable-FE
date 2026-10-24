@@ -13,7 +13,7 @@ export default function RequiredApprovalsPicker({ unit, value = [], onChange, di
   const ticked = new Set(Array.isArray(value) ? value : []);
 
   if (!catalogue.length)
-    return <p className="row-meta">This business unit has no approval types set up — add them in Admin → Unit settings.</p>;
+    return <p className="row-meta">This business unit has no approval types set up - add them in Admin → Unit settings.</p>;
 
   const toggle = (key) => {
     const next = new Set(ticked);

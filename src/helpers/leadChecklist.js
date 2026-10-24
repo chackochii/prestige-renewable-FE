@@ -18,7 +18,6 @@ import {
 } from "@/constants/estimationInput";
 import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementText, storeyLabel } from "@/features/leads/propertyOptions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
-import { formatNumber } from "@/utils/formatCurrency";
 import { joinAddress } from "@/utils/text";
 
 const filled = (value) => String(value ?? "").trim().length > 0;
@@ -57,11 +56,11 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     { key: "address", label: "Site address", value: address, done: filled(opp.siteLine1) && filled(opp.sitePostcode) },
     {
       key: "service",
-      label: "Service requirement",
+      label: "Job Requirement",
       value: serviceRequirementText(opp.serviceRequirement, estimationInputFromOpp(opp).serviceRequirementOther),
       done:
         filled(opp.serviceRequirement) &&
-        (opp.serviceRequirement !== "other" || filled(estimationInputFromOpp(opp).serviceRequirementOther)),
+        (!String(opp.serviceRequirement).split(",").includes("other") || filled(estimationInputFromOpp(opp).serviceRequirementOther)),
     },
     {
       key: "billing",
@@ -84,15 +83,9 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
       done: Boolean(opp.energyHasBills) || billCount > 0,
     },
     {
-      key: "usage",
-      label: "Daily usage",
-      value: opp.energyAnnualKwh ? `${formatNumber(opp.energyAnnualKwh)} kWh / day` : "",
-      done: filled(opp.energyAnnualKwh),
-    },
-    {
       key: "finance",
       label: "Finance assistance",
-      value: opp.financeAssistance === "yes" ? `Needed — ${opp.financeNotes || "details on the lead"}` : opp.financeAssistance,
+      value: opp.financeAssistance === "yes" ? `Needed - ${opp.financeNotes || "details on the lead"}` : opp.financeAssistance,
       done: filled(opp.financeAssistance),
     },
     {
@@ -109,7 +102,7 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     },
     {
       key: "location",
-      label: "Preferred battery location",
+      label: "Preferred Installation Location",
       value: opp.preferredInstallLocation,
       done: filled(opp.preferredInstallLocation),
     },
@@ -127,8 +120,8 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     },
     {
       key: "source",
-      label: "Where they got our details",
-      value: `${leadSourceLabel(opp.leadSource)}${opp.leadSourceDetails ? ` — ${opp.leadSourceDetails}` : ""}`,
+      label: "Lead Source",
+      value: `${leadSourceLabel(opp.leadSource)}${opp.leadSourceDetails ? ` - ${opp.leadSourceDetails}` : ""}`,
       done: filled(opp.leadSource),
     },
   ];
@@ -220,7 +213,7 @@ export function leadOptionalItems(opp, { drawingCount = 0, sitePhotoCount = 0 } 
       type: "readonly",
       value: opp?.electricalPhase || "",
       display: opp?.electricalPhase
-        ? `${electricalPhaseLabel(opp.electricalPhase)} — confirmed at lead qualification`
+        ? `${electricalPhaseLabel(opp.electricalPhase)} - confirmed at lead qualification`
         : "",
     },
     {

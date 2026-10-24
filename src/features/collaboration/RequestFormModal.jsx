@@ -154,7 +154,7 @@ export default function RequestFormModal({
     if (!isAssignment && !isApproval && !form.fields.length && !documents.length)
       return setError("Add at least one piece of information you need back.");
     if (!isAssignment && !isApproval && form.fields.some((f) => isBlank(f.label)))
-      return setError("Name every item you need — that is what the other team sees.");
+      return setError("Name every item you need - that is what the other team sees.");
 
     setSaving(true);
     setError("");
@@ -199,7 +199,7 @@ export default function RequestFormModal({
 
   return (
     <Modal
-      title={isAssignment ? "Assign to another team" : isApproval ? `Request approval${approvalRoleLabel ? ` — ${approvalRoleLabel}` : ""}` : "Request information"}
+      title={isAssignment ? "Assign to another team" : isApproval ? `Request approval${approvalRoleLabel ? ` - ${approvalRoleLabel}` : ""}` : "Request information"}
       body={`${opportunity?.number ? `${opportunity.number} · ` : ""}${stageById(stage).label}`}
       className="wide"
       onClose={onClose}
@@ -243,15 +243,15 @@ export default function RequestFormModal({
       {isInspection && screen === "inspection" ? (
         <div className="section" style={{ marginBottom: 0 }}>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Tick what this visit has to bring back. Each one becomes a field the person attending fills in, so ask for
-            what you need and leave the rest — everything here is optional.
+            Select what you need from this visit. Each item becomes a field for the crew member to complete on site.
+            All items are optional, so only pick what you need.
           </p>
           <InspectionChecklist selected={checklist} onChange={setChecklist} disabled={saving} />
 
           <div className="section" style={{ marginTop: 18, marginBottom: 0 }}>
             <h3>Anything else to confirm</h3>
             <p className="lede" style={{ marginBottom: 12 }}>
-              Not on the list? Write it here — one line each, and the person attending gets a field for it.
+              Not on the list? Add it here, one item per line, and the crew member will get a field for each.
             </p>
             {custom.map((item, i) => (
               <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
@@ -283,7 +283,7 @@ export default function RequestFormModal({
           </Field>
         ) : (
           <>
-            <Field label="What do you need?" className="span-2">
+            <Field label={isAssignment ? "Required Action" : "Required Information"} className="span-2">
               <select value={templateKey} onChange={(e) => applyTemplate(e.target.value)}>
                 {templates.map((t) => (
                   <option key={t.key} value={t.key}>
@@ -314,7 +314,7 @@ export default function RequestFormModal({
                 : `nobody in this unit holds the ${approvalRoleLabel || approvalRole} role`
               : teamHasPeople
                 ? undefined
-                : `nobody in ${departmentLabel(form.department)} yet — showing everyone`
+                : `nobody in ${departmentLabel(form.department)} yet - showing everyone`
           }
         >
           <select value={form.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
@@ -342,12 +342,12 @@ export default function RequestFormModal({
               onClick={() => setScreen("inspection")}
             >
               <ListChecks size={14} />
-              Inspection checklist — {askedCount} item{askedCount === 1 ? "" : "s"} requested
+              Inspection checklist - {askedCount} item{askedCount === 1 ? "" : "s"} requested
             </button>
           </div>
         ) : initial && !isApproval ? null : (
           <Field
-            label={isAssignment ? "What needs doing" : isApproval ? "What needs approving" : "Why you need it"}
+            label={isAssignment ? "What needs doing" : isApproval ? "What needs approving" : "Request Justification"}
             className="span-2"
             hint={isAssignment ? "the coordinator sees this" : isApproval ? "the approver reads this before deciding" : "context for whoever answers"}
           >
@@ -378,9 +378,10 @@ export default function RequestFormModal({
 
       {!isAssignment && !isApproval ? (
         <div className="section" style={{ marginTop: 20, marginBottom: 0 }}>
-          <h3>Information you need back</h3>
+          <h3>Required Details</h3>
           <p className="lede" style={{ marginBottom: 12 }}>
-            One line per thing you need. They get an input for each, and answer those and nothing else.
+            Enter one item per line. The recipient will get a separate answer box for each, and can respond only to
+            what you’ve listed.
           </p>
           {form.fields.map((field, i) => (
             <div key={i} className="row-grid" style={{ "--row-cols": "1fr auto" }}>
@@ -441,7 +442,7 @@ export default function RequestFormModal({
       ) : null}
 
       <p className="lede" style={{ marginTop: 16, marginBottom: 0 }}>
-        {REQUEST_KINDS[kind].label} · they are notified as soon as you send it.
+        The assignee is notified as soon as you submit the request.
       </p>
     </Modal>
   );

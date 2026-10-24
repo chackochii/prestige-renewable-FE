@@ -39,12 +39,12 @@ export default function RequoteSummary({ requote, timeZone, title }) {
           <>
             <blockquote className="requote-quote">{requote.customerMessage}</blockquote>
             <div className="row-meta" style={{ whiteSpace: "normal" }}>
-              — {customerMessageSource(requote)}
+              - {customerMessageSource(requote)}
             </div>
           </>
         ) : (
           <div className="row-meta" style={{ whiteSpace: "normal" }}>
-            No message from the customer was recorded — see the comments below.
+            No message from the customer was recorded - see the comments below.
           </div>
         )}
       </div>
@@ -67,7 +67,7 @@ export default function RequoteSummary({ requote, timeZone, title }) {
         <div className="requote-section">
           <div className="requote-label">
             What changed
-            {requote.completedBy?.name ? ` — ${requote.completedBy.name}` : ""}
+            {requote.completedBy?.name ? ` - ${requote.completedBy.name}` : ""}
             {requote.completedAt ? `, ${formatDate(requote.completedAt, { withTime: true, timeZone })}` : ""}
           </div>
           {requote.estimatorNote ? <div className="requote-text">{requote.estimatorNote}</div> : <div className="row-meta">No note was left.</div>}

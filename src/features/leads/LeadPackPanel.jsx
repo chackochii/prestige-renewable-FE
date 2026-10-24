@@ -76,7 +76,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
   const [advanceTab, setAdvanceTab] = useState(0);
   // The tab a save moves on to, as LeadForm reports it — named on the Save button.
   const [nextTabLabel, setNextTabLabel] = useState(null);
-  // The lead could leave the stage on this save — LeadForm says so from the Mark Potential tab.
+  // The lead could leave the stage on this save — LeadForm says so from the Assign to Estimator tab.
   const [readyToProceed, setReadyToProceed] = useState(false);
   // The tab open in the form — Save checks only that tab and the ones before it.
   const [activeTab, setActiveTab] = useState("customer");
@@ -260,7 +260,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
         addOpportunityHistoryEntry({
           id: opp.id,
           body: {
-            note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) — ${attempt.reason}`,
+            note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) - ${attempt.reason}`,
           },
         }),
       ).unwrap();
@@ -314,7 +314,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
           await dispatch(
             addOpportunityHistoryEntry({
               id: opp.id,
-              body: { note: `Lead left unassigned — ${form.unassignedReason.trim()}` },
+              body: { note: `Lead left unassigned - ${form.unassignedReason.trim()}` },
             }),
           ).unwrap();
         }
@@ -341,7 +341,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
           await dispatch(
             addOpportunityHistoryEntry({
               id: opp.id,
-              body: { note: "Lead pack edited after handover to estimation — estimator notified." },
+              body: { note: "Lead pack edited after handover to estimation - estimator notified." },
             }),
           ).unwrap();
         } catch {
@@ -352,7 +352,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
       // Deliberately stays in edit mode: the checklist spans several tabs and
       // people save as they go.
       clearLeadDraft(opp.id);
-      notify(handedOver ? "Lead pack saved — estimator notified" : "Lead pack saved");
+      notify(handedOver ? "Lead pack saved - estimator notified" : "Lead pack saved");
       setAdvanceTab((n) => n + 1);
       return true;
     } catch (err) {
@@ -367,12 +367,6 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
   // "Handed over" means an estimator owns it now, whether or not the stage moved.
   const estimatorName = opp.estimator?.name || userName(opp.estimatorId);
   const handedOver = Boolean(opp.estimatorId);
-  // Throws away what was typed since the last save.
-  const cancelEditing = () => {
-    setForm(leadToForm(opp));
-    setBase(opp);
-    setErrors({});
-  };
   const gate = leadGateItems(opp);
   // On the last tab, a lead that is ready saves and moves straight on.
   const nextStage = nextStageFor(LEAD_STAGE, unit);
@@ -408,7 +402,7 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
       </div>
       <p className="sub">
         {atLeadStage
-          ? "A lead becomes an opportunity once it's marked Potential with an estimator assigned."
+          ? "A lead becomes an opportunity once the checklist is complete and an estimator is assigned."
           : "This lead has already moved on. You can still review and update the details."}
       </p>
 
@@ -432,11 +426,11 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
       {atLeadStage ? (
         gate.length ? (
           <Alert tone="info" style={{ marginBottom: 12 }}>
-            Complete the checklist to mark this lead Potential and move it on.
+            Complete the checklist and assign an estimator to move this lead on.
           </Alert>
         ) : (
           <Alert tone="success" style={{ marginBottom: 12 }}>
-            Checklist complete — this lead is ready to advance.
+            Checklist Complete - This lead is ready to advance to the next stage.
           </Alert>
         )
       ) : null}
@@ -517,20 +511,11 @@ export default function LeadPackPanel({ opp, unit, canEdit, onMoved }) {
                     : "Save lead details"}
             </button>
           )}
-          <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={saving}>
-            Cancel
-          </button>
-          <span className="row-meta" style={{ alignSelf: "center" }}>
-            {autosaveState === "error"
-              ? "Could not save — try Save lead details."
-              : autosaveState === "saving"
-                ? "Saving…"
-                : dirty
-                  ? "Unsaved — kept on this device until you save"
-                  : autosaveState === "saved"
-                    ? "All changes saved"
-                    : ""}
-          </span>
+          {autosaveState === "error" ? (
+            <span className="row-meta" style={{ alignSelf: "center" }}>
+              Could not save. Try Save again.
+            </span>
+          ) : null}
           {handedOver ? (
             <span className="row-meta" style={{ alignSelf: "center" }}>
               {estimatorName || "The estimator"} is notified when you save.

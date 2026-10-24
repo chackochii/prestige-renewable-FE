@@ -37,7 +37,7 @@ export default function BoqOrderList({ job }) {
       <SectionHead icon={<FileDown size={13} />} title="BOQ & BOS list for quotes" />
       <p className="row-meta" style={{ whiteSpace: "normal", marginBottom: 10 }}>
         {approved
-          ? `${materials.length} material${materials.length === 1 ? "" : "s"} and ${services.length} service${services.length === 1 ? "" : "s"} not in our inventory to get quotes for — saved lines only.`
+          ? `${materials.length} material${materials.length === 1 ? "" : "s"} and ${services.length} service${services.length === 1 ? "" : "s"} not in our inventory to get quotes for - saved lines only.`
           : "Available once “BOQ changes approved before ordering” is signed above."}
       </p>
       <button type="button" className="btn btn-primary btn-sm" onClick={download} disabled={!approved || busy}>

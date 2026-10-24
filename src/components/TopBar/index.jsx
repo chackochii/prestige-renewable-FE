@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Menu, Moon, Sun } from "lucide-react";
-import UnitBrandMark from "@/components/UnitBrandMark";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
@@ -42,7 +41,6 @@ export default function TopBar({ onMenu }) {
         </button>
         {/* Shown only while the sidebar is a drawer, so the brand stays visible. */}
         <div className="topbar-brand">
-          <UnitBrandMark unit={unit} size={28} />
           <span>{unit?.name || "Prestige"}</span>
         </div>
       </div>

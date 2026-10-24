@@ -38,8 +38,8 @@ export default function NewLeadPage() {
   const [submitError, setSubmitError] = useState("");
   const [saving, setSaving] = useState(false);
   const [billFiles, setBillFiles] = useState([]);
-  const [historyNotes, setHistoryNotes] = useState([]);
-  const [noteDraft, setNoteDraft] = useState("");
+  // No job-history box on capture any more: "Initial Requirements & Comments" carries that.
+  const historyNotes = [];
 
   useEffect(() => {
     if (referrersStatus === "idle") dispatch(fetchReferrers({ status: "active" }));
@@ -57,13 +57,6 @@ export default function NewLeadPage() {
 
   const addBills = (files) => setBillFiles((prev) => [...prev, ...files]);
 
-  const addNote = () => {
-    const text = noteDraft.trim();
-    if (!text) return;
-    setHistoryNotes((prev) => [...prev, text]);
-    setNoteDraft("");
-  };
-  const removeNote = (i) => setHistoryNotes((prev) => prev.filter((_, idx) => idx !== i));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -102,7 +95,7 @@ export default function NewLeadPage() {
             await dispatch(
               addOpportunityHistoryEntry({
                 id: created.id,
-                body: { note: `Lead left unassigned — ${form.unassignedReason.trim()}` },
+                body: { note: `Lead left unassigned - ${form.unassignedReason.trim()}` },
               }),
             ).unwrap();
           } catch {
@@ -121,7 +114,7 @@ export default function NewLeadPage() {
             addOpportunityHistoryEntry({
               id: created.id,
               body: {
-                note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) — ${attempt.reason}`,
+                note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) - ${attempt.reason}`,
               },
             }),
           ).unwrap();
@@ -194,57 +187,6 @@ export default function NewLeadPage() {
           billFiles={billFiles.map((f, i) => ({ id: `bill-${i}`, filename: f.name }))}
           onUploadBills={addBills}
         />
-
-        <div className="section">
-          <SectionHead icon={<Clock size={13} />} title="Job history" />
-          <p className="lede" style={{ marginBottom: 16 }}>
-            Add context now — these notes land on the History tab as soon as the lead is saved, visible to anyone
-            who can view it.
-          </p>
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 16 }}>
-            <div className="field" style={{ flex: 1 }}>
-              <textarea
-                rows={2}
-                placeholder="Add to the job history…"
-                value={noteDraft}
-                disabled={saving}
-                onChange={(e) => setNoteDraft(e.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={saving || !noteDraft.trim()}
-              onClick={addNote}
-            >
-              <MessageSquarePlus size={14} /> Add
-            </button>
-          </div>
-
-          {historyNotes.length ? (
-            <div className="list-stack">
-              {historyNotes.map((note, i) => (
-                <div key={i} className="list-row">
-                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                    <span className="status-icon current">
-                      <Clock size={16} />
-                    </span>
-                    <div className="row-title">{note}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={saving}
-                    onClick={() => removeNote(i)}
-                    aria-label="Remove note"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
 
         {errorList.length ? (
           <Alert tone="danger" style={{ marginTop: 16 }}>

@@ -163,7 +163,7 @@ export default function ApprovalWorkflow({
     try {
       // true: answers were sent (now, or a save already on its way has landed).
       const sent = await onSaveChecklist(section.key);
-      notify(sent ? `${section.tab} saved` : `${section.tab} saved — everything was already on the record`);
+      notify(sent ? `${section.tab} saved` : `${section.tab} saved - everything was already on the record`);
     } catch (err) {
       notifyError(typeof err === "string" ? err : err?.message || "The checklist could not be saved.");
     } finally {
@@ -185,7 +185,7 @@ export default function ApprovalWorkflow({
           className={`btn btn-sm ${saveState?.dirty ? "btn-primary" : "btn-ghost"}`}
           onClick={saveChecklistNow}
           disabled={savingChecklist || saveState?.saving}
-          title={saveState?.dirty ? "Save what you have entered" : "Everything is saved — save again anyway"}
+          title={saveState?.dirty ? "Save what you have entered" : "Everything is saved - save again anyway"}
         >
           <Save size={14} /> {savingChecklist || saveState?.saving ? "Saving…" : "Save"}
         </button>
@@ -197,7 +197,7 @@ export default function ApprovalWorkflow({
       {saveError ? (
         <Alert tone="danger" style={{ marginBottom: 14, display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
           <span>
-            <strong>Your last checklist answers were not saved.</strong> {saveError} The checklist now shows what is on record — enter
+            <strong>Your last checklist answers were not saved.</strong> {saveError} The checklist now shows what is on record - enter
             the answers again.
           </span>
           {onDismissSaveError ? (
@@ -209,7 +209,7 @@ export default function ApprovalWorkflow({
       ) : null}
       {isOverdue(job) ? (
         <Alert tone="danger" style={{ marginBottom: 14 }}>
-          Past the approvals timeline — due {formatDate(job.slaDueAt, { withTime: true })} ({slaStatus(job.slaDueAt).label}).
+          Past the approvals timeline - due {formatDate(job.slaDueAt, { withTime: true })} ({slaStatus(job.slaDueAt).label}).
         </Alert>
       ) : null}
       <Tabs items={tabs} value={tab} onChange={setTab} />
@@ -220,7 +220,7 @@ export default function ApprovalWorkflow({
             <div>
               <SectionHead icon={<ListChecks size={13} />} title="Approvals required" />
               <p className="row-meta" style={{ whiteSpace: "normal", marginBottom: 8 }}>
-                Ticked by sales on the lead or by estimation — the approvals tracked above.
+                Ticked by sales on the lead or by estimation - the approvals tracked above.
                 {canEdit && !movedOn ? " Change it here if the job needs another one, or one less." : ""}
               </p>
               {choosing ? (

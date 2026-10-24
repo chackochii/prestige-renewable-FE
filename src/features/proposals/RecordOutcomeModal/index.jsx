@@ -12,7 +12,7 @@ import { recordProposalOutcome } from "@/services/api/proposalsApi";
 const OUTCOMES = [
   { key: "accepted", label: "Accepted", hint: "The job moves on to Approvals." },
   { key: "renegotiate", label: "Wants changes", hint: "Next: send the job to the estimator for a re-quote, with what they said." },
-  { key: "rejected", label: "Declined", hint: "The job stays here — re-quote, send a revised proposal, or mark it lost." },
+  { key: "rejected", label: "Declined", hint: "The job stays here - re-quote, send a revised proposal, or mark it lost." },
 ];
 
 export default function RecordOutcomeModal({ opportunity, proposal, onClose, onRecorded }) {
@@ -44,7 +44,7 @@ export default function RecordOutcomeModal({ opportunity, proposal, onClose, onR
 
   return (
     <Modal
-      title={`Record the customer's answer — ${proposal.number}`}
+      title={`Record the customer's answer - ${proposal.number}`}
       onClose={busy ? undefined : onClose}
       actions={
         <>
@@ -75,10 +75,10 @@ export default function RecordOutcomeModal({ opportunity, proposal, onClose, onR
         ))}
       </div>
       <div className="form-grid" style={{ marginTop: 14 }}>
-        <Field className="span-2" label="Who you spoke to" hint="optional" htmlFor="ro-name">
+        <Field className="span-2" label="Contact Name" hint="optional" htmlFor="ro-name">
           <input id="ro-name" value={customerName} maxLength={120} onChange={(e) => setCustomerName(e.target.value)} />
         </Field>
-        <Field className="span-2" label={outcome === "renegotiate" ? "What they want changed" : "Note"} hint={outcome === "renegotiate" ? "required" : "optional"} htmlFor="ro-note">
+        <Field className="span-2" label={outcome === "renegotiate" ? "What they want changed" : "Comments"} hint={outcome === "renegotiate" ? "required" : "optional"} htmlFor="ro-note">
           <textarea id="ro-note" rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
       </div>

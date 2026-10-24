@@ -79,7 +79,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
     return (
       <div className="section" style={{ marginTop: 20 }}>
         <SectionHead icon={<Send size={13} />} title="Send to proposal" />
-        <Alert tone="success">This quote has been sent on — the job is now at {stageById(stage).label}.</Alert>
+        <Alert tone="success">This quote has been sent on - the job is now at {stageById(stage).label}.</Alert>
       </div>
     );
   }
@@ -116,7 +116,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
         ).unwrap();
       }
       const moved = await dispatch(handOverToProposal({ id: opp.id, body: { quoteVersionId: version.id, note: note.trim() || undefined } })).unwrap();
-      notify(`${requote ? "Revised quote sent" : "Sent"} to ${stageById(moved.stage).label}${opp.salesperson?.name ? ` — ${opp.salesperson.name} has been notified` : ""}`);
+      notify(`${requote ? "Revised quote sent" : "Sent"} to ${stageById(moved.stage).label}${opp.salesperson?.name ? ` - ${opp.salesperson.name} has been notified` : ""}`);
       onSent?.(moved);
     } catch (err) {
       setError(errText(err, "The quote could not be sent to proposal."));
@@ -130,8 +130,8 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
       <SectionHead icon={<Send size={13} />} title={requote ? "Send the revised quote to proposal" : "Send to proposal"} />
       <p className="lede" style={{ marginBottom: 12 }}>
         {requote
-          ? `The customer asked for changes (re-quote round ${requote.round}). When the revised quote is final, send it back to ${nextLabel} with a note on what changed — sales sends the new proposal.`
-          : `When the quote is final, send it to ${nextLabel}. Sales then sends the proposal to the customer, who accepts it online.`}
+          ? `The customer asked for changes (re-quote round ${requote.round}). When the revised quote is final, send it back to ${nextLabel} with a note on what changed - sales sends the new proposal.`
+          : `Once the quote is final, send it to the ${nextLabel} stage. Sales will then send the proposal to the customer to accept online.`}
       </p>
 
       <div className="list-stack">
@@ -148,7 +148,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
             }
             detail={
               unchanged
-                ? "The quote is still the version the customer asked to change. Revise it — or say in the note why it stays as quoted."
+                ? "The quote is still the version the customer asked to change. Revise it - or say in the note why it stays as quoted."
                 : requote.customerMessage
                   ? `They asked: “${requote.customerMessage}”`
                   : null
@@ -179,7 +179,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
           warn
           title={
             generated
-              ? `Generated as version ${versionOf(generated)} — locked`
+              ? `Generated as version ${versionOf(generated)} - locked`
               : matching
                 ? `New quote, unchanged from version ${versionOf(matching)}`
                 : versions.length
@@ -201,8 +201,8 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
       <div className="form-grid" style={{ marginTop: 16 }}>
         <Field
           className="span-2"
-          label={requote ? "What changed — note to sales" : "Note to sales"}
-          hint={requote ? "required — sales explains it to the customer" : "optional — goes with the notification and into the history"}
+          label={requote ? "What changed - Additional Notes" : "Additional Notes"}
+          hint={requote ? "required - sales explains it to the customer" : "optional - goes with the notification and into the history"}
           htmlFor="handover-note"
         >
           <textarea
@@ -254,7 +254,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
         </p>
       ) : (
         <p className="row-meta" style={{ marginTop: 8 }}>
-          No salesperson is assigned yet — everyone on the job will be notified.
+          No salesperson is assigned yet - everyone on the job will be notified.
         </p>
       )}
     </div>
