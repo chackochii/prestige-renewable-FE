@@ -284,7 +284,7 @@ export default function SiteVisitPage() {
             ))}
         </div>
       );
-    if (field.key === "submittedOn") return <div className="site-form-auto">{formatDate(new Date())} — recorded when you send the form</div>;
+    if (field.key === "submittedOn") return <div className="site-form-auto">{formatDate(new Date())} - recorded when you send the form</div>;
     return null;
   };
 
@@ -348,7 +348,7 @@ export default function SiteVisitPage() {
       window.scrollTo({ top: 0 });
     } catch (err) {
       if (Array.isArray(err?.errors) && err.errors.length) setFieldErrors(Object.fromEntries(err.errors.map((x) => [x.field, x.message])));
-      setError(getErrorMessage(err, "We couldn't send your report. Please try again — your answers are kept on this phone."));
+      setError(getErrorMessage(err, "We couldn't send your report. Please try again - your answers are kept on this phone."));
     } finally {
       setSubmitting(false);
     }
@@ -396,7 +396,7 @@ export default function SiteVisitPage() {
                 <div style={{ color: "var(--success)", marginBottom: 12 }}>
                   <CheckCircle2 size={40} strokeWidth={1.6} />
                 </div>
-                <h1>Thanks — the inspection has been sent.</h1>
+                <h1>Thanks - the inspection has been sent.</h1>
                 <p className="lede">
                   Your findings{photos.length ? ` and ${photos.length} photo${photos.length === 1 ? "" : "s"}` : ""} have gone to the coordinator and the
                   estimation team.
@@ -422,7 +422,7 @@ export default function SiteVisitPage() {
           <h1>{task?.title || "Pre-site inspection"}</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
             {task?.description ||
-              "Record what you find on site — roof, switchboard, cable pathway, access and anything that limits the install — so the estimator can finalise the quote against real site conditions."}
+              "Record what you find on site - roof, switchboard, cable pathway, access and anything that limits the install - so the estimator can finalise the quote against real site conditions."}
           </p>
         </section>
 

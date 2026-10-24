@@ -26,7 +26,7 @@ export default function ApprovalItemForm({ item, onSave, onCancel }) {
   const save = async (event) => {
     event.preventDefault();
     if (form.status === "rejected" && !form.note.trim()) {
-      setError("Say why it was not given — sales relooks at the options from this.");
+      setError("Say why it was not given - sales relooks at the options from this.");
       return;
     }
     setBusy(true);
@@ -70,7 +70,7 @@ export default function ApprovalItemForm({ item, onSave, onCancel }) {
         <Field label="Decided on" hint="optional" htmlFor={`${id}-decided`}>
           <input id={`${id}-decided`} type="date" value={form.decidedAt} onChange={(e) => set("decidedAt", e.target.value)} />
         </Field>
-        <Field className="span-2" label="Note" hint={form.status === "rejected" ? "required — why it was not given" : "optional"} htmlFor={`${id}-note`}>
+        <Field className="span-2" label="Note" hint={form.status === "rejected" ? "required - why it was not given" : "optional"} htmlFor={`${id}-note`}>
           <textarea id={`${id}-note`} rows={2} maxLength={2000} value={form.note} onChange={(e) => set("note", e.target.value)} />
         </Field>
       </div>

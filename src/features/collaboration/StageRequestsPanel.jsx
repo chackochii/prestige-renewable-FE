@@ -116,7 +116,7 @@ export default function StageRequestsPanel({
 
         {openItems.length ? (
           <p className="lede" style={{ marginTop: 10, marginBottom: 0 }}>
-            {openItems.length} still open — this stage is waiting on {openItems.length === 1 ? "it" : "them"}.
+            {openItems.length} still open - this stage is waiting on {openItems.length === 1 ? "it" : "them"}.
           </p>
         ) : null}
       </div>

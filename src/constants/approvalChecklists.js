@@ -54,7 +54,7 @@ export const DWELLING_TYPES = [
 
 export const OCCUPANCY_STATUSES = [
   { value: "owner_occupier", label: "Owner-occupier" },
-  { value: "owner_rented", label: "Owner — rented out" },
+  { value: "owner_rented", label: "Owner - rented out" },
   { value: "tenant", label: "Tenant" },
 ];
 
@@ -71,7 +71,7 @@ export const FINANCE_OPTIONS = [
  */
 const DNSP_STATUSES = [
   { value: "not_started", label: "Not started", track: "not_started" },
-  { value: "submitted", label: "Submitted — with the DNSP", track: "submitted", requires: { items: true, fields: ["reference", "submittedOn"] } },
+  { value: "submitted", label: "Submitted - with the DNSP", track: "submitted", requires: { items: true, fields: ["reference", "submittedOn"] } },
   {
     value: "approved",
     label: "Approved",
@@ -86,20 +86,20 @@ const DA_STATUSES = [
   { value: "not_started", label: "Not started", track: "not_started" },
   {
     value: "lodged",
-    label: "Lodged — with council or certifier",
+    label: "Lodged - with council or certifier",
     track: "submitted",
     requires: { items: true, conditions: { daRequired: true }, fields: ["reference", "submittedOn"] },
   },
   {
     value: "approved",
-    label: "Approved — DA satisfied",
+    label: "Approved - DA satisfied",
     track: "approved",
     done: true,
     requires: { items: true, conditions: { daRequired: true }, fields: ["reference", "submittedOn", "evidence"] },
   },
   {
     value: "exempt",
-    label: "Exempt — no DA or consent needed",
+    label: "Exempt - no DA or consent needed",
     track: "approved",
     done: true,
     requires: { items: true, conditions: { daRequired: false }, fields: ["evidence"] },
@@ -109,7 +109,7 @@ const DA_STATUSES = [
 
 const FINANCE_STATUSES = [
   { value: "not_started", label: "Not started", track: "not_started" },
-  { value: "submitted", label: "Submitted — with the lender", track: "submitted", requires: { items: true, fields: ["reference", "submittedOn"] } },
+  { value: "submitted", label: "Submitted - with the lender", track: "submitted", requires: { items: true, fields: ["reference", "submittedOn"] } },
   {
     value: "approved",
     label: "Approved",
@@ -141,7 +141,7 @@ export const APPROVAL_CHECKLISTS = [
         kind: "text",
         validate: "nmi",
         placeholder: "e.g. 4103123456",
-        note: "New field — not captured earlier in the process.",
+        note: "New field - not captured earlier in the process.",
       },
       {
         key: "customerConfirmed",
@@ -229,7 +229,7 @@ export const APPROVAL_CHECKLISTS = [
         kind: "text",
         onlyIf: "daRequired",
         waitingOn: ["solarNeedsDa", "batteryNeedsDa"],
-        notNeeded: "Not needed — neither the solar nor the battery requires a DA.",
+        notNeeded: "Not needed - neither the solar nor the battery requires a DA.",
         placeholder: "e.g. Complying development certificate through a private certifier",
       },
       {
@@ -255,7 +255,7 @@ export const APPROVAL_CHECKLISTS = [
     // Only when the customer is financing the job; the coordinator can switch it on or off.
     optional: true,
     appliesLabel: "The customer is financing this job",
-    notApplicableText: "No finance on this job — the customer is paying outright, so there is no finance application to make. Tick above if that changes.",
+    notApplicableText: "No finance on this job - the customer is paying outright, so there is no finance application to make. Tick above if that changes.",
     items: [
       {
         key: "contactConfirmed",
@@ -268,7 +268,7 @@ export const APPROVAL_CHECKLISTS = [
         key: "dwelling",
         label: "NMI, dwelling type and occupancy status confirmed",
         kind: "group",
-        note: "The NMI comes from the DNSP application — only dwelling type and occupancy status are new here.",
+        note: "The NMI comes from the DNSP application - only dwelling type and occupancy status are new here.",
         fields: [
           { key: "__nmi", label: "NMI", kind: "auto", source: "nmi" },
           { key: "dwellingType", label: "Dwelling type", kind: "select", options: DWELLING_TYPES },

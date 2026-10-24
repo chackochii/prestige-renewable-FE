@@ -20,18 +20,18 @@ export function toNumber(value) {
 
 export function formatCurrency(value, { withCents = false } = {}) {
   const n = toNumber(value);
-  if (n === null) return "—";
+  if (n === null) return "-";
   return (withCents ? cents : whole).format(n);
 }
 
 export function formatPercent(value, digits = 1) {
   const n = toNumber(value);
-  if (n === null) return "—";
+  if (n === null) return "-";
   return `${n.toFixed(digits)}%`;
 }
 
 export function formatNumber(value) {
   const n = toNumber(value);
-  if (n === null) return "—";
+  if (n === null) return "-";
   return new Intl.NumberFormat("en-AU").format(n);
 }

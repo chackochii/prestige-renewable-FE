@@ -21,7 +21,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, Mail, PhoneCall, RefreshCw, Send, Undo2 } from "lucide-react";
 import Alert from "@/components/Alert";
-import ApprovalGate from "@/components/ApprovalGate";
 import Badge from "@/components/Badge";
 import Card from "@/components/Card";
 import CopyLinkButton from "@/components/CopyLinkButton";
@@ -60,17 +59,17 @@ const GATE_OUTCOME = { accepted: "approved", rejected: "rejected" };
 /** What the gate says while it waits. */
 function waitingText(latest, requote) {
   if (isRequoteOpen(requote))
-    return `With ${requote.estimator?.name || "the estimator"} for a re-quote since ${formatDate(requote.requestedAt)} (round ${requote.round}) — the revised quote comes back here.`;
+    return `With ${requote.estimator?.name || "the estimator"} for a re-quote since ${formatDate(requote.requestedAt)} (round ${requote.round}) - the revised quote comes back here.`;
   if (latest?.status === "re-estimated")
     return requote?.status === "completed"
-      ? `Revised quote back from ${requote.completedBy?.name || "the estimator"} on ${formatDate(requote.completedAt)} — send it to the customer below.`
+      ? `Revised quote back from ${requote.completedBy?.name || "the estimator"} on ${formatDate(requote.completedAt)} - send it to the customer below.`
       : "Sent back for a re-quote.";
-  if (!latest || latest.status === "withdrawn") return "No proposal with the customer yet — send one below.";
-  if (latest.status === "negotiation") return "The customer asked for changes — send the job to the estimator for a re-quote.";
-  if (latest.expired) return `The link expired ${formatDate(latest.expiresAt)} — resend it or send a revised proposal.`;
+  if (!latest || latest.status === "withdrawn") return "No proposal with the customer yet - send one below.";
+  if (latest.status === "negotiation") return "The customer asked for changes - send the job to the estimator for a re-quote.";
+  if (latest.expired) return `The link expired ${formatDate(latest.expiresAt)} - resend it or send a revised proposal.`;
   if (latest.status === "presented")
-    return `Opened ${formatDate(latest.viewedAt, { withTime: true })} (${latest.viewCount} view${latest.viewCount === 1 ? "" : "s"}) — waiting for the customer's answer.`;
-  return `Prepared for ${latest.sentTo} on ${formatDate(latest.sentAt)} — not opened yet.`;
+    return `Opened ${formatDate(latest.viewedAt, { withTime: true })} (${latest.viewCount} view${latest.viewCount === 1 ? "" : "s"}) - waiting for the customer's answer.`;
+  return `Proposal sent to ${latest.sentTo} on ${formatDate(latest.sentAt)} · Not opened yet.`;
 }
 
 // Longer mail links can be cut short by the email app; the copy button is the way round.
@@ -83,7 +82,6 @@ const LONG_MAIL_LINK = 2000;
  */
 function EmailNotice({ prepared, onDownload, onDismiss }) {
   const { proposal, link, mailUrl, gmailUrl, body, fileName, via, opened } = prepared;
-  const where = via === "gmail" ? "Gmail" : "your email app";
   const mailButton = (
     <a key="mail" className={`btn btn-sm ${via === "mail" ? "btn-primary" : "btn-ghost"}`} href={mailUrl} rel="noreferrer">
       <Mail size={14} /> {via === "mail" ? "Open email app again" : "Open in email app"}
@@ -98,23 +96,20 @@ function EmailNotice({ prepared, onDownload, onDismiss }) {
     <Alert tone={opened ? "success" : "warning"} style={{ marginBottom: 14 }}>
       {opened ? (
         <>
-          <strong>
-            {via === "gmail" ? "Gmail is open" : "Your email app is opening"} with the proposal for {proposal.sentTo}.
-          </strong>{" "}
+          {via === "gmail" ? "Gmail is open." : "Your email app is opening."} Attach <strong>{fileName || "the proposal PDF"}</strong> (just
+          downloaded) and press Send. You’ll be notified when the customer opens and responds.{" "}
+          {via === "mail" ? <em>Didn’t open? Try Gmail or copy the text.</em> : null}
         </>
       ) : (
         // The browser's pop-up blocker stopped the tab. The email is ready; a
         // click on the link below always opens, because it is a plain link.
         <div style={{ marginBottom: 8 }}>
-          <strong>Your browser blocked the Gmail tab, so it did not open.</strong> The email to {proposal.sentTo} is ready — click{" "}
+          <strong>Your browser blocked the Gmail tab, so it did not open.</strong> The email to {proposal.sentTo} is ready. Click{" "}
           <strong>Open Gmail</strong> below. To have it open by itself next time, allow pop-ups for this site: click the blocked pop-up icon at the
           right end of the address bar and choose “Always allow”.
         </div>
       )}
-      Attach the PDF that just downloaded{fileName ? ` (${fileName})` : ""} — email links cannot attach files — then press Send in {where}. You will be
-      notified when the customer opens it and when they answer.
-      {via === "mail" ? " Nothing opened? Use Open in Gmail, or copy the email text into any email." : ""}
-      {mailUrl.length > LONG_MAIL_LINK ? " The message is long, so some email apps cut it short — check it all arrived, or paste the copied email text." : ""}
+      {mailUrl.length > LONG_MAIL_LINK ? " The message is long, so some email apps cut it short. Check it all arrived, or paste the copied email text." : ""}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
         {via === "gmail" ? [gmailButton, mailButton] : [mailButton, gmailButton]}
         <button type="button" className="btn btn-ghost btn-sm" onClick={onDownload}>
@@ -130,9 +125,6 @@ function EmailNotice({ prepared, onDownload, onDismiss }) {
           {link}
         </code>
         <CopyLinkButton value={link} />
-      </div>
-      <div className="row-meta" style={{ marginTop: 6, whiteSpace: "normal" }}>
-        This link is only shown now. To get a new one later, use “Resend with a new link”.
       </div>
     </Alert>
   );
@@ -292,7 +284,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
         ) : null}
         {revisedReady ? (
           <Alert tone="success" style={{ marginTop: 14 }}>
-            <strong>Revised quote ready</strong> — {requote.completedBy?.name || "the estimator"} handed it back on{" "}
+            <strong>Revised quote ready</strong> - {requote.completedBy?.name || "the estimator"} handed it back on{" "}
             {formatDate(requote.completedAt, { withTime: true })}. Send it to the customer below; the newest version is preselected.
             <div style={{ marginTop: 10 }}>
               <RequoteSummary requote={requote} timeZone={unit?.timezone} />
@@ -378,23 +370,13 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
           </div>
         ) : null}
 
-        {/* Where the job went — or is waiting to go — sits with the record of
-            what was sent, just above it. */}
-        <div style={{ marginTop: 18 }}>
-          <ApprovalGate
-            question="Customer accepted the proposal?"
-            outcome={GATE_OUTCOME[latest?.status] ?? "pending"}
-            yes={{ title: "Approvals", detail: "The job moves on as soon as the customer accepts" }}
-            no={{
-              title: latest?.status === "rejected" ? "Declined by the customer" : "Changes wanted or declined",
-              detail:
-                latest?.status === "rejected"
-                  ? latest.responseNote || "Send it for a re-quote, send a revised proposal, or mark the job lost"
-                  : "Back to the estimator for a re-quote, then a revised proposal",
-            }}
-            waiting={waitingText(latest, requote)}
-          />
-        </div>
+        {/* While the customer has not answered, one line says where it stands;
+            an answer and its note show on the proposal it was given to, below. */}
+        {(GATE_OUTCOME[latest?.status] ?? "pending") === "pending" ? (
+          <p className="row-meta" style={{ marginTop: 18, whiteSpace: "normal" }}>
+            {waitingText(latest, requote)}
+          </p>
+        ) : null}
 
         <div style={{ marginTop: 18 }}>
           <SectionHead icon={<Send size={13} />} title="Proposals sent" />
@@ -436,7 +418,7 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
       title={`${opportunity.number} · ${opportunity.customer ?? ""}`}
       icon={<Send size={16} />}
       sub={[opportunity.customerEmail, opportunity.salesperson?.name ? `${opportunity.salesperson.name} (sales)` : null].filter(Boolean).join(" · ")}
-      actions={<Badge tone={requoteOpen ? "warning" : status.tone}>{requoteOpen ? "With the estimator — re-quote" : status.label}</Badge>}
+      actions={<Badge tone={requoteOpen ? "warning" : status.tone}>{requoteOpen ? "With the estimator - re-quote" : status.label}</Badge>}
     >
       {body}
     </Card>

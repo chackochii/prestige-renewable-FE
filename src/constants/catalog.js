@@ -2,7 +2,7 @@
 // (items, brands, unit prices) comes from the API — see slices/catalogSlice.js —
 // not from here.
 
-export const PROJECT_TYPES = ["Solar", "Battery", "Solar + Battery", "Other"];
+export const PROJECT_TYPES = ["Solar", "Battery", "Solar + Battery", "EV", "Other"];
 
 // Additional costs add to the quote; rebates and discounts take money off it.
 // Each has its own section in the quote builder, and a cost line's `kind`

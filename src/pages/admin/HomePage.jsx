@@ -34,6 +34,21 @@ const TONE_COLOR = { success: "var(--brand)", warning: "var(--warning)", danger:
 
 const owners = (o) => [o.leadOwnerId, o.estimatorId, o.salespersonId, o.deliveryOwnerId].filter(Boolean);
 
+// One colour per stage for the activity chips (see .stage-chip).
+const STAGE_CHIP_COLORS = {
+  1: "#2563eb",
+  2: "#7c3aed",
+  3: "#0d9488",
+  4: "#0891b2",
+  5: "#d97706",
+  6: "#db2777",
+  7: "#65a30d",
+  8: "#0284c7",
+  9: "#9333ea",
+  10: "#475569",
+  11: "#475569",
+};
+
 export default function HomePage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -123,7 +138,7 @@ export default function HomePage() {
           oppId: o.id,
           tone: "success",
           title: oppTitle(o),
-          meta: "Potential client — ready for estimation team inputs",
+          meta: "Potential client - ready for estimation team inputs",
           cta: o.estimatorId ? "Advance to estimation" : "Assign an estimator",
         })),
     ].slice(0, 6);
@@ -148,8 +163,8 @@ export default function HomePage() {
   return (
     <>
       <PageHeader
-        title={`Good day, ${firstName(user.name)}`}
-        description={`A quiet view of ${unit?.name}: what is live, what is yours, and what is late.`}
+        title={`Good Day, ${firstName(user.name)}`}
+        description={`Here’s what’s happening at ${unit?.name} today.`}
         actions={
           hasPermission(PERMISSIONS.LEADS_CREATE) ? (
             <Link className="btn btn-primary" to="/leads/new">
@@ -215,7 +230,7 @@ export default function HomePage() {
             </div>
             <div className="hero-chip">
               <div className="hc-label">
-                <span className="dot" style={{ background: "#c4b5fd" }} /> Leads to qualify
+                <span className="dot" style={{ background: "#c4b5fd" }} /> Leads to Qualify
               </div>
               <div className="hc-value">{data.leads.length}</div>
             </div>
@@ -226,12 +241,12 @@ export default function HomePage() {
       <div className="stats">
         <StatCard
           icon={<Briefcase size={17} />}
-          label="Leads to qualify"
+          label="Leads to Qualify"
           value={data.leads.length}
           hint={canReadLeads ? <Link to="/leads">Open leads</Link> : "In this unit"}
           style={{ "--i": 0 }}
         />
-        <StatCard icon={<UserCheck size={17} />} label="My work" value={data.mine.length} hint="Assigned to you right now" style={{ "--i": 1 }} />
+        <StatCard icon={<UserCheck size={17} />} label="My Work" value={data.mine.length} hint="Assigned to you right now" style={{ "--i": 1 }} />
         <StatCard
           icon={<TriangleAlert size={17} />}
           label="Past SLA"
@@ -241,7 +256,7 @@ export default function HomePage() {
         />
         <StatCard
           icon={<CircleDollarSign size={17} />}
-          label="Closed value"
+          label="Closed Value"
           value={formatCurrency(data.closedValue)}
           hint={`${data.closed.length} job${data.closed.length === 1 ? "" : "s"}, ${periodLabel}`}
           style={{ "--i": 3 }}
@@ -250,7 +265,7 @@ export default function HomePage() {
 
       <div className="grid-2">
         <div>
-          <Card title="Pipeline by stage" sub="Active records per stage — open the pipeline for the full board.">
+          <Card title="Pipeline by Stage" sub="Active records per stage. Open the Jobs Board for the full view.">
             <div className="stage-list">
               {data.byStage.map((s, i) => (
                 <button
@@ -271,13 +286,36 @@ export default function HomePage() {
             </div>
           </Card>
 
+          <Card title="My Queue" sub="Items you own, with SLA status." style={{ marginTop: 20 }}>
+            {data.mine.length === 0 ? (
+              <p className="lede">Nothing assigned to you in this unit.</p>
+            ) : (
+              <div className="list-stack">
+                {data.mine.slice(0, 5).map((o) => {
+                  const sla = slaStatus(o.slaDueAt);
+                  return (
+                    <button key={o.id} type="button" className="list-row" onClick={() => navigate(`/opportunities/${o.id}`)}>
+                      <div>
+                        <div className="row-title">{oppTitle(o)}</div>
+                        <div className="row-meta">
+                          {o.number} · {stageById(o.stage).label}
+                        </div>
+                      </div>
+                      <span className={`badge ${sla.tone}`}>{sla.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
           {data.team.length ? (
-            <Card title="Team performance" sub={`${data.team.length} rep${data.team.length === 1 ? "" : "s"} · sorted by open pipeline`} style={{ marginTop: 20 }}>
+            <Card title="Team Performance" sub={`${data.team.length} Member${data.team.length === 1 ? "" : "s"}. Sorted by Open Pipeline`} style={{ marginTop: 20 }}>
               <div className="table-wrap">
-                <table className="table clickable stack">
+                <table className="table stack">
                   <thead>
                     <tr>
-                      <th>Rep</th>
+                      <th>Sales Team Member</th>
                       <th>Pipeline</th>
                       <th>Closed</th>
                       <th>Win rate</th>
@@ -286,8 +324,8 @@ export default function HomePage() {
                   </thead>
                   <tbody>
                     {data.team.map((r) => (
-                      <tr key={r.id} onClick={() => navigate("/pipeline")}>
-                        <td data-label="Rep">
+                      <tr key={r.id}>
+                        <td data-label="Sales Team Member">
                           <div className="cell-with-avatar">
                             <Avatar name={r.name} size={30} />
                             <span className="row-title">{r.name}</span>
@@ -307,7 +345,7 @@ export default function HomePage() {
                             </div>
                           )}
                         </td>
-                        <td data-label="Avg deal">{r.avgDeal ? formatCurrency(r.avgDeal) : "—"}</td>
+                        <td data-label="Avg deal">{r.avgDeal ? formatCurrency(r.avgDeal) : "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -316,35 +354,38 @@ export default function HomePage() {
             </Card>
           ) : null}
 
-          <Card title="Latest activity" sub="Most recently updated records in this unit." style={{ marginTop: 20 }}>
-            {data.activity.length === 0 ? (
-              <p className="lede">No activity recorded yet.</p>
+          <WaitingFor groups={data.waiting} total={waitingForCount(data.waiting)} timeZone={unit?.timezone} />
+
+          <Card
+            title="Needs Attention"
+            sub="Ranked by urgency: SLA breaches, overdue next actions and potential clients awaiting handoff."
+            style={{ marginTop: 20 }}
+          >
+            {data.attention.length === 0 ? (
+              <p className="lede">Nothing needs attention right now.</p>
             ) : (
-              <div className="activity-feed">
-                {data.activity.map((o) => (
-                  <div key={o.id} className="activity-row">
-                    <span className="activity-icon">
-                      <History size={15} />
-                    </span>
-                    <div>
-                      <div className="activity-text">
-                        <b>{userName(o.salespersonId || o.leadOwnerId) || "Someone"}</b> updated{" "}
-                        <Link to={`/opportunities/${o.id}`}>
-                          <b>{oppTitle(o)}</b>
-                        </Link>{" "}
-                        — {stageById(o.stage).label}
-                      </div>
-                      <div className="activity-time">{timeAgo(o.updatedAt)}</div>
+              <div className="attn-list">
+                {data.attention.map((a) => (
+                  <button key={a.id} type="button" className="attn-row" onClick={() => navigate(`/opportunities/${a.oppId}`)}>
+                    <div className="attn-row-top">
+                      <span className="attn-title">
+                        <span className="attn-dot" style={{ background: TONE_COLOR[a.tone] }} />
+                        {a.title}
+                      </span>
+                      <Target size={13} style={{ color: "var(--muted)" }} />
                     </div>
-                  </div>
+                    <div className="attn-meta">{a.meta}</div>
+                    <div className="attn-cta">{a.cta} →</div>
+                  </button>
                 ))}
               </div>
             )}
           </Card>
+
         </div>
 
         <div>
-          <Card title="Pipeline health" sub="Active opportunities by SLA status.">
+          <Card title="Pipeline Health" sub="Active opportunities by SLA status.">
             {data.pipeline.length === 0 ? (
               <p className="lede">No qualified opportunities in the pipeline yet.</p>
             ) : (
@@ -373,63 +414,36 @@ export default function HomePage() {
             )}
           </Card>
 
-          <WaitingFor
-            groups={data.waiting}
-            total={waitingForCount(data.waiting)}
-            timeZone={unit?.timezone}
-          />
-
-          <Card
-            title="Needs attention"
-            sub="Ranked by urgency — SLA breaches, overdue next actions and potential clients awaiting handoff."
-            style={{ marginTop: 20 }}
-          >
-            {data.attention.length === 0 ? (
-              <p className="lede">Nothing needs attention right now.</p>
+          <Card title="Latest Activity" sub="Most recently updated records in this unit." style={{ marginTop: 20 }}>
+            {data.activity.length === 0 ? (
+              <p className="lede">No activity recorded yet.</p>
             ) : (
-              <div className="attn-list">
-                {data.attention.map((a) => (
-                  <button key={a.id} type="button" className="attn-row" onClick={() => navigate(`/opportunities/${a.oppId}`)}>
-                    <div className="attn-row-top">
-                      <span className="attn-title">
-                        <span className="attn-dot" style={{ background: TONE_COLOR[a.tone] }} />
-                        {a.title}
-                      </span>
-                      <Target size={13} style={{ color: "var(--muted)" }} />
+              <div className="activity-feed">
+                {data.activity.map((o) => (
+                  <div key={o.id} className="activity-row">
+                    <span className="activity-icon">
+                      <History size={15} />
+                    </span>
+                    <div>
+                      <div className="activity-text">
+                        <b>{userName(o.salespersonId || o.leadOwnerId) || "Someone"}</b> updated{" "}
+                        <Link to={`/opportunities/${o.id}`}>
+                          <b>{oppTitle(o)}</b>
+                        </Link>{" "}
+                        {/* The stage the update happened at, as a small chip in that stage's colour. */}
+                        <span className="stage-chip" style={{ "--chip": STAGE_CHIP_COLORS[o.stage] ?? "#64748b" }}>
+                          {stageById(o.stage).label}
+                        </span>
+                      </div>
+                      <div className="activity-time">{timeAgo(o.updatedAt)}</div>
                     </div>
-                    <div className="attn-meta">{a.meta}</div>
-                    <div className="attn-cta">{a.cta} →</div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
           </Card>
-
-          <Card title="My queue" sub="Items you own, with SLA status." style={{ marginTop: 20 }}>
-            {data.mine.length === 0 ? (
-              <p className="lede">Nothing assigned to you in this unit.</p>
-            ) : (
-              <div className="list-stack">
-                {data.mine.slice(0, 5).map((o) => {
-                  const sla = slaStatus(o.slaDueAt);
-                  return (
-                    <button key={o.id} type="button" className="list-row" onClick={() => navigate(`/opportunities/${o.id}`)}>
-                      <div>
-                        <div className="row-title">{oppTitle(o)}</div>
-                        <div className="row-meta">
-                          {o.number} · {stageById(o.stage).label}
-                        </div>
-                      </div>
-                      <span className={`badge ${sla.tone}`}>{sla.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-
           {users.length === 0 && ready ? (
-            <Card title="Your team" sub="Nobody else is assigned to this unit yet." style={{ marginTop: 20 }}>
+            <Card title="Your Team" sub="Nobody else is assigned to this unit yet." style={{ marginTop: 20 }}>
               <p className="lede" style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <Bell size={14} /> Add people in Administration to start assigning work.
               </p>

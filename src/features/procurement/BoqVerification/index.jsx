@@ -76,7 +76,7 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
         </Alert>
       ) : (Array.isArray(job?.boq) ? job.boq : []).length === 0 ? (
         <Alert tone="warning">
-          No BOQ lines on this job — the accepted quote had no items, or none was accepted. Add the lines the site needs below.
+          No BOQ lines on this job - the accepted quote had no items, or none was accepted. Add the lines the site needs below.
         </Alert>
       ) : (
         <Alert tone="warning">
@@ -88,7 +88,7 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
 
       {latest ? (
         <div style={{ marginTop: 20 }}>
-          <SectionHead icon={<History size={13} />} title={`Round ${round} of ${round} — revised ${formatDate(latest.at)} by ${latest.by}`} />
+          <SectionHead icon={<History size={13} />} title={`Round ${round} of ${round} - revised ${formatDate(latest.at)} by ${latest.by}`} />
           <p className="lede" style={{ fontSize: 14, marginBottom: 10 }}>
             {latest.reason}
           </p>
@@ -134,7 +134,7 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
               </Field>
               <div className="decision-actions" style={{ marginTop: 12, display: "flex", gap: 8 }}>
                 <button type="button" className="btn btn-primary btn-sm" onClick={revise} disabled={busy || !reason.trim()}>
-                  Revise — {wouldDiffer.map((line) => `${line.item} ${formatNumber(line.proposalQty)} → ${formatNumber(line.siteQty)}`).join(", ")}
+                  Revise - {wouldDiffer.map((line) => `${line.item} ${formatNumber(line.proposalQty)} → ${formatNumber(line.siteQty)}`).join(", ")}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setRevising(false)} disabled={busy}>
                   Cancel
@@ -147,7 +147,7 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
             <div className="decision-card" style={{ marginTop: 12 }}>
               <SectionHead
                 icon={adding === "service" ? <Wrench size={13} /> : <ClipboardCheck size={13} />}
-                title={adding === "service" ? "New BOS item — a service found on site" : "New BOQ item — a material found on site"}
+                title={adding === "service" ? "New BOS item - a service found on site" : "New BOQ item - a material found on site"}
               />
               <div className="form-grid">
                 <Field label={adding === "service" ? "Service" : "Item"} required>

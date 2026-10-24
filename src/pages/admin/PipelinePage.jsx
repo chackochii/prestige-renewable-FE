@@ -135,7 +135,7 @@ export default function PipelinePage() {
       await dispatch(advanceStage(dragging.id)).unwrap();
       notify(`${oppTitle(dragging)} moved to ${stageById(stageId).label}`);
     } catch (err) {
-      notify(`Can't move yet — ${typeof err === "string" ? err : err?.message}`, "danger");
+      notify(`Can't move yet - ${typeof err === "string" ? err : err?.message}`, "danger");
     }
   };
 
@@ -157,12 +157,12 @@ export default function PipelinePage() {
   return (
     <>
       <PageHeader
-        title="Pipeline"
+        title="Jobs Board"
         description={
           ready
             ? `${total} opportunit${total === 1 ? "y" : "ies"}.${
                 view === "board" && movableStages.length
-                  ? ` Drag a card to move it into the next stage — you can move ${movableStages.map((s) => s.short).join(", ")}.`
+                  ? ` Drag a card to move it into the next stage - you can move ${movableStages.map((s) => s.short).join(", ")}.`
                   : ""
               }`
             : "Loading the pipeline…"
@@ -320,11 +320,11 @@ export default function PipelinePage() {
                             {badge.label}
                           </Badge>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
-                      <td data-label="Owner">{userName(o.salespersonId || o.leadOwnerId) || "—"}</td>
-                      <td data-label="Created by">{userName(createdById(o)) || "—"}</td>
+                      <td data-label="Owner">{userName(o.salespersonId || o.leadOwnerId) || "-"}</td>
+                      <td data-label="Created by">{userName(createdById(o)) || "-"}</td>
                       <td data-label="SLA">
                         <Badge tone={sla.tone}>{sla.label}</Badge>
                       </td>

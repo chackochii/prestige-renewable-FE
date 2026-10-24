@@ -100,8 +100,8 @@ function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onC
 
   const selectItem = (key) => {
     const item = findCatalogItem(catalogItems, key);
-    const brand = item?.brands?.[0];
-    setForm((f) => ({ ...f, itemKey: key, unit: item?.unit || "", brand: brand?.name || "", unitPrice: brand?.unitPrice ?? "" }));
+    // No brand picked for them: the brand (and its price) is the estimator's choice.
+    setForm((f) => ({ ...f, itemKey: key, unit: item?.unit || "", brand: "", unitPrice: "" }));
   };
 
   const selectBrand = (name) => {
@@ -182,17 +182,9 @@ function ItemModal({ initial, catalogItems: catalog, catalogLoading, onSave, onC
         <Field label="Quantity">
           <NumberInput value={form.quantity} min={0} onChange={(v) => setForm((f) => ({ ...f, quantity: v }))} />
         </Field>
-        <Field label="Unit" hint="unit of measure — from the item, editable">
-          <input
-            type="text"
-            value={form.unit}
-            maxLength={30}
-            placeholder="e.g. panel, unit, m, hr"
-            onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-          />
-        </Field>
-        <Field label="Unit price" hint="auto from item + brand, editable">
-          <NumberInput value={form.unitPrice} min={0} onChange={(v) => setForm((f) => ({ ...f, unitPrice: v }))} />
+        <Field label="Unit Price">
+          {/* Comes from the item and brand picked; not typed over. */}
+          <NumberInput value={form.unitPrice} min={0} disabled onChange={() => {}} />
         </Field>
         <Field label="Discount %">
           <NumberInput value={form.discountPct} min={0} max={100} onChange={(v) => setForm((f) => ({ ...f, discountPct: v }))} />
@@ -249,11 +241,6 @@ function QuotePreviewModal({ opp, quote, unit, source, title, actions, onClose }
   );
 }
 
-const TAX_TREATMENT_HINT = {
-  exclusive: "Prices below are GST-exclusive — GST is added on top.",
-  inclusive: "Prices below are GST-inclusive — GST is already included in the total.",
-  no_gst: "No GST applies to this quote.",
-};
 
 export default function QuoteBuilder({ opp, unit, canEdit }) {
   const dispatch = useAppDispatch();
@@ -361,7 +348,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       <div className="section" style={{ marginTop: 20 }}>
         <SectionHead icon={<FileSpreadsheet size={13} />} title="Quote" />
         <p className="lede" style={{ marginBottom: 12 }}>
-          Estimation is ready — create a quote to start pricing this job.
+          Estimation is ready - create a quote to start pricing this job.
         </p>
         {editable ? (
           <button type="button" className="btn btn-primary btn-sm" onClick={createQuote} disabled={creating}>
@@ -431,7 +418,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         dispatch(
           addQuoteCost({
             id: opp.id,
-            body: { kind, costType: COST_KINDS[kind].types[0], calcType: "fixed", value: 0, description: "" },
+            body: { kind, costType: "", calcType: "fixed", value: 0, description: "" },
           }),
         ),
       ).unwrap();
@@ -495,7 +482,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         ...costEdits.map(([costId, patch]) => patchCostField(costId, patch).unwrap()),
       ]);
       setSavedAt(new Date());
-      notify(hadEdits ? "Draft saved" : "Draft saved — everything is already on the record");
+      notify(hadEdits ? "Draft saved" : "Draft saved - everything is already on the record");
     } catch (err) {
       notifyError(errText(err, "Could not save the draft."));
     } finally {
@@ -509,7 +496,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       className={`btn btn-sm ${dirty ? "btn-primary" : "btn-ghost"}`}
       onClick={saveDraft}
       disabled={savingDraft}
-      title={dirty ? "Save what you have typed" : "Everything is saved — save again anyway"}
+      title={dirty ? "Save what you have typed" : "Everything is saved - save again anyway"}
     >
       <Save size={14} /> {savingDraft ? "Saving…" : "Save draft"}
     </button>
@@ -554,7 +541,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                   const draft = { value: cost.value, description: cost.description, ...costDrafts[cost.id] };
                   // "Other": a type outside the list is a name the estimator typed.
                   const otherType = meta.otherType;
-                  const isOther = Boolean(otherType) && (cost.costType === otherType || !meta.types.includes(cost.costType));
+                  const isOther = Boolean(otherType) && Boolean(cost.costType) && (cost.costType === otherType || !meta.types.includes(cost.costType));
                   const otherName = draft.otherName ?? (cost.costType === otherType ? "" : cost.costType);
                   return (
                     <tr key={cost.id}>
@@ -568,6 +555,9 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                                 patchCostField(cost.id, { costType: e.target.value });
                               }}
                             >
+                              <option value="" disabled>
+                                Select from options
+                              </option>
                               {(otherType ? meta.types : [...new Set([...meta.types, cost.costType].filter(Boolean))]).map((t) => (
                                 <option key={t} value={t}>
                                   {t === otherType ? "Other" : t}
@@ -636,7 +626,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
                             onBlur={() => blurCostField(cost, "description")}
                           />
                         ) : (
-                          cost.description || "—"
+                          cost.description || "-"
                         )}
                       </td>
                       {editable ? (
@@ -692,8 +682,8 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         }),
       ).unwrap();
       const number = versionOf(generated) ?? nextVersion;
-      if (savedMatch) notify(`New quote cancelled — ${quote.quoteNumber} stays at version ${number}`, "info");
-      else notify(`Version ${number} generated — the quote is now locked`);
+      if (savedMatch) notify(`New quote cancelled - ${quote.quoteNumber} stays at version ${number}`, "info");
+      else notify(`Version ${number} generated - the quote is now locked`);
     } catch (err) {
       notifyError(errText(err, "Could not generate the quote."));
     } finally {
@@ -706,7 +696,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     setStartingDraft(true);
     try {
       await dispatch(startQuoteDraft(opp.id)).unwrap();
-      notify(`New quote started from version ${latestVersion} — edit it, then generate it as version ${latestVersion + 1}`, "info");
+      notify(`New quote started from version ${latestVersion} - edit it, then generate it as version ${latestVersion + 1}`, "info");
     } catch (err) {
       notifyError(errText(err, "Could not start a new quote."));
     } finally {
@@ -730,7 +720,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
               <span>
                 <strong>Generated as version {versionOf(generatedVersion) ?? latestVersion}</strong>
                 {generatedVersion?.createdAt ? ` on ${formatDate(generatedVersion.createdAt, { withTime: true })}` : ""}
-                {generatedVersion?.createdByName ? ` by ${generatedVersion.createdByName}` : ""} — this quote is locked and cannot be edited.
+                {generatedVersion?.createdByName ? ` by ${generatedVersion.createdByName}` : ""} - this quote is locked and cannot be edited.
                 {canEdit ? " To change anything, create a new quote: it starts from this one." : ""}
               </span>
             </span>
@@ -747,7 +737,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             <Badge tone="warning">Draft</Badge>
             <span>
               {versions.length ? `New quote from version ${latestVersion}. ` : ""}
-              Save the draft as you go — generate it when it is final to lock it as version {nextVersion}.
+              Save the draft as you go - generate it when it is final to lock it as version {nextVersion}.
             </span>
           </p>
           {editable ? (
@@ -767,7 +757,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           <input type="text" value={quote.customer} disabled />
         </Field>
         <Field label="Estimator">
-          <input type="text" value={quote.estimatorName || "—"} disabled />
+          <input type="text" value={quote.estimatorName || "-"} disabled />
         </Field>
         <Field label="Project" className="span-2">
           <input
@@ -780,7 +770,8 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           />
         </Field>
         <Field label="Project type">
-          <select value={quote.projectType} disabled={!editable} onChange={(e) => patchHeaderField("projectType", e.target.value)}>
+          <select value={quote.projectType || ""} disabled={!editable} onChange={(e) => patchHeaderField("projectType", e.target.value)}>
+            <option value="">Select from options</option>
             {PROJECT_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -817,7 +808,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       ) : null}
       {catalogStatus === "failed" ? (
         <Alert tone="danger" style={{ marginBottom: 12 }}>
-          Could not load the product catalog — try again shortly.
+          Could not load the product catalog - try again shortly.
         </Alert>
       ) : null}
 
@@ -869,46 +860,8 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           </table>
         </div>
       ) : (
-        <p className="lede">No items yet — add the first line item.</p>
+        <p className="lede">No items yet - add the first line item.</p>
       )}
-
-      {/* Asked once there is something to apply it to: the treatment decides how
-          the prices on the lines above are read, so it has no meaning on an
-          empty quote. */}
-      {quote.items.length ? (
-        <div style={{ marginTop: 24 }}>
-          <SectionHead icon={<Receipt size={13} />} title="Tax treatment" />
-          <p className="lede" style={{ marginBottom: 12 }}>
-            How the prices on the lines above are read.
-          </p>
-          <div className="form-grid" style={{ marginBottom: 8 }}>
-            <Field label="Tax treatment">
-              <select
-                value={quote.taxTreatment}
-                disabled={!editable}
-                onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
-              >
-                {TAX_TREATMENTS.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="GST rate">
-              <NumberInput
-                value={gstRateDraft}
-                min={0}
-                max={100}
-                disabled={!editable || quote.taxTreatment === "no_gst"}
-                onChange={setGstRateDraft}
-                onBlur={blurGstRate}
-              />
-            </Field>
-          </div>
-          <Badge tone="neutral">{TAX_TREATMENT_HINT[quote.taxTreatment]}</Badge>
-        </div>
-      ) : null}
 
       {costSection({
         kind: "cost",
@@ -932,6 +885,45 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         emptyText: "No discounts yet.",
         hint: "Entered as positive values and taken off the quote before GST.",
       })}
+
+      {/* Asked once there is something to apply it to: the treatment decides how
+          the prices on the quote are read, so it has no meaning on an
+          empty quote. */}
+      {quote.items.length ? (
+        <div style={{ marginTop: 24 }}>
+          <SectionHead icon={<Receipt size={13} />} title="Tax treatment" />
+          <p className="lede" style={{ marginBottom: 12 }}>
+            Choose whether the line prices above include or exclude GST.
+          </p>
+          <div className="form-grid" style={{ marginBottom: 8 }}>
+            <Field label="Tax treatment">
+              <select
+                value={quote.taxTreatment}
+                disabled={!editable}
+                onChange={(e) => patchHeaderField("taxTreatment", e.target.value)}
+              >
+                {/* No GST is not offered; a quote saved with it still shows it. */}
+                {TAX_TREATMENTS.filter((t) => t.key !== "no_gst" || quote.taxTreatment === "no_gst").map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="GST rate">
+              <NumberInput
+                value={gstRateDraft}
+                min={0}
+                max={100}
+                // The standard rate: not edited on a quote.
+                disabled
+                onChange={setGstRateDraft}
+                onBlur={blurGstRate}
+              />
+            </Field>
+          </div>
+        </div>
+      ) : null}
 
       <div className="list-stack" style={{ marginTop: 20, maxWidth: 320, marginLeft: "auto" }}>
         <div className="list-row">
@@ -1015,7 +1007,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             className="btn btn-ghost btn-sm"
             onClick={handleGenerate}
             disabled={savingVersion}
-            title={`Nothing has changed — lock the quote back onto version ${latestVersion}`}
+            title={`Nothing has changed - lock the quote back onto version ${latestVersion}`}
           >
             <Undo2 size={14} /> Cancel new quote
           </button>
@@ -1032,7 +1024,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
               <span className="row-title">{versionLabel(latest)}</span>
               <span className="row-meta">
                 {formatCurrency(latest.grandTotal ?? latest.snapshot?.grandTotal, { withCents: true })} ·{" "}
-                {locked ? "generated — locked" : savedMatch ? "unchanged in the new quote" : "the new quote has changed"}
+                {locked ? "generated - locked" : savedMatch ? "unchanged in the new quote" : "the new quote has changed"}
               </span>
             </span>
             <button
@@ -1068,7 +1060,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       {!versions.length && versionsStatus !== "loading" ? (
         <p className="lede" style={{ marginTop: 10 }}>
           {quote.items.length
-            ? "Generate the quote to get the PDF — preview and download come from a generated version, and generating locks the quote."
+            ? "Generate the quote to get the PDF - preview and download come from a generated version, and generating locks the quote."
             : "Add the items, then generate the quote to get the PDF."}
         </p>
       ) : null}

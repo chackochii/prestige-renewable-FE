@@ -68,4 +68,4 @@ export const APPROVAL_RULES = [
 ];
 
 /** Integrations the chart calls for, and where they stand. */
-export const INTEGRATIONS = [{ key: "green_deal", label: "Green Deal", status: "Planned — job creation is manual until the integration is connected" }];
+export const INTEGRATIONS = [{ key: "green_deal", label: "Green Deal", status: "Planned - job creation is manual until the integration is connected" }];

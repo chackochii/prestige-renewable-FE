@@ -20,9 +20,9 @@ export function setDisplayTimeZone(timeZone) {
 export const displayTimeZone = () => displayZone;
 
 export function formatDate(value, { withTime = false, timeZone } = {}) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   // A calendar day with no clock time ("2026-10-07", or the UTC midnight it is
   // stored as — see hasClockTime) is that day wherever it is read: shown in
   // UTC so no zone moves it, and never given a made-up time.
@@ -40,7 +40,7 @@ export function formatDate(value, { withTime = false, timeZone } = {}) {
 }
 
 export function timeAgo(value) {
-  if (!value) return "—";
+  if (!value) return "-";
   const diffMs = Date.now() - new Date(value).getTime();
   const minutes = Math.round(diffMs / 60000);
   if (minutes < 1) return "just now";

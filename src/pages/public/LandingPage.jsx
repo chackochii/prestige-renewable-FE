@@ -36,7 +36,7 @@ const FEATURES = [
   {
     icon: ClipboardCheck,
     title: "Lead capture & qualification",
-    desc: "Every enquiry — campaign, referrer, inbound or repeat — logged, assigned and qualified with a full audit trail.",
+    desc: "Every enquiry - campaign, referrer, inbound or repeat - logged, assigned and qualified with a full audit trail.",
   },
   {
     icon: Gauge,
@@ -76,7 +76,7 @@ const FEATURES = [
   {
     icon: Bell,
     title: "SLA-aware notifications",
-    desc: "Every stage carries a response-time target — overdue items surface automatically, to the right person.",
+    desc: "Every stage carries a response-time target - overdue items surface automatically, to the right person.",
   },
 ];
 
@@ -140,11 +140,11 @@ export default function LandingPage() {
             <Sparkles size={13} /> Lead to service, in one platform
           </span>
           <h1>
-            From first enquiry to final <em>commission</em> — one system, every stage.
+            From first enquiry to final <em>commission</em> - one system, every stage.
           </h1>
           <p>
-            Prestige runs the entire delivery lifecycle — leads, estimation, approvals, procurement, construction,
-            billing and warranty — so nothing gets lost between a WhatsApp message and a signed-off job.
+            Prestige runs the entire delivery lifecycle - leads, estimation, approvals, procurement, construction,
+            billing and warranty - so nothing gets lost between a WhatsApp message and a signed-off job.
           </p>
           <div className="landing-cta-row">
             <Link className="btn btn-primary" to="/login">
@@ -175,7 +175,7 @@ export default function LandingPage() {
           <div className="landing-section-head">
             <span className="landing-eyebrow">Platform</span>
             <h2>Every module your team already needs</h2>
-            <p>Built around the actual way a job moves — not a generic pipeline bolted on afterwards.</p>
+            <p>Built around the actual way a job moves - not a generic pipeline bolted on afterwards.</p>
           </div>
         </Reveal>
         <div className="landing-features">
@@ -198,7 +198,7 @@ export default function LandingPage() {
           <div className="landing-section-head">
             <span className="landing-eyebrow">Process</span>
             <h2>The whole company process, mapped</h2>
-            <p>From the first marketing touch to the day defects liability closes out — one record, start to finish.</p>
+            <p>From the first marketing touch to the day defects liability closes out - one record, start to finish.</p>
           </div>
         </Reveal>
         <div className="landing-timeline">
@@ -219,7 +219,7 @@ export default function LandingPage() {
       <Reveal>
         <div className="landing-cta-banner">
           <h2>Ready to see your pipeline like this?</h2>
-          <p>Sign in with your team credentials — every lead, quote and job you already have is waiting.</p>
+          <p>Sign in with your team credentials - every lead, quote and job you already have is waiting.</p>
           <Link className="btn btn-primary" to="/login">
             Sign in <ArrowRight size={16} />
           </Link>

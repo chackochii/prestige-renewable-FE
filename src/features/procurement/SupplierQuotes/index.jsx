@@ -52,7 +52,7 @@ export default function SupplierQuotes({ job, canEdit = false, onAdd, onRemove }
   return (
     <div style={{ marginBottom: 20 }}>
       {quotesReceived(job) ? (
-        <Alert tone="success">Every line is quoted — {quotes.length} supplier quote{quotes.length === 1 ? "" : "s"} on record.</Alert>
+        <Alert tone="success">Every line is quoted - {quotes.length} supplier quote{quotes.length === 1 ? "" : "s"} on record.</Alert>
       ) : (
         <Alert tone="info">
           {quoted} of {lines} lines priced so far. Record each quote here as it comes in, compare them, then price the BOQ lines

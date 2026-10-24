@@ -45,8 +45,8 @@ export default function JobCard({ opp, owner, userName, draggable, dragging, onD
         {opp.qualification ? <span className="kanban-card-pct">{opp.qualification}</span> : null}
       </div>
       <div className="kanban-card-foot">
-        <Avatar name={owner?.name || "—"} size={24} />
-        <span className="row-meta">{inStage != null ? `${inStage}d in stage` : "—"}</span>
+        <Avatar name={owner?.name || "-"} size={24} />
+        <span className="row-meta">{inStage != null ? `${inStage}d in stage` : "-"}</span>
       </div>
     </div>
   );

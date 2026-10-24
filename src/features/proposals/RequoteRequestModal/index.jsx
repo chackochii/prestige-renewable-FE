@@ -61,7 +61,7 @@ export default function RequoteRequestModal({ opportunity, proposal, onClose, on
 
   return (
     <Modal
-      title={`Send to the estimator for a re-quote — ${opportunity.number}`}
+      title={`Send to the estimator for a re-quote - ${opportunity.number}`}
       onClose={busy ? undefined : onClose}
       actions={
         <>
@@ -87,14 +87,14 @@ export default function RequoteRequestModal({ opportunity, proposal, onClose, on
               <div className="requote-label">The customer's message</div>
               <blockquote className="requote-quote">{proposal.responseNote}</blockquote>
               <div className="row-meta" style={{ whiteSpace: "normal" }}>
-                — {proposal.responseName || "The customer"}
+                - {proposal.responseName || "The customer"}
                 {proposal.responseChannel === "staff" ? `, as recorded by ${proposal.recordedBy?.name || "sales"}` : ", through the proposal link"}
                 {proposal.respondedAt ? ` on ${formatDate(proposal.respondedAt, { withTime: true })}` : ""} · goes to the estimator as written
               </div>
             </div>
           ) : (
             <>
-              <Field className="span-2" label="What the customer asked for" hint="optional — their words, from the call or email" htmlFor="rq-customer">
+              <Field className="span-2" label="What the customer asked for" hint="optional - their words, from the call or email" htmlFor="rq-customer">
                 <textarea
                   id="rq-customer"
                   rows={3}
@@ -109,13 +109,13 @@ export default function RequoteRequestModal({ opportunity, proposal, onClose, on
               </Field>
             </>
           )}
-          <Field className="span-2" label="Comments for the estimator" hint="required — what to change, and anything the customer said that matters" error={errors.comments} htmlFor="rq-comments">
+          <Field className="span-2" label="Comments for the estimator" hint="required - what to change, and anything the customer said that matters" error={errors.comments} htmlFor="rq-comments">
             <textarea
               id="rq-comments"
               rows={4}
               maxLength={2000}
               value={comments}
-              placeholder="e.g. Re-price with 440W panels and a 10 kWh battery. Customer's budget is around $18k — keep the inverter as quoted."
+              placeholder="e.g. Re-price with 440W panels and a 10 kWh battery. Customer's budget is around $18k - keep the inverter as quoted."
               onChange={(e) => {
                 setComments(e.target.value);
                 if (errors.comments) setErrors((current) => ({ ...current, comments: undefined }));

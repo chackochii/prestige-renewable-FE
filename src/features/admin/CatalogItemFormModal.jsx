@@ -31,7 +31,7 @@ export default function CatalogItemFormModal({ item, onClose, onSave }) {
     if (isBlank(form.name)) return showError("Enter the item's name.");
     if (form.sortOrder !== "" && !Number.isInteger(Number(form.sortOrder))) return showError("Order must be a whole number.");
     const brands = form.brands.filter((b) => !isBlank(b.name) || b.unitPrice !== "");
-    if (!brands.length) return showError("Add at least one brand — the quote builder needs one to price the item.");
+    if (!brands.length) return showError("Add at least one brand - the quote builder needs one to price the item.");
     if (brands.some((b) => isBlank(b.name))) return showError("Every brand needs a name.");
     if (brands.some((b) => b.unitPrice === "" || Number(b.unitPrice) < 0)) return showError("Every brand needs a unit price of 0 or more.");
     const names = brands.map((b) => b.name.trim().toLowerCase());
@@ -62,7 +62,7 @@ export default function CatalogItemFormModal({ item, onClose, onSave }) {
       title={editing ? `Edit ${item.name}` : "New catalog item"}
       body={
         editing
-          ? "Changes apply to quote lines added from now on — saved quotes keep the brand and price they were priced with."
+          ? "Changes apply to quote lines added from now on - saved quotes keep the brand and price they were priced with."
           : "Offered in the quote builder's Add item once saved. Prices are AUD ex GST."
       }
       onClose={onClose}
@@ -89,12 +89,12 @@ export default function CatalogItemFormModal({ item, onClose, onSave }) {
         </Field>
         <Field label="Status" className="span-2" htmlFor="cat-active">
           <select id="cat-active" value={form.isActive ? "active" : "inactive"} onChange={(e) => setForm({ ...form, isActive: e.target.value === "active" })}>
-            <option value="active">Active — offered in the quote builder</option>
-            <option value="inactive">Inactive — hidden from new quotes</option>
+            <option value="active">Active - offered in the quote builder</option>
+            <option value="inactive">Inactive - hidden from new quotes</option>
           </select>
         </Field>
         {editing ? (
-          <Field label="Key" className="span-2" hint="permanent — quote lines refer to it">
+          <Field label="Key" className="span-2" hint="permanent - quote lines refer to it">
             <input value={item.key} disabled />
           </Field>
         ) : null}

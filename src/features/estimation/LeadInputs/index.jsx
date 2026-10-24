@@ -113,7 +113,7 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
         <span className="lead-input-label">{row.label}</span>
         <span className={`lead-input-value${row.done ? "" : " is-missing"}`}>
           {!pickable
-            ? "Comes off the record — nothing to ask"
+            ? "Comes off the record - nothing to ask"
             : row.done
               ? row.display || "Confirmed"
               : "Not supplied by sales"}
@@ -164,7 +164,7 @@ function OptionalRow({ row, canEdit, onSave, saving, selecting = false, selected
         </span>
         <span className="lead-input-label">{row.label}</span>
         <span className="lead-input-value">
-          <Field hint="saves as you go — collected from the client">{control()}</Field>
+          <Field hint="saves as you go - collected from the client">{control()}</Field>
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             {/* mousedown keeps the field from blurring first, so Save sends once and Cancel sends nothing. */}
             <button type="button" className="btn btn-primary btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={() => commit()} disabled={saving}>
@@ -299,9 +299,6 @@ export default function LeadInputs({
         </div>
         {isOpen("mandatory") ? (
           <>
-            <p className="lede" style={{ marginBottom: 12 }}>
-              What sales had to confirm before handing the lead over. Read-only here.
-            </p>
             <div className="lead-input-list">
               {mandatory.map((row) => (
                 <Tick key={row.key} done={row.done} label={row.label} value={row.value} />
@@ -342,9 +339,9 @@ export default function LeadInputs({
         </div>
         <p className="lede" style={{ marginBottom: 12 }}>
           {selecting
-            ? "Tick everything sales has to confirm, then Request — they go across as one information request."
+            ? "Tick everything sales has to confirm, then Request - they go across as one information request."
             : outstanding.length
-              ? `Sales left ${outstanding.length} of these blank — collect them from the client and record them here, or assign them back to sales.`
+              ? `${outstanding.length} optional detail${outstanding.length === 1 ? " was" : "s were"} not provided by Sales (left blank or marked N/A). If you need them, collect them from the client and record them here, or send them back to Sales.`
               : "Everything optional was supplied with the lead."}
         </p>
         {optionalGroups.map((group) => (
@@ -387,7 +384,7 @@ export default function LeadInputs({
           template="site_details"
           people={active}
           initial={{
-            title: `Lead information needed — ${pickedRows.length} item${pickedRows.length === 1 ? "" : "s"}`,
+            title: `Lead information needed - ${pickedRows.length} item${pickedRows.length === 1 ? "" : "s"}`,
             fields: pickedRows
               .filter((row) => row.type !== "files")
               .map((row) => ({ key: row.field, label: row.label })),

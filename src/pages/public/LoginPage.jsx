@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { redirectTarget } from "@/helpers/navigation";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import Field from "@/components/Field";
 import Alert from "@/components/Alert";
 import BrandMark from "@/components/BrandMark";
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [forgot, setForgot] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 
   // Once the "why you were signed out" message has been shown here, the
@@ -48,7 +49,9 @@ export default function LoginPage() {
       await login(email.trim(), password);
       navigate(redirectTarget(location), { replace: true });
     } catch (err) {
-      setError(typeof err === "string" ? err : err?.message || "Sign in failed.");
+      // One message for any refused sign-in, as the UAT asks; it does not say which of the two was wrong.
+      const text = typeof err === "string" ? err : err?.message || "";
+      setError(/network|reach|timeout/i.test(text) ? "Cannot reach the server. Try again." : "Email or password is incorrect.");
     }
   };
 
@@ -63,10 +66,10 @@ export default function LoginPage() {
               <div className="brand-sub">Sales &amp; delivery</div> */}
             </div>
           </Link>
-          <h2>One record from lead to service. Every business unit.</h2>
+          <h2>Every job, every stage, one place.</h2>
           <p>
-            Capture any lead — campaign, referrer, inbound or repeat — then estimate, deliver and hand over, with the
-            right people seeing the right stage.
+            Manage leads, estimates, delivery and handover in one place. Keep every team connected, with the right
+            information at every stage.
           </p>
         </div>
         {/* <p>Prestige Business Units · Sales &amp; Delivery</p> */}
@@ -83,7 +86,7 @@ export default function LoginPage() {
             </div>
           </Link>
           <h1>Sign in</h1>
-          <p className="lede">Use the email and password your administrator set up for you.</p>
+          <p className="lede">Enter your work email and password to get started.</p>
 
           {NOTICE_TEXT[notice] ? (
             <Alert tone="info" style={{ marginTop: 16, marginBottom: 0 }}>
@@ -102,7 +105,17 @@ export default function LoginPage() {
                 autoFocus
               />
             </Field>
-            <div style={{ height: 12 }} />
+ <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, marginBottom: -6 }}>
+              {/* Passwords are reset by an administrator; there is no self-service reset. */}
+              <button type="button" className="link-btn" onClick={() => setForgot(true)}>
+                Forgot password?
+              </button>
+            </div>
+            {forgot ? (
+              <Alert tone="info" style={{ marginTop: 10, marginBottom: 0 }}>
+                Contact your administrator to reset your password.
+              </Alert>
+            ) : null}
             <Field label="Password" error={fieldErrors.password} htmlFor="login-password">
               <div className="input-with-action">
                 <input
@@ -134,8 +147,11 @@ export default function LoginPage() {
             disabled={status === "loading"}
             style={{ width: "100%", justifyContent: "center" }}
           >
-            {status === "loading" ? "Signing in…" : "Continue"} <ArrowRight size={16} />
+            {status === "loading" ? "Signing in…" : "Sign in"}
           </button>
+          <p className="row-meta" style={{ textAlign: "center", marginTop: 14 }}>
+            Need access? Contact your administrator.
+          </p>
         </form>
       </section>
     </div>

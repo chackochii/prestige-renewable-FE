@@ -37,7 +37,7 @@ export function useSessionExpiry() {
       const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 60000));
       dispatch(
         pushToast({
-          message: `Your session ends in about ${minutes} minute${minutes === 1 ? "" : "s"}. Save your work — you'll be asked to sign in again.`,
+          message: `Your session ends in about ${minutes} minute${minutes === 1 ? "" : "s"}. Save your work - you'll be asked to sign in again.`,
           tone: "info",
         }),
       );

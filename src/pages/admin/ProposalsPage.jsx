@@ -99,15 +99,15 @@ export default function ProposalsPage() {
     <>
       <PageHeader
         title="Proposals"
-        description="Send the customer their proposal from your own email app or Gmail — the email, link and PDF are prepared for you. From the link they can view the PDF and accept it (the job then moves straight on to Approvals), ask for changes (send the job to the estimator for a re-quote, then send the revised version), or decline."
+        description="Send the customer their proposal from your own email app or Gmail - the email, link and PDF are prepared for you. From the link they can view the PDF and accept it (the job then moves straight on to Approvals), ask for changes (send the job to the estimator for a re-quote, then send the revised version), or decline."
       />
 
       <div className="stats">
         <StatCard label="Not sent yet" value={counts.draft} icon={<FilePen size={14} />} hint="Quote ready, proposal not out" />
         <StatCard label="With the customer" value={counts.waiting} icon={<Hourglass size={14} />} hint="Sent, waiting for an answer" />
         <StatCard label="Wants changes" value={counts.changes} icon={<MessageSquareText size={14} />} hint="Send to the estimator for a re-quote" />
-        <StatCard label="With the estimator" value={counts.requote} icon={<Undo2 size={14} />} hint="Being re-quoted — comes back here" />
-        <StatCard label="Accepted" value={counts.accepted} icon={<CircleCheck size={14} />} hint="Last 30 days — moved to Approvals" />
+        <StatCard label="With the estimator" value={counts.requote} icon={<Undo2 size={14} />} hint="Being re-quoted - comes back here" />
+        <StatCard label="Accepted" value={counts.accepted} icon={<CircleCheck size={14} />} hint="Last 30 days - moved to Approvals" />
         <StatCard label="Declined" value={counts.declined} icon={<CircleX size={14} />} hint="Last 30 days" />
       </div>
 
@@ -176,7 +176,7 @@ export default function ProposalsPage() {
                       <td>
                         {quote ? (
                           <>
-                            <div className="row-title">{quote.grandTotal !== null ? formatCurrency(quote.grandTotal, { withCents: true }) : "—"}</div>
+                            <div className="row-title">{quote.grandTotal !== null ? formatCurrency(quote.grandTotal, { withCents: true }) : "-"}</div>
                             <div className="row-meta">
                               {quote.quoteNumber} v{quote.version}
                             </div>
@@ -196,7 +196,7 @@ export default function ProposalsPage() {
                             <div className="row-meta">{proposal.viewedAt ? `Opened ${formatDate(proposal.viewedAt)}` : "Not opened"}</div>
                           </>
                         ) : (
-                          <span className="row-meta">—</span>
+                          <span className="row-meta">-</span>
                         )}
                       </td>
                       <td>{opportunity.salesperson?.name ?? <span className="row-meta">Unassigned</span>}</td>

@@ -34,8 +34,8 @@ export default function PriceVariationCheck({ job }) {
     return (
       <>
         <Alert tone="info">
-          Waiting on supplier quotes — {quotedLineCount(job)} of {lines.length} lines priced. The variation check runs once
-          every line has a quote against it — price the lines on the supplier-quote tab.
+          Waiting on supplier quotes - {quotedLineCount(job)} of {lines.length} lines priced. The variation check runs once
+          every line has a quote against it - price the lines on the supplier-quote tab.
         </Alert>
         <LineTable job={job} />
       </>
@@ -48,7 +48,7 @@ export default function PriceVariationCheck({ job }) {
         <StatCard
           label="Accepted proposal"
           value={formatCurrency(proposalTotal(job))}
-          hint={round > 1 ? `Round 1 BOQ — the variation is measured from here` : "From the accepted proposal's BOQ"}
+          hint={round > 1 ? `Round 1 BOQ - the variation is measured from here` : "From the accepted proposal's BOQ"}
         />
         <StatCard label="Quoted cost" value={formatCurrency(quotedTotal(job))} hint={`Suppliers' prices at site quantities (round ${round})`} />
         <StatCard
@@ -75,7 +75,7 @@ export default function PriceVariationCheck({ job }) {
               <div className="list-row" key={key}>
                 <div>
                   <div className="row-title">
-                    {option.label} — {option.approvers.map(roleLabel).join(" + ")}
+                    {option.label} - {option.approvers.map(roleLabel).join(" + ")}
                   </div>
                   <div className="row-meta">{option.rule}</div>
                 </div>
@@ -131,7 +131,7 @@ function LineTable({ job }) {
                 <td>{hasQuote ? formatCurrency(quotedCost) : <span className="row-meta">awaiting quote</span>}</td>
                 <td>
                   {diff === null ? (
-                    "—"
+                    "-"
                   ) : Math.abs(diff) < 0.005 ? (
                     <Badge tone="success">No change</Badge>
                   ) : (

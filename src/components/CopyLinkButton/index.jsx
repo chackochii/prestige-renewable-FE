@@ -22,7 +22,7 @@ export default function CopyLinkButton({
   const onClick = async () => {
     const ok = await copyText(value);
     if (!ok) {
-      notify("Couldn't copy automatically — select the link and copy it.", "danger");
+      notify("Couldn't copy automatically - select the link and copy it.", "danger");
       return;
     }
     setCopied(true);

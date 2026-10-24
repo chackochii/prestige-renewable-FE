@@ -32,6 +32,7 @@ import {
   SERVICE_REQUIREMENTS,
   STOREY_OPTIONS,
   electricalPhaseLabel,
+  serviceRequirementKeys,
 } from "@/features/leads/propertyOptions";
 import { DEFAULT_LANGUAGE } from "@/constants/languages";
 import {
@@ -67,8 +68,8 @@ function GroupHead({ title, count, open = true, onToggle }) {
 }
 
 const BILLING_OPTIONS = [
-  { key: "yes", label: "Yes — bill to the site address" },
-  { key: "no", label: "No — different billing address" },
+  { key: "yes", label: "Yes" },
+  { key: "no", label: "No" },
 ];
 
 /**
@@ -77,8 +78,8 @@ const BILLING_OPTIONS = [
  * behind it.
  */
 const CONTACT_OPTIONS = [
-  { key: "yes", label: "Yes — log every attempt below" },
-  { key: "no", label: "No — we already had everything" },
+  { key: "yes", label: "Yes - log every attempt below" },
+  { key: "no", label: "No - we already had everything" },
 ];
 
 /**
@@ -136,14 +137,14 @@ export default function LeadForm({
   // without it a locked form just says why it is locked.
   onUnlock,
   // Bumped by the panel after a successful save: the form moves on to the
-  // next tab (customer → checklist → mark potential).
+  // next tab (customer → checklist → assign to estimator).
   advanceTab = 0,
   // Told which tab a save moves on to (its label), or null on the last one —
   // so the panel's Save button can say "Save & continue to …".
   onNextTabChange,
   // "yyyy-mm-dd": the day the lead was created. Date fields cannot go earlier.
   minDate = "",
-  // Told true when the Mark Potential tab is open and the lead could leave the
+  // Told true when the Assign to Estimator tab is open and the lead could leave the
   // stage on save (checklist complete, Potential, estimator chosen).
   onReadyToProceedChange,
   // Told which tab is open, so the panel's Save checks that tab (and earlier ones) only.
@@ -159,7 +160,7 @@ export default function LeadForm({
   // requests do not, so they stay reachable on an unassigned lead.
   const needsSalesperson = ["checklist", "decision"].includes(tab);
   const activeTab = hasSalesperson || !needsSalesperson ? tab : "customer";
-  // A save just went through: move on to the next tab, as far as Mark Potential.
+  // A save just went through: move on to the next tab, as far as Assign to Estimator.
   const tabOrder = hasSalesperson ? ["customer", "checklist", "decision"] : ["customer"];
   const nextTabKey = tabOrder.includes(activeTab) ? (tabOrder[tabOrder.indexOf(activeTab) + 1] ?? null) : null;
   const [seenAdvance, setSeenAdvance] = useState(advanceTab);
@@ -168,7 +169,7 @@ export default function LeadForm({
     if (nextTabKey) setTab(nextTabKey);
   }
   // The panel names the tab a save leads to on its Save button.
-  const nextTabLabel = nextTabKey ? { checklist: "Checklist", decision: "Mark Potential" }[nextTabKey] : null;
+  const nextTabLabel = nextTabKey ? { checklist: "Checklist", decision: "Assign to Estimator" }[nextTabKey] : null;
   useEffect(() => {
     onNextTabChange?.(nextTabLabel);
   }, [nextTabLabel, onNextTabChange]);
@@ -284,8 +285,8 @@ export default function LeadForm({
   const siteAddressLine = [form.siteLine1, form.siteSuburb, `${form.siteState || ""} ${form.sitePostcode || ""}`.trim()]
     .filter((part) => !isBlank(part))
     .join(", ");
-  const doneService =
-    !isBlank(form.serviceRequirement) && (form.serviceRequirement !== "other" || !isBlank(form.serviceRequirementOther));
+  const serviceKeys = serviceRequirementKeys(form.serviceRequirement);
+  const doneService = serviceKeys.length > 0 && (!serviceKeys.includes("other") || !isBlank(form.serviceRequirementOther));
   const doneBilling =
     form.billingSameAsSite === "no"
       ? !isBlank(form.customerBillingAddress)
@@ -296,14 +297,13 @@ export default function LeadForm({
   const doneRoof = !isBlank(form.roofType);
   const donePhase = !isBlank(form.electricalPhase);
   const doneBills = form.energyHasBills || billFiles.length > 0;
-  const doneUsage = !isBlank(form.energyAnnualKwh);
-  const doneFinance = !isBlank(form.financeAssistance) && (form.financeAssistance !== "yes" || !isBlank(form.financeNotes));
+  const doneFinance = !isBlank(form.financeAssistance);
   const doneSiteRequirements = form.siteRequirementsNone || !isBlank(form.siteSpecificRequirements);
   const doneTimeframe = !isBlank(form.preferredInstallTimeframe);
   const doneLocation = !isBlank(form.preferredInstallLocation);
   const doneComments = !isBlank(form.customerComments);
   const doneIntent = Boolean(form.customerIntentConfirmed);
-  const doneSource = !isBlank(form.leadSource) && (automated || !isBlank(form.leadSourceDetails));
+  const doneSource = !isBlank(form.leadSource);
   // Offers and budget are recorded when there are any — never a blocker.
   const doneOffers = !isBlank(form.businessOffers) || !isBlank(form.customerBudget);
 
@@ -327,7 +327,7 @@ export default function LeadForm({
   // One entry per mandatory row — the single source of truth for the row
   // ticks, the progress bar and the "Potential" gate below.
   const requiredRows = [
-    { label: "Where they got our details", done: doneSource },
+    { label: "Lead Source", done: doneSource },
     { label: "Initial requirements & comments", done: doneComments },
     { label: "Contact client", done: doneContact },
     { label: "Genuine interest", done: doneIntent },
@@ -338,18 +338,17 @@ export default function LeadForm({
     { label: "Roof type", done: doneRoof },
     { label: "Electrical phase", done: donePhase },
     { label: "Electricity bills", done: doneBills },
-    { label: "Daily usage", done: doneUsage },
     { label: "Finance assistance", done: doneFinance },
-    { label: "Site requirements & extra costs", done: doneSiteRequirements },
+    { label: "Site Specific Requirements & Additional Costs", done: doneSiteRequirements },
     { label: "Preferred timeframe", done: doneTimeframe },
-    { label: "Preferred battery location", done: doneLocation },
+    { label: "Preferred Installation Location", done: doneLocation },
   ];
   // Everything the Potential gate needs, wherever it is asked.
   const outstanding = requiredRows.filter((r) => !r.done);
   const checklistComplete = outstanding.length === 0;
   // Where they got our details, genuine interest and the contact question are
   // asked on the Customer details tab; the Checklist tab counts its own rows.
-  const CUSTOMER_TAB_ROWS = ["Where they got our details", "Genuine interest", "Contact client"];
+  const CUSTOMER_TAB_ROWS = ["Lead Source", "Genuine interest", "Contact client", "Initial requirements & comments"];
   const checklistRows = requiredRows.filter((r) => !CUSTOMER_TAB_ROWS.includes(r.label));
   const checklistOutstanding = checklistRows.filter((r) => !r.done);
   const doneCount = checklistRows.length - checklistOutstanding.length;
@@ -382,7 +381,7 @@ export default function LeadForm({
                   icon: <ClipboardCheck size={14} />,
                   count: `${doneCount}/${checklistRows.length}`,
                 },
-                { key: "decision", label: "Mark Potential", icon: <Check size={14} /> },
+                { key: "decision", label: "Assign to Estimator", icon: <Check size={14} /> },
               ]
             : []),
           ...(requestsPanel
@@ -421,7 +420,7 @@ export default function LeadForm({
           <div className="form-grid">
             {/* First: a commercial lead is a business with an ABN, a
                 residential one is a person — the rest of the section follows. */}
-            <Field label="Type of lead" className="span-2" required error={err("leadType")}>
+            <Field label="Lead Type" className="span-2" required error={err("leadType")}>
               <select value={form.leadType} disabled={disabled} onChange={(e) => set("leadType", e.target.value)}>
                 <option value="">Select type</option>
                 {leadTypeOptions.map((t) => (
@@ -450,10 +449,10 @@ export default function LeadForm({
               {input("customerLastName", { autoComplete: "family-name" })}
             </Field>
 
-            <Field label="Phone" required hint="phone or email" error={err("customerPhone")}>
+            <Field label="Phone" required hint="Phone or Email" error={err("customerPhone")}>
               {input("customerPhone")}
             </Field>
-            <Field label="Email" required hint="phone or email" error={err("customerEmail")}>
+            <Field label="Email" required hint="Phone or Email" error={err("customerEmail")}>
               {input("customerEmail", { type: "email" })}
             </Field>
 
@@ -474,38 +473,42 @@ export default function LeadForm({
               </Field>
             </div>
 
-            <Field label="Salesperson" hint="unlocks the mandatory checklist once set">
-              <select value={form.salespersonId} disabled={disabled} onChange={(e) => set("salespersonId", e.target.value)}>
-                <option value="">Later</option>
-                {sales.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {isBlank(form.salespersonId) ? (
-              <Field label="Reason no salesperson is assigned yet" className="span-2" required error={err("unassignedReason")}>
-                <textarea
-                  rows={2}
-                  value={form.unassignedReason}
+            <div>
+              <Field label="Preferred Language">
+                <select
+                  value={languageIsOther ? "__other" : ""}
                   disabled={disabled}
-                  onChange={(e) => set("unassignedReason", e.target.value)}
-                />
+                  onChange={(e) => {
+                    const other = e.target.value === "__other";
+                    setLanguageOther(other);
+                    set("preferredLanguage", "");
+                  }}
+                >
+                  <option value="">{DEFAULT_LANGUAGE}</option>
+                  <option value="__other">Other</option>
+                </select>
               </Field>
-            ) : null}
+              {languageIsOther ? (
+                <div style={{ marginTop: 10 }}>
+                  <Field label="Language">
+                    {input("preferredLanguage", { placeholder: "Type the language", autoFocus: languageOther })}
+                  </Field>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {/* Asked on the first call with the customer, so they sit with the
               customer's details rather than in the checklist. */}
           <div className="checklist" style={{ marginTop: 20 }}>
             <GroupHead title="Contact & interest" />
-              <ChecklistRow done={doneSource} label="Where they got our details" required>
+              <ChecklistRow done={doneSource} label="Lead Source" required>
                 <Field hint="feeds the referral reward program" error={err("leadSource")}>
                   {automated ? (
                     <input value={leadSourceLabel(form.leadSource)} disabled />
                   ) : (
                     <select value={form.leadSource} disabled={disabled} onChange={(e) => set("leadSource", e.target.value)}>
+                      <option value="">Select lead source</option>
                       {MANUAL_LEAD_SOURCES.map((s) => (
                         <option key={s.key} value={s.key}>
                           {s.label}
@@ -532,7 +535,7 @@ export default function LeadForm({
                       label="Referrer"
                       required
                       error={err("referrerId")}
-                      hint={form.referrerId ? "registered referrer — counts towards the referral program" : "type a name, or pick a registered referrer"}
+                      hint={form.referrerId ? "registered referrer - counts towards the referral program" : "type a name, or pick a registered referrer"}
                     >
                       {/* Free text, with the registered referrers offered as you
                           type. A name that matches one links the lead to it. */}
@@ -573,7 +576,7 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneContact} label="Contact client?" required>
+              <ChecklistRow done={doneContact} label="Have you contacted the client?" required>
                 <p className="lede" style={{ margin: "0 0 10px" }}>
                   Did you have to contact the client to collect the mandatory details?
                 </p>
@@ -681,7 +684,7 @@ export default function LeadForm({
                       <Plus size={14} /> Add attempt
                     </button>
                     <p className="lede" style={{ margin: "8px 0 0" }}>
-                      No response yet? Add another — every attempt is kept.
+                      No response yet? Add another - every attempt is kept.
                     </p>
                   </div>
                 ) : null}
@@ -704,32 +707,39 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              {/* Optional: only recorded when the customer would rather not deal
-                  in English, so the lead can go to a native speaker. */}
-              <ChecklistRow done label="Preferred language">
-                <Field hint="optional — leave as English unless the customer asked otherwise">
-                  <select
-                    value={languageIsOther ? "__other" : ""}
-                    disabled={disabled}
-                    onChange={(e) => {
-                      const other = e.target.value === "__other";
-                      setLanguageOther(other);
-                      set("preferredLanguage", "");
-                    }}
-                  >
-                    <option value="">{DEFAULT_LANGUAGE}</option>
-                    <option value="__other">Other</option>
-                  </select>
+              <ChecklistRow done={doneComments} label="Initial requirements & comments" required>
+                <Field
+                  hint="what they want from the system, anything else they asked for, financial options discussed"
+                  error={err("customerComments")}
+                >
+                  {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
                 </Field>
-                {languageIsOther ? (
-                  <div style={{ marginTop: 10 }}>
-                    <Field label="Language">
-                      {input("preferredLanguage", { placeholder: "Type the language", autoFocus: true })}
-                    </Field>
-                  </div>
-                ) : null}
               </ChecklistRow>
 
+          </div>
+
+          {/* Assigned once the contact and interest are known. */}
+          <div className="form-grid" style={{ marginTop: 20 }}>
+            <Field label="Salesperson" hint="unlocks the mandatory checklist once set">
+              <select value={form.salespersonId} disabled={disabled} onChange={(e) => set("salespersonId", e.target.value)}>
+                <option value="">Later</option>
+                {sales.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {isBlank(form.salespersonId) ? (
+              <Field label="Reason no salesperson is assigned yet" className="span-2" required error={err("unassignedReason")}>
+                <textarea
+                  rows={2}
+                  value={form.unassignedReason}
+                  disabled={disabled}
+                  onChange={(e) => set("unassignedReason", e.target.value)}
+                />
+              </Field>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -739,8 +749,8 @@ export default function LeadForm({
       {activeTab === "checklist" ? (
         <div className="section" id="lf-checklist">
           <p className="lede" style={{ marginBottom: 16 }}>
-            The counted rows are needed before this lead can move forward. The optional rows below them travel to
-            estimation with the lead — fill in what you have.
+            Fields marked * are required before this lead can move forward. Optional fields are passed to the
+            estimator, so add any details you have.
           </p>
             <div className="checklist-progress">
               <span className="cp-label">
@@ -760,15 +770,6 @@ export default function LeadForm({
               />
               {isOpen("mandatory") ? (
               <>
-              <ChecklistRow done={doneComments} label="Initial requirements & comments" required>
-                <Field
-                  hint="what they want from the system, anything else they asked for, financial options discussed"
-                  error={err("customerComments")}
-                >
-                  {textarea("customerComments", { rows: 3, placeholder: "Initial customer requirements and comments" })}
-                </Field>
-              </ChecklistRow>
-
               {/* Name, phone and email are captured once, at the top of the form —
                   this row only confirms them, it never asks again. */}
               <ChecklistRow done={doneCustomer} label="Customer details" required>
@@ -794,16 +795,26 @@ export default function LeadForm({
                 </button>
               </ChecklistRow>
 
-              <ChecklistRow done={doneService} label="Service requirement" required>
-                <ChoiceGroup
-                  name="lf-service"
-                  options={SERVICE_REQUIREMENTS}
-                  value={form.serviceRequirement}
-                  disabled={disabled}
-                  error={err("serviceRequirement")}
-                  onChange={(v) => set("serviceRequirement", v)}
-                />
-                {form.serviceRequirement === "other" ? (
+              <ChecklistRow done={doneService} label="Job Requirement" required>
+                <Field error={err("serviceRequirement")}>
+                  <div className="choice-grid">
+                    {SERVICE_REQUIREMENTS.map((o) => (
+                      <label key={o.key} className="choice">
+                        <input
+                          type="checkbox"
+                          checked={serviceKeys.includes(o.key)}
+                          disabled={disabled}
+                          onChange={(e) => {
+                            const next = e.target.checked ? [...serviceKeys, o.key] : serviceKeys.filter((key) => key !== o.key);
+                            set("serviceRequirement", SERVICE_REQUIREMENTS.map((x) => x.key).filter((key) => next.includes(key)).join(","));
+                          }}
+                        />
+                        <span>{o.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+                {serviceKeys.includes("other") ? (
                   <div style={{ marginTop: 10 }}>
                     <Field label="Service required" required error={err("serviceRequirementOther")}>
                       {input("serviceRequirementOther", { placeholder: "e.g. Solar hot water, heat pump", maxLength: 120 })}
@@ -815,7 +826,7 @@ export default function LeadForm({
               {/* The site address is captured above — only billing is asked here. */}
               <ChecklistRow done={doneBilling} label="Billing address" required>
                 <p className="lede" style={{ margin: "0 0 10px" }}>
-                  Is the site address also the billing address?
+                  Is the billing address the same as the site address?
                 </p>
                 <ChoiceGroup
                   name="lf-billing"
@@ -839,7 +850,7 @@ export default function LeadForm({
                   <Field label="Map location" className="span-2" error={err("siteMapUrl")}>
                     {input("siteMapUrl", { placeholder: "Paste a Google Maps link" })}
                   </Field>
-                  <Field label="Site contact" hint="if someone else meets us there">
+                  <Field label="Site contact" hint="Provide contact details if someone else will meet us on site.">
                     {input("siteContact", { placeholder: "Name and number" })}
                   </Field>
                   <Field label="Access notes" hint="gate codes, parking, hours">
@@ -857,6 +868,13 @@ export default function LeadForm({
                   error={err("propertyStoreys")}
                   onChange={(v) => set("propertyStoreys", v)}
                 />
+                {business ? (
+                  <div style={{ marginTop: 10 }}>
+                    <Field label="Building Details" hint="optional">
+                      {input("buildingTypeDetails", { placeholder: "e.g. Warehouse, Shopping Complex" })}
+                    </Field>
+                  </div>
+                ) : null}
               </ChecklistRow>
 
               <ChecklistRow done={doneRoof} label="Roof type" required>
@@ -900,18 +918,7 @@ export default function LeadForm({
                 )}
               </ChecklistRow>
 
-              <ChecklistRow done={doneUsage} label="Daily usage (kWh)" required>
-                <Field error={err("energyAnnualKwh")}>
-                  <NumberInput
-                    value={form.energyAnnualKwh}
-                    disabled={disabled}
-                    min={0}
-                    onChange={(v) => set("energyAnnualKwh", v)}
-                  />
-                </Field>
-              </ChecklistRow>
-
-              <ChecklistRow done={doneFinance} label="Finance assistance" required>
+              <ChecklistRow done={doneFinance} label="Finance Assistance Required?" required>
                 <ChoiceGroup
                   name="lf-finance"
                   options={FINANCE_OPTIONS}
@@ -920,16 +927,9 @@ export default function LeadForm({
                   error={err("financeAssistance")}
                   onChange={(v) => set("financeAssistance", v)}
                 />
-                {form.financeAssistance === "yes" ? (
-                  <div style={{ marginTop: 10 }}>
-                    <Field label="What they need" required hint="lender, loan type, deposit" error={err("financeNotes")}>
-                      {textarea("financeNotes", { placeholder: "e.g. zero-interest loan, 24 months" })}
-                    </Field>
-                  </div>
-                ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneSiteRequirements} label="Site requirements & extra costs" required>
+              <ChecklistRow done={doneSiteRequirements} label="Site Specific Requirements & Additional Costs" required>
                 <label className="check" style={{ marginBottom: form.siteRequirementsNone ? 0 : 10 }}>
                   <input
                     type="checkbox"
@@ -949,14 +949,14 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneTimeframe} label="Preferred timeframe" required>
+              <ChecklistRow done={doneTimeframe} label="Expected Job Completion Timeframe" required>
                 <Field error={err("preferredInstallTimeframe")}>
                   <select
                     value={form.preferredInstallTimeframe}
                     disabled={disabled}
                     onChange={(e) => set("preferredInstallTimeframe", e.target.value)}
                   >
-                    <option value="">When does the customer want it installed?</option>
+                    <option value="">Select a timeframe</option>
                     {[
                       ...INSTALL_TIMEFRAMES,
                       // A lead saved under the old month-based list keeps its answer.
@@ -970,15 +970,15 @@ export default function LeadForm({
                 </Field>
               </ChecklistRow>
 
-              <ChecklistRow done={doneLocation} label="Preferred battery location" required>
-                <Field hint="where on site the battery goes" error={err("preferredInstallLocation")}>
-                  {input("preferredInstallLocation", { placeholder: "e.g. garage wall, side of the house" })}
+              <ChecklistRow done={doneLocation} label="Preferred Installation Location" required>
+                <Field hint="where on site the system goes" error={err("preferredInstallLocation")}>
+                  {input("preferredInstallLocation", { placeholder: "e.g. north-facing roof, garage wall for the battery" })}
                 </Field>
               </ChecklistRow>
 
               <ChecklistRow done={doneOffers} label="Business offers & budget">
                 <div className="form-grid">
-                  <Field label="Offers made" className="span-2" hint="promotions or pricing the customer was offered — leave blank if none">
+                  <Field label="Offers made" className="span-2" hint="promotions or pricing the customer was offered - leave blank if none">
                     {textarea("businessOffers", { rows: 2, placeholder: "e.g. free monitoring for 12 months" })}
                   </Field>
                   <Field label="Customer budget" hint="if they gave one" error={err("customerBudget")}>
@@ -1002,8 +1002,8 @@ export default function LeadForm({
               {isOpen("site") ? (
               <>
 
-                <ChecklistRow done={!isBlank(form.preSiteInspectionRequired)} label="Pre-site inspection">
-                <Field label="Inspection required">{yesNo("preSiteInspectionRequired")}</Field>
+                <ChecklistRow done={!isBlank(form.preSiteInspectionRequired)} label="Pre-Site Inspection Required?">
+                <Field>{yesNo("preSiteInspectionRequired")}</Field>
                 {inspectionNeeded ? (
                   <p className="lede" style={{ margin: "10px 0 0" }}>
                     Estimation raises the request and tracks the visit.
@@ -1016,9 +1016,11 @@ export default function LeadForm({
                   request brings the visit and its photos back. */}
               {!inspectionNeeded ? (
               <>
-              <ChecklistRow done={Boolean(form.siteVisitCompleted)} label="Site visit completed">
-                {checkbox("siteVisitCompleted", "Site visit completed")}
-              </ChecklistRow>
+              {isBlank(form.preSiteInspectionRequired) ? (
+                <ChecklistRow done={Boolean(form.siteVisitCompleted)} label="Site visit completed">
+                  {checkbox("siteVisitCompleted", "Site visit completed")}
+                </ChecklistRow>
+              ) : null}
 
               {/* Optional, like every other estimation-input row: tick it when the
                   photos are already on file, or attach them here. */}
@@ -1140,14 +1142,14 @@ export default function LeadForm({
 
               <ChecklistRow
                 done={!isBlank(form.mountingRequirements) || !isBlank(form.siteConstraints)}
-                label="Mounting, shading & site constraints"
+                label="Mounting, Cabling & Other Site Constraints"
               >
                 <div className="form-grid">
-                  <Field label="Mounting / roof structure" className="span-2" hint="tilt frames, rail type, structural notes">
+                  <Field label="Roof & Mounting Details" className="span-2" hint="Record roof type, mounting system (flush or tilt), rail type and any structural concerns">
                     {textarea("mountingRequirements")}
                   </Field>
-                  <Field label="Cable, conduit & trunking" className="span-2">{textarea("cableRequirements")}</Field>
-                  <Field label="Shading, orientation & constraints" className="span-2">{textarea("siteConstraints")}</Field>
+                  <Field label="Cable Run & Conduit Requirements" className="span-2" hint="Note cable run lengths, any underground or external runs, and whether conduit or trunking is needed.">{textarea("cableRequirements")}</Field>
+                  <Field label="Shading, Orientation & Site Constraints" className="span-2">{textarea("siteConstraints")}</Field>
                 </div>
               </ChecklistRow>
 
@@ -1215,9 +1217,9 @@ export default function LeadForm({
               >
                 <div className="form-grid">
                   <Field
-                    label="Client special requirement"
+                    label="Any Client Specific Requirements?"
                     className="span-2"
-                    hint="optional — anything the client specifically asked for"
+                    hint="optional"
                   >
                     {textarea("clientSpecialRequirements")}
                   </Field>
@@ -1234,10 +1236,10 @@ export default function LeadForm({
       {activeTab === "decision" ? (
         <div className="section" id="lf-decision">
             <div className="decision-card">
-              <SectionHead icon={<Check size={13} />} title="Potential client?" />
+              <SectionHead icon={<Check size={13} />} title="Assign to Estimator" />
               {!checklistComplete ? (
                 <div className="alert warning" style={{ marginBottom: 12 }}>
-                  Complete the checklist before marking this lead Potential — Estimation needs all of it. Still open:
+                  Complete the checklist before assigning an estimator - Estimation needs all of it. Still open:
                   <ul>
                     {outstanding.map((r) => (
                       <li key={r.label}>
@@ -1248,56 +1250,31 @@ export default function LeadForm({
                   </ul>
                 </div>
               ) : null}
-              <div className="decision-actions">
-                <button
-                  type="button"
-                  className={`btn ${form.potential === "yes" ? "btn-primary" : "btn-ghost"}`}
-                  disabled={disabled || !checklistComplete}
-                  onClick={() => set("potential", "yes")}
-                >
-                  Potential
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${form.potential === "no" ? "btn-danger" : "btn-ghost"}`}
-                  disabled={disabled}
-                  onClick={() => set("potential", "no")}
-                >
-                  Not potential
-                </button>
+              {/* No Potential / Not potential buttons: assigning the estimator is
+                  what marks the lead Potential (qualified); clearing it undoes that. */}
+              <div style={{ maxWidth: 320 }}>
+                <Field label="Assign estimator" error={err("estimatorId")}>
+                  <select
+                    value={form.estimatorId}
+                    disabled={disabled || !checklistComplete}
+                    onChange={(e) => {
+                      set("estimatorId", e.target.value);
+                      set("potential", e.target.value ? "yes" : "");
+                    }}
+                  >
+                    <option value="">Select estimator</option>
+                    {estimators.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                        {u.title ? ` · ${u.title}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {estimators.length === 0 ? (
+                    <span className="field-error">No one in this unit can be assigned yet. Add users in Admin.</span>
+                  ) : null}
+                </Field>
               </div>
-
-              {form.potential === "no" ? (
-                <div style={{ marginTop: 14, maxWidth: 480 }}>
-                  <Field label="Reason" error={err("notPotentialReason")}>
-                    <textarea
-                      rows={2}
-                      value={form.notPotentialReason}
-                      disabled={disabled}
-                      onChange={(e) => set("notPotentialReason", e.target.value)}
-                    />
-                  </Field>
-                </div>
-              ) : null}
-
-              {form.potential === "yes" ? (
-                <div style={{ marginTop: 14, maxWidth: 320 }}>
-                  <Field label="Assign estimator" error={err("estimatorId")}>
-                    <select value={form.estimatorId} disabled={disabled} onChange={(e) => set("estimatorId", e.target.value)}>
-                      <option value="">Select estimator</option>
-                      {estimators.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name}
-                          {u.title ? ` · ${u.title}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    {estimators.length === 0 ? (
-                      <span className="field-error">No one in this unit can be assigned yet. Add users in Admin.</span>
-                    ) : null}
-                  </Field>
-                </div>
-              ) : null}
             </div>
 
             <div className="decision-card">
@@ -1344,7 +1321,7 @@ export default function LeadForm({
 
             <div className="decision-card">
               <SectionHead icon={<ClipboardCheck size={13} />} title="Note for the estimator" />
-              <Field hint="optional — anything estimation should know before they pick this up">
+              <Field hint="optional - anything estimation should know before they pick this up">
                 {textarea("noteForEstimator", { rows: 2 })}
               </Field>
             </div>

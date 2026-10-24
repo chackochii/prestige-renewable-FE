@@ -40,7 +40,7 @@ function Row({ label, value }) {
     <div className="list-row">
       <div className="row-title">{label}</div>
       <div className="row-meta" style={{ textAlign: "right" }}>
-        {value ?? "—"}
+        {value ?? "-"}
       </div>
     </div>
   );
@@ -110,7 +110,7 @@ function StageFacts({ stageId, opp, unit }) {
           <Row
             key={m.key}
             label={`${m.label || m.key} · ${m.percent}%`}
-            value={basis ? formatCurrency((basis * Number(m.percent)) / 100) : "—"}
+            value={basis ? formatCurrency((basis * Number(m.percent)) / 100) : "-"}
           />
         ))
       ) : (

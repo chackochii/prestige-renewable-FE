@@ -43,7 +43,7 @@ export default function DnspNetworkFormModal({ network, onClose, onSave }) {
       title={editing ? `Edit ${network.name}` : "New DNSP network"}
       body={
         editing
-          ? "Jobs keep the name they were recorded with — renaming here changes what new applications pick from."
+          ? "Jobs keep the name they were recorded with - renaming here changes what new applications pick from."
           : "Active networks are offered on the DNSP application, grouped by state."
       }
       onClose={onClose}
@@ -76,8 +76,8 @@ export default function DnspNetworkFormModal({ network, onClose, onSave }) {
         </Field>
         <Field label="Status" className="span-2" htmlFor="dnsp-active">
           <select id="dnsp-active" value={form.isActive ? "active" : "inactive"} onChange={(e) => setForm({ ...form, isActive: e.target.value === "active" })}>
-            <option value="active">Active — offered on new applications</option>
-            <option value="inactive">Inactive — hidden from new applications</option>
+            <option value="active">Active - offered on new applications</option>
+            <option value="inactive">Inactive - hidden from new applications</option>
           </select>
         </Field>
       </div>

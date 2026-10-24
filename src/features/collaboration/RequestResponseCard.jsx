@@ -127,7 +127,7 @@ export default function RequestResponseCard({ request, user, timeZone, onOpen })
           <h4>Latest update</h4>
           <AnswerRow
             label={statusMeta("assignment", latestProgress.status).label}
-            value={`${latestProgress.note || "—"}${latestProgress.byName ? ` — ${latestProgress.byName}` : ""}`}
+            value={`${latestProgress.note || "-"}${latestProgress.byName ? ` - ${latestProgress.byName}` : ""}`}
             answered
           />
           {request.scheduledFor ? (
@@ -139,8 +139,8 @@ export default function RequestResponseCard({ request, user, timeZone, onOpen })
       <div className="rr-foot">
         <span className="row-meta">
           {response?.submittedAt
-            ? `Answered by ${response.submittedByName || "—"} on ${formatDate(response.submittedAt, { withTime: true, timeZone })}`
-            : `Raised by ${request.createdByName || "—"} on ${formatDate(request.createdAt, { timeZone })}`}
+            ? `Answered by ${response.submittedByName || "-"} on ${formatDate(response.submittedAt, { withTime: true, timeZone })}`
+            : `Raised by ${request.createdByName || "-"} on ${formatDate(request.createdAt, { timeZone })}`}
         </span>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(request)}>
           {action?.label || "View details"}

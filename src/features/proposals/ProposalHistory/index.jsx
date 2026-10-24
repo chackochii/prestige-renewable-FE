@@ -26,14 +26,14 @@ export default function ProposalHistory({ proposals }) {
                 {proposal.grandTotal !== null ? ` · ${formatCurrency(proposal.grandTotal, { withCents: true })}` : ""}
               </div>
               <div className="row-meta" style={{ whiteSpace: "normal" }}>
-                Prepared for {proposal.sentTo}
+                Proposal sent to {proposal.sentTo}
                 {proposal.sentBy ? ` by ${proposal.sentBy.name}` : ""} on {formatDate(proposal.sentAt, { withTime: true })}
-                {proposal.viewedAt ? ` · opened ${formatDate(proposal.viewedAt, { withTime: true })} (${proposal.viewCount} view${proposal.viewCount === 1 ? "" : "s"})` : " · not opened yet"}
+                {proposal.viewedAt ? ` · opened ${formatDate(proposal.viewedAt, { withTime: true })} (${proposal.viewCount} view${proposal.viewCount === 1 ? "" : "s"})` : " · Not opened yet"}
               </div>
               {answer ? (
                 <div className="row-meta" style={{ whiteSpace: "normal", marginTop: 4 }}>
                   {answer} on {formatDate(proposal.respondedAt, { withTime: true })}
-                  {proposal.responseNote ? <> — “{proposal.responseNote}”</> : null}
+                  {proposal.responseNote ? <> - “{proposal.responseNote}”</> : null}
                 </div>
               ) : null}
             </div>

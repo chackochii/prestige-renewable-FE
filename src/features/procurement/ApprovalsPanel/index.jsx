@@ -78,7 +78,7 @@ export default function ApprovalsPanel({ job, canEdit = false }) {
   }
   const tier = tierFor(job);
   if (tier?.key === "none") {
-    return <Alert tone="success">No approvals needed — the quoted cost matches the proposal.</Alert>;
+    return <Alert tone="success">No approvals needed - the quoted cost matches the proposal.</Alert>;
   }
 
   const required = requiredApprovers(job);
@@ -97,16 +97,16 @@ export default function ApprovalsPanel({ job, canEdit = false }) {
   return (
     <>
       {complete ? (
-        <Alert tone="success">All required approvals received — the purchase orders can be released.</Alert>
+        <Alert tone="success">All required approvals received - the purchase orders can be released.</Alert>
       ) : (
         <Alert tone="danger">
-          Not every approval is in. Send each approver a request below — they approve or reject it, with notes, from the request
+          Not every approval is in. Send each approver a request below - they approve or reject it, with notes, from the request
           itself, and the decision shows here.
         </Alert>
       )}
 
       <div style={{ marginTop: 20 }}>
-        <SectionHead icon={<ShieldCheck size={13} />} title={`Required — ${tier.label}`} />
+        <SectionHead icon={<ShieldCheck size={13} />} title={`Required - ${tier.label}`} />
         <div className="list-stack">
           {required.map((role) => {
             const approval = approvalFor(job, role);
@@ -122,9 +122,9 @@ export default function ApprovalsPanel({ job, canEdit = false }) {
                   <div className="row-title">{roleLabel(role)}</div>
                   <div className="row-meta" style={{ whiteSpace: "normal" }}>
                     {approved || rejected
-                      ? `${approved ? "Approved" : "Declined"} by ${approval?.approver ?? "—"}${decidedAt ? ` on ${decidedAt}` : ""}`
+                      ? `${approved ? "Approved" : "Declined"} by ${approval?.approver ?? "-"}${decidedAt ? ` on ${decidedAt}` : ""}`
                       : waiting
-                        ? `Requested from ${waiting.assigneeName || "—"} on ${formatDate(waiting.createdAt, { timeZone: unit?.timezone })}`
+                        ? `Requested from ${waiting.assigneeName || "-"} on ${formatDate(waiting.createdAt, { timeZone: unit?.timezone })}`
                         : "Not requested yet"}
                   </div>
                   {approval?.note && (approved || rejected) ? (
@@ -164,7 +164,7 @@ export default function ApprovalsPanel({ job, canEdit = false }) {
           people={active}
           initial={{
             title: `${job.number}: approve price variation of ${pct}`,
-            description: `${job.customer ? `${job.customer} — s` : "S"}uppliers quoted ${formatCurrency(quotedTotal(job))} against ${formatCurrency(
+            description: `${job.customer ? `${job.customer} - s` : "S"}uppliers quoted ${formatCurrency(quotedTotal(job))} against ${formatCurrency(
               proposalTotal(job),
             )} in the accepted proposal: a variation of ${pct} (${tier.label}). The purchase orders are held until it is approved.`,
           }}

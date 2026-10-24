@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CheckCircle2, Download, ExternalLink, FileText, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
 import Alert from "@/components/Alert";
+import { DEFAULT_MESSAGE } from "@/helpers/proposals";
 import Field from "@/components/Field";
 import LoadingState from "@/components/LoadingState";
 import { formatDate } from "@/helpers/dateTimeHelpers";
@@ -19,9 +20,9 @@ import { getPublicProposal, respondToProposal } from "@/services/api/proposalsAp
 import { formatCurrency } from "@/utils/formatCurrency";
 
 const CHOICES = [
-  { key: "accept", label: "Accept proposal", icon: ThumbsUp, tone: "primary", blurb: "Go ahead with this proposal as quoted." },
-  { key: "renegotiate", label: "Request changes", icon: MessageSquareText, tone: "ghost", blurb: "Tell us what you would like revised." },
-  { key: "reject", label: "Decline", icon: ThumbsDown, tone: "ghost", blurb: "Let us know you will not be going ahead." },
+  { key: "accept", label: "Accept Proposal", icon: ThumbsUp, tone: "primary", blurb: "Go ahead with this proposal as quoted." },
+  { key: "renegotiate", label: "Request Changes", icon: MessageSquareText, tone: "ghost", blurb: "Tell us what you would like revised." },
+  { key: "reject", label: "Decline Proposal", icon: ThumbsDown, tone: "ghost", blurb: "Let us know you will not be going ahead." },
 ];
 
 /** What the page says once the proposal can no longer be answered. */
@@ -32,7 +33,7 @@ function ClosedNotice({ proposal }) {
   if (state === "accepted")
     return (
       <Alert tone="success">
-        <strong>Accepted{response?.name ? ` by ${response.name}` : ""}</strong> {when ? `on ${when}` : ""}. Thank you — we will be in touch about the next steps.
+        <strong>Accepted{response?.name ? ` by ${response.name}` : ""}</strong> {when ? `on ${when}` : ""}. Thank you - we will be in touch about the next steps.
       </Alert>
     );
   if (state === "negotiation" || (state === "re-estimated" && response?.decision === "renegotiate"))
@@ -146,7 +147,7 @@ function ResponseForm({ proposal, token, onAnswered }) {
           // Destructured in the body, not the parameter list: no-unused-vars
           // exempts capitalised *variables* as components, but not parameters,
           // so a component pulled out of the arguments reads as unused.
-          const { key, label, icon: Icon, blurb } = option;
+          const { key, label, icon: Icon } = option;
           return (
             <button
               key={key}
@@ -162,7 +163,6 @@ function ResponseForm({ proposal, token, onAnswered }) {
             >
               <Icon size={18} />
               <span className="row-title">{label}</span>
-              <span className="row-meta">{blurb}</span>
             </button>
           );
         })}
@@ -171,12 +171,12 @@ function ResponseForm({ proposal, token, onAnswered }) {
       {selected ? (
         <div className="proposal-public-form">
           <div className="form-grid">
-            <Field className="span-2" label="Your full name" error={errors.name} htmlFor="pp-name">
+            <Field className="span-2" label="Your Full Name" error={errors.name} htmlFor="pp-name">
               <input id="pp-name" value={name} maxLength={120} autoComplete="name" onChange={(e) => setName(e.target.value)} />
             </Field>
             <Field
               className="span-2"
-              label={choice === "renegotiate" ? "What would you like changed?" : choice === "reject" ? "Reason" : "Anything we should know?"}
+              label={choice === "renegotiate" ? "Describe the changes required" : choice === "reject" ? "Reason for declining" : "Additional Comments"}
               hint={choice === "renegotiate" ? "required" : "optional"}
               error={errors.note}
               htmlFor="pp-note"
@@ -226,7 +226,7 @@ export default function ProposalPage() {
   }, [token]);
 
   useEffect(() => {
-    document.title = proposal ? `Proposal ${proposal.number} — ${proposal.business?.name ?? ""}` : "Your proposal";
+    document.title = proposal ? `Proposal ${proposal.number} - ${proposal.business?.name ?? ""}` : "Your proposal";
   }, [proposal]);
 
   const business = proposal?.business?.name || "Your proposal";
@@ -250,7 +250,9 @@ export default function ProposalPage() {
               <div className="proposal-public-title">
                 <FileText size={20} />
                 <div>
-                  <h1>Your proposal, {proposal.customerName}</h1>
+                  <h1>
+                    Hello {proposal.customerName}, Here’s your proposal from {proposal.business?.name || "us"}.
+                  </h1>
                   <div className="row-meta">
                     {proposal.number} · sent {formatDate(proposal.sentAt)}
                     {proposal.state === "open" ? ` · valid until ${formatDate(proposal.expiresAt)}` : ""}
@@ -263,7 +265,7 @@ export default function ProposalPage() {
                   </div>
                 ) : null}
               </div>
-              {proposal.message ? <p className="proposal-public-message">{proposal.message}</p> : null}
+              <p className="proposal-public-message">{proposal.message || DEFAULT_MESSAGE}</p>
               {proposal.contact ? (
                 <div className="row-meta">
                   From {proposal.contact.name}
@@ -276,7 +278,7 @@ export default function ProposalPage() {
             {answered && proposal.state !== "open" ? (
               <div className="proposal-public-done">
                 <CheckCircle2 size={22} />
-                <span>Thank you — your answer has been sent to {proposal.contact?.name || "our team"}.</span>
+                <span>Thank you - your answer has been sent to {proposal.contact?.name || "our team"}.</span>
               </div>
             ) : null}
 

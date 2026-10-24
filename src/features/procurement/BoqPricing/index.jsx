@@ -32,10 +32,10 @@ export default function BoqPricing({ job, canEdit = false, onSave }) {
       <SectionHead icon={<Tags size={13} />} title="Price the BOQ from the approved quote" />
       {total === 0 ? (
         <p className="lede" style={{ fontSize: 14 }}>
-          No BOQ lines yet — add them on the BOQ vs site tab.
+          No BOQ lines yet - add them on the BOQ vs site tab.
         </p>
       ) : quotesReceived(job) ? (
-        <Alert tone="success">Every line is priced — the price variation is worked from these figures.</Alert>
+        <Alert tone="success">Every line is priced - the price variation is worked from these figures.</Alert>
       ) : (
         <Alert tone="info">
           {priced} of {total} line{total === 1 ? "" : "s"} priced. Once the quotes are compared, enter the chosen supplier and its price
@@ -46,11 +46,11 @@ export default function BoqPricing({ job, canEdit = false, onSave }) {
       {backordered.length ? (
         <Alert tone="danger" style={{ marginTop: 10 }}>
           On back-order: {backordered.map((line) => `${line.item}${line.leadTimeDays ? ` (${line.leadTimeDays} days)` : ""}`).join(", ")}. Delivery is
-          scheduled around it — see POs & delivery.
+          scheduled around it - see POs & delivery.
         </Alert>
       ) : leadTime ? (
         <p className="row-meta" style={{ marginTop: 10 }}>
-          Longest lead time {leadTime} days — the earliest everything can be on site once ordered.
+          Longest lead time {leadTime} days - the earliest everything can be on site once ordered.
         </p>
       ) : null}
 

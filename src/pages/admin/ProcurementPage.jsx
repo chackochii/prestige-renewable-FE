@@ -56,7 +56,7 @@ export default function ProcurementPage() {
     <>
       <PageHeader
         title={PROCUREMENT_STAGE.label}
-        description="Check the bill of quantities against the site, confirm the supplier quote, clear any price variation with the right approvers, release the purchase orders and receive the materials, then create the Green Deal job for construction — each step through its checklist."
+        description="Check the bill of quantities against the site, confirm the supplier quote, clear any price variation with the right approvers, release the purchase orders and receive the materials, then create the Green Deal job for construction - each step through its checklist."
       />
 
       <div className="stats">
@@ -118,7 +118,7 @@ export default function ProcurementPage() {
                         <div className="row-title">{job.number}</div>
                         <div className="row-meta">{job.customer}</div>
                       </td>
-                      <td>{job.enteredAt ? formatDate(job.enteredAt) : "—"}</td>
+                      <td>{job.enteredAt ? formatDate(job.enteredAt) : "-"}</td>
                       <td>
                         {sla ? (
                           <Badge tone={sla.tone} title={job.slaDueAt ? `Due ${formatDate(job.slaDueAt)}` : undefined}>
@@ -128,7 +128,7 @@ export default function ProcurementPage() {
                           <span className="row-meta">Moved on</span>
                         )}
                       </td>
-                      <td>{job.acceptedValue !== null && job.acceptedValue !== undefined ? formatCurrency(job.acceptedValue) : "—"}</td>
+                      <td>{job.acceptedValue !== null && job.acceptedValue !== undefined ? formatCurrency(job.acceptedValue) : "-"}</td>
                       <td>
                         <Badge tone={status.tone}>{status.label}</Badge>
                       </td>

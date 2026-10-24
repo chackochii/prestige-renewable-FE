@@ -225,7 +225,7 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
             <AutoRows rows={autoRows(item.source)} />
             <label className="check cl-check">
               <input id={id} type="checkbox" checked={answers[item.key] === true} disabled={disabled} onChange={(e) => set(item.key, e.target.checked)} />
-              <span>{item.confirmLabel ?? "Shown correctly — details confirmed"}</span>
+              <span>{item.confirmLabel ?? "Shown correctly - details confirmed"}</span>
             </label>
           </>
         );
@@ -320,7 +320,7 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
         const value = answers[item.key];
         const invalid = item.validate === "nmi" && !blank(value) && !isNmi(value);
         return (
-          <Field error={invalid ? "An NMI is 10 characters — 11 with its checksum digit." : undefined} htmlFor={id}>
+          <Field error={invalid ? "An NMI is 10 characters - 11 with its checksum digit." : undefined} htmlFor={id}>
             {control(item, value, (next) => set(item.key, next), id, disabled)}
           </Field>
         );

@@ -25,7 +25,7 @@ export const STAGES = [
     key: "estimation",
     short: "Estimation",
     label: "Estimation",
-    description: "Solution options, cost build-up, sell price and target margin, verified before a proposal is prepared.",
+    description: "Build and cost solution options, set the sell price and margin, and verify everything before a proposal is prepared.",
   },
   {
     id: 3,
@@ -33,7 +33,7 @@ export const STAGES = [
     short: "Proposal",
     label: "Proposal & negotiation",
     description:
-      "The sales rep reviews the final quote, applies any approved discount and emails it to the client, then follows up until the client accepts (on to Approvals), asks for changes (back to Estimation for a re-quote) or declines.",
+      "Sales reviews the final quote, applies any approved discount and sends it to the client, then follows up until the client accepts (moves to Approvals), requests changes (returns to Estimation) or declines (job closed).",
   },
   {
     id: 5,

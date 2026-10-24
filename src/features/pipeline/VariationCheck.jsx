@@ -32,7 +32,7 @@ const errText = (err, fallback) => (typeof err === "string" ? err : err?.message
 /** The job-history note for the check, in plain sentences. */
 function historyNote(v) {
   if (!v.hasVariation) {
-    return "Variation check: no variations from the default price list — no price changes, discounts or extra costs on the quote.";
+    return "Variation check: no variations from the default price list - no price changes, discounts or extra costs on the quote.";
   }
   const parts = [];
   if (v.priceVariations.length) {
@@ -112,7 +112,7 @@ export default function VariationCheck({ opp, canEdit }) {
     setRecording(true);
     try {
       await dispatch(addOpportunityHistoryEntry({ id: opp.id, body: { note: historyNote(v) } })).unwrap();
-      notify(v.hasVariation ? "Variations recorded in job history" : "No variations — recorded in job history");
+      notify(v.hasVariation ? "Variations recorded in job history" : "No variations - recorded in job history");
     } catch (err) {
       notifyError(errText(err, "Could not record the check in job history."));
     } finally {
@@ -148,7 +148,7 @@ export default function VariationCheck({ opp, canEdit }) {
       {!v.hasVariation ? (
         <Alert tone="success">
           <CircleCheck size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />
-          No variations — every item is at its default price, with no discounts or extra costs.
+          No variations - every item is at its default price, with no discounts or extra costs.
         </Alert>
       ) : null}
 

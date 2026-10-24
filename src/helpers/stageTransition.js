@@ -13,7 +13,7 @@ import { isBlank } from "@/utils/validators";
 export function leadGateItems(opp) {
   if (!opp) return [];
   const missing = [];
-  if (opp.qualification !== "qualified") missing.push("Lead must be marked Potential to progress");
+  if (opp.qualification !== "qualified") missing.push("Assign an estimator to progress");
   if (!opp.estimatorId) missing.push("Assigned estimator");
   return missing;
 }
@@ -68,7 +68,7 @@ export function estimationGateItems(opp) {
 
 /** Items still missing before an opportunity can leave estimation without a priced quote. */
 export function quoteGateItems(quote) {
-  return quote?.items?.length ? [] : ["Add at least one item to the quote"];
+  return quote?.items?.length ? [] : ["In order to send a proposal, ensure that at least one priced item is added to the quote."];
 }
 
 /**
@@ -107,11 +107,11 @@ export function advanceState(opp, { quote, user, procurementJob } = {}) {
         ? [...estimationGateItems(opp), ...quoteGateItems(quote)]
         : stage === 3
           ? // The customer accepting (online, or recorded by sales) moves the job on by itself.
-            ["Customer accepts the proposal — the job then moves on to Approvals by itself"]
+            ["This stage is complete when the customer accepts the proposal. The job will then move to Approvals automatically."]
           : stage === 5
             ? // The last required approval moves the job on; with none required it is moved by hand.
               (Array.isArray(opp.requiredApprovals) && opp.requiredApprovals.length
-                ? ["Every required approval approved — the job then moves on to Procurement by itself"]
+                ? ["Every required approval approved - the job then moves on to Procurement by itself"]
                 : [])
             : stage === 6 || stage === 7
               ? procurementGateItems(stage, procurementJob)

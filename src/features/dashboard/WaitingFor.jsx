@@ -28,7 +28,7 @@ export default function WaitingFor({ groups = [], timeZone, total = 0 }) {
 
   return (
     <Card
-      title="Waiting For"
+      title="Awaiting Action"
       icon={<Hourglass size={16} />}
       sub={total ? `${total} handoff${total === 1 ? "" : "s"} with another team.` : undefined}
       actions={
@@ -103,7 +103,7 @@ export default function WaitingFor({ groups = [], timeZone, total = 0 }) {
         <Modal
           title={`${detail.number} · ${detail.title}`}
           confirmClose={false}
-          body={`${detail.customer}${detail.owner ? ` — with ${detail.owner}` : ""}`}
+          body={`${detail.customer}${detail.owner ? ` - with ${detail.owner}` : ""}`}
           className="wide"
           onClose={() => setDetail(null)}
           actions={

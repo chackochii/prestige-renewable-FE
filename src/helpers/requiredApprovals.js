@@ -44,5 +44,5 @@ export function requiredApprovalsLabel(opp, unit, fallback = "None marked yet") 
 
 /** A hint for the finance option: sales already said the customer wants help with finance. */
 export function approvalHints(opp) {
-  return opp?.financeAssistance === "yes" ? { finance: `Sales noted finance assistance${opp.financeNotes ? ` — ${opp.financeNotes}` : ""}` } : {};
+  return opp?.financeAssistance === "yes" ? { finance: `Sales noted finance assistance${opp.financeNotes ? ` - ${opp.financeNotes}` : ""}` } : {};
 }

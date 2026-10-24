@@ -66,7 +66,7 @@ export function jobCreationBlocker(job, checklist) {
   if (!itemDone(po, approval, answersOf(checklist, "po"), ctx)) waiting.push(`the price-variation approval (PO release, item ${itemNumber(po, approval.key)})`);
   const open = receipt.items.filter((item) => !itemDone(receipt, item, answersOf(checklist, "receipt"), ctx)).length;
   if (open) waiting.push(`material receipt (${open} item${open === 1 ? "" : "s"} to go)`);
-  return waiting.length ? `Opens once the price-variation approval and material receipt are complete — still waiting on ${waiting.join(" and ")}.` : null;
+  return waiting.length ? `Opens once the price-variation approval and material receipt are complete - still waiting on ${waiting.join(" and ")}.` : null;
 }
 
 /** Every item of a section done. */

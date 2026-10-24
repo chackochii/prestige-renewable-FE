@@ -18,7 +18,7 @@ export default function EnquiryLinkCard({ style }) {
     <Card
       title="Share the enquiry form"
       icon={<Link2 size={16} />}
-      sub="Anyone with these links can send an enquiry without signing in. The link decides which business unit the lead lands in — the sender never picks, and never sees the list."
+      sub="Anyone with these links can send an enquiry without signing in. The link decides which business unit the lead lands in - the sender never picks, and never sees the list."
       style={style}
     >
       <div className="table-wrap">

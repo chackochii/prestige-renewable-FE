@@ -38,62 +38,62 @@ export const INSPECTION_SECTIONS = [
         kind: "auto",
         hint: "shown from the job record",
       },
-      { key: "inspectionDate", label: "Inspection date", kind: "date", required: true, hint: "defaults to today — change it if the visit is logged later" },
+      { key: "inspectionDate", label: "Inspection date", kind: "date", required: true, hint: "defaults to today - change it if the visit is logged later" },
     ],
   },
   {
     key: "site",
     title: "Site Inspection",
+    // What the estimator picks from on the request (UAT, Oct 2026).
     fields: [
-      { key: "siteAccessConfirmed", label: "Site address and property access confirmed", kind: "checkbox" },
-      { key: "roofCondition", label: "Roof condition and roof type", kind: "text", placeholder: "e.g. Colorbond, good condition" },
+      { key: "roofCondition", label: "Roof Condition and Roof Type", kind: "text", placeholder: "e.g. Colorbond, good condition" },
       {
         key: "roofDimensions",
-        label: "Roof dimensions and available installation area",
+        label: "Roof Dimensions and Available Installation Area",
         kind: "text",
         placeholder: "e.g. 14m × 8m, ~95 m² usable",
       },
-      { key: "roofPitch", label: "Roof pitch and orientation", kind: "text", placeholder: "e.g. 22°, north-west" },
-      { key: "shading", label: "Shading or obstructions identified", kind: "textarea" },
-      { key: "switchboard", label: "Switchboard location and condition", kind: "textarea" },
-      { key: "meter", label: "Meter location and meter type", kind: "text", placeholder: "e.g. garage wall, smart meter" },
-      { key: "inverterLocation", label: "Proposed inverter location", kind: "text" },
-      { key: "batteryLocation", label: "Proposed battery location", kind: "text" },
-      { key: "cablePathway", label: "Cable pathway and approximate cable length", kind: "text", placeholder: "e.g. through roof cavity, ~18 m" },
-      { key: "accessDifficulties", label: "Access or installation difficulties identified", kind: "textarea" },
-      { key: "scaffoldRequired", label: "Scaffolding or EWP (elevated work platform) required", kind: "checkbox" },
-      { key: "additionalWork", label: "Additional electrical or building work noted", kind: "textarea" },
+      { key: "roofPitch", label: "Roof Pitch and Orientation", kind: "text", placeholder: "e.g. 22°, north-west" },
+      { key: "shading", label: "Shading or Obstructions", kind: "textarea" },
+      { key: "switchboard", label: "Switchboard Location and Condition", kind: "textarea" },
+      { key: "meter", label: "Meter Location and Meter Type", kind: "text", placeholder: "e.g. garage wall, smart meter" },
+      { key: "inverterLocation", label: "Proposed Inverter Location", kind: "text" },
+      { key: "batteryLocation", label: "Proposed Battery Location", kind: "text" },
+      { key: "cablePathway", label: "Cable Pathway and Approximate Cable Length", kind: "text", placeholder: "e.g. through roof cavity, ~18 m" },
+      { key: "scaffoldRequired", label: "Scaffolding or Elevated Work Platform (EWP) Requirements", kind: "checkbox" },
+    ],
+  },
+  {
+    key: "access",
+    title: "Site Access & Observations",
+    // On every crew form, whatever was picked: the estimator does not choose these.
+    fields: [
+      { key: "siteAccessConfirmed", label: "Site address and property access confirmed?", kind: "checkbox", standard: true },
+      { key: "accessDifficulties", label: "Any access or installation difficulties identified?", kind: "textarea", standard: true },
+      { key: "additionalWork", label: "Any additional electrical or building work identified?", kind: "textarea", standard: true },
+      { key: "measurements", label: "Measurements and Other Site Observations", kind: "textarea", standard: true },
+      { key: "risks", label: "Risks or Special Requirements", kind: "textarea", standard: true },
       {
         key: "unconfirmed",
-        label: "Anything that cannot be confirmed from photos or mapping",
+        label: "Is there anything that cannot be confirmed from photos or mapping?",
         kind: "textarea",
-        hint: "what the estimator cannot work out from a desktop review",
+        standard: true,
       },
+      { key: "estimationComments", label: "Additional Comments for the Estimation Team", kind: "textarea", standard: true },
     ],
   },
   {
     key: "photos",
-    title: "Photos & Notes",
-    fields: [
-      { key: "__photos", label: "Additional site photos", kind: "files", hint: "take them with the camera or choose from the phone" },
-      { key: "measurements", label: "Measurements and site observations", kind: "textarea" },
-      { key: "risks", label: "Risks or special requirements", kind: "textarea" },
-      { key: "estimationComments", label: "Comments for the Estimation team", kind: "textarea" },
-    ],
+    title: "Photos",
+    fields: [{ key: "__photos", label: "Additional site photos", kind: "files", hint: "take them with the camera or choose from the phone" }],
   },
   {
     key: "final",
     title: "Final Check",
     fields: [
-      { key: "findingsRecorded", label: "All site findings recorded", kind: "checkbox" },
-      { key: "photosUploaded", label: "Photos uploaded", kind: "checkbox" },
-      { key: "measurementsRecorded", label: "Measurements recorded", kind: "checkbox" },
-      {
-        key: "estimationNotified",
-        label: "Estimation team notified of any special requirements",
-        kind: "checkbox",
-        hint: "sending this form notifies them automatically",
-      },
+      { key: "findingsRecorded", label: "All site findings recorded", kind: "checkbox", standard: true },
+      { key: "photosUploaded", label: "Photos uploaded", kind: "checkbox", standard: true },
+      { key: "measurementsRecorded", label: "Measurements recorded", kind: "checkbox", standard: true },
     ],
   },
   {
@@ -106,7 +106,7 @@ export const INSPECTION_SECTIONS = [
   },
 ];
 
-/** Sl. No for each item, in form order — 1 to 26, as CL-04 numbers them. */
+/** Sl. No for each item, in form order, as CL-04 numbers them. */
 export const ITEM_NUMBERS = Object.fromEntries(
   INSPECTION_SECTIONS.flatMap((section) => section.fields).map((field, index) => [field.key, index + 1]),
 );
@@ -121,7 +121,8 @@ export const INSPECTION_FIELDS = INSPECTION_SECTIONS.flatMap((section) =>
  * asked for through document slots), not what the form fills in by itself,
  * and not what is always required anyway.
  */
-export const isSelectable = (field) => field.kind !== "files" && field.kind !== "auto" && !field.required && !field.key.startsWith("__");
+export const isSelectable = (field) =>
+  field.kind !== "files" && field.kind !== "auto" && !field.required && !field.standard && !field.key.startsWith("__");
 
 /** The items a requester can mark as required. */
 export const SELECTABLE_FIELDS = INSPECTION_FIELDS.filter(isSelectable);

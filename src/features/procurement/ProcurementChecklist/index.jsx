@@ -47,8 +47,8 @@ function procurementAutoRows(source, job, checklist) {
       const differ = mismatchedLines(job).length;
       return [
         ["Approved BOQ", boqLines(job).length ? `Round ${currentRound(job)} · ${boqLines(job).length} lines · ${boqMatches(job) ? "matches the site" : `${differ} line${differ === 1 ? "" : "s"} differ`}` : null],
-        ["Supplier quotes", quotes.length ? `${quotes.length} received — ${quotes.map((entry) => entry.supplier).join(", ")}` : null, "None received yet"],
-        ["Quote confirmed (CL-12)", quote.finalQuoteFile?.length ? "Saved for records" : null, "Not saved yet — CL-12 item 10"],
+        ["Supplier quotes", quotes.length ? `${quotes.length} received - ${quotes.map((entry) => entry.supplier).join(", ")}` : null, "None received yet"],
+        ["Quote confirmed (CL-12)", quote.finalQuoteFile?.length ? "Saved for records" : null, "Not saved yet - CL-12 item 10"],
       ];
     }
     case "quotedTotal":
@@ -58,18 +58,18 @@ function procurementAutoRows(source, job, checklist) {
         ["Accepted proposal", formatCurrency(proposalTotal(job))],
         ["Quoted cost", quoted ? formatCurrency(quotedTotal(job)) : null, "Not every line is quoted yet"],
         ["Variation", pct === null ? null : signedPct(pct), "Calculated once every line is quoted"],
-        ["5% rule", tier ? `${tier.label} — ${tier.rule}` : null, "Calculated once every line is quoted"],
+        ["5% rule", tier ? `${tier.label} - ${tier.rule}` : null, "Calculated once every line is quoted"],
       ];
     case "variationApprovals": {
       const required = requiredApprovers(job);
-      if (!required.length) return [["Approvals", "None needed — no price variation"]];
+      if (!required.length) return [["Approvals", "None needed - no price variation"]];
       return required.map((role) => {
         const approval = approvalFor(job, role);
         const decided = approval?.status === "approved" || approval?.status === "rejected";
         const state = decided
-          ? `${approval.status === "approved" ? "approved" : "declined"} by ${approval.approver ?? "—"} ${formatDate(approval.decidedAt)}`
-          : "waiting — request it on the Approvals tab";
-        return [roleLabel(role), approval ? state : null, "Not requested yet — request it on the Approvals tab"];
+          ? `${approval.status === "approved" ? "approved" : "declined"} by ${approval.approver ?? "-"} ${formatDate(approval.decidedAt)}`
+          : "waiting - request it on the Approvals tab";
+        return [roleLabel(role), approval ? state : null, "Not requested yet - request it on the Approvals tab"];
       });
     }
     case "suppliers": {
@@ -82,16 +82,16 @@ function procurementAutoRows(source, job, checklist) {
       const backordered = unavailableLines(job);
       const method = FULFILMENT_OPTIONS.find((option) => option.value === quote.fulfilmentMethod)?.label;
       return [
-        ["Stock availability", quote.stockConfirmed ? (backordered.length ? `Confirmed — ${backordered.map((line) => line.item).join(", ")} on back-order` : "Confirmed") : null, "Not confirmed yet — CL-12 item 6"],
+        ["Stock availability", quote.stockConfirmed ? (backordered.length ? `Confirmed - ${backordered.map((line) => line.item).join(", ")} on back-order` : "Confirmed") : null, "Not confirmed yet - CL-12 item 6"],
         ["Longest lead time", lead ? `${lead} days` : "None"],
-        ["Delivery or pickup", method && quote.fulfilmentDate ? `${method} · ${formatDate(quote.fulfilmentDate)}${quote.fulfilmentTime ? ` ${quote.fulfilmentTime}` : ""}` : null, "Not confirmed yet — CL-12 item 7"],
-        ["Freight", quote.freightCharges !== "" && quote.freightCharges !== undefined && quote.freightCharges !== null ? formatCurrency(quote.freightCharges) : null, "Not confirmed yet — CL-12 item 8"],
+        ["Delivery or pickup", method && quote.fulfilmentDate ? `${method} · ${formatDate(quote.fulfilmentDate)}${quote.fulfilmentTime ? ` ${quote.fulfilmentTime}` : ""}` : null, "Not confirmed yet - CL-12 item 7"],
+        ["Freight", quote.freightCharges !== "" && quote.freightCharges !== undefined && quote.freightCharges !== null ? formatCurrency(quote.freightCharges) : null, "Not confirmed yet - CL-12 item 8"],
       ];
     }
     case "paymentTerms":
       return [
-        ["Terms confirmed", quote.termsConfirmed ? "Yes" : null, "Not confirmed yet — CL-12 item 9"],
-        ["Payment due", quote.paymentDueDate ? formatDate(quote.paymentDueDate) : null, "Not confirmed yet — CL-12 item 9"],
+        ["Terms confirmed", quote.termsConfirmed ? "Yes" : null, "Not confirmed yet - CL-12 item 9"],
+        ["Payment due", quote.paymentDueDate ? formatDate(quote.paymentDueDate) : null, "Not confirmed yet - CL-12 item 9"],
       ];
     case "greenDeal": {
       const system = procurementSystem(job);

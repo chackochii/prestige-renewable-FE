@@ -44,8 +44,8 @@ import { addDaysIso, formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { joinAddress } from "@/utils/text";
 
 const TAX_TREATMENT_LABEL = {
-  exclusive: "Prices are GST-exclusive — GST is added on top.",
-  inclusive: "Prices are GST-inclusive — GST is already included in the total.",
+  exclusive: "Prices are GST-exclusive - GST is added on top.",
+  inclusive: "Prices are GST-inclusive - GST is already included in the total.",
   no_gst: "No GST applies to this quote.",
 };
 
@@ -372,12 +372,12 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
   const until = validUntil(quote.quoteDate);
   row({
     body: [
-      ["PREPARED FOR", quote.customer || "—"],
-      ["SITE", site || "—"],
+      ["PREPARED FOR", quote.customer || "-"],
+      ["SITE", site || "-"],
       [
         "QUOTE NO.",
         [
-          quote.quoteNumber || "—",
+          quote.quoteNumber || "-",
           `Prepared: ${formatDate(quote.quoteDate)}`,
           until ? `Valid until: ${formatDate(until)}` : "",
           saved?.invoiceNumber ? `Invoice No: ${saved.invoiceNumber}` : "",
@@ -386,7 +386,7 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
           .filter(Boolean)
           .join("    "),
       ],
-      ["PREPARED BY", `${quote.estimatorName || "—"}, ${company.name}, ABN ${company.abn}`],
+      ["PREPARED BY", `${quote.estimatorName || "-"}, ${company.name}, ABN ${company.abn}`],
     ],
     columnStyles: { 0: LABEL_COL },
   });
@@ -424,7 +424,7 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
     body: quote.items.length
       ? quote.items.map((item) => [
           item.itemName,
-          item.brand || "—",
+          item.brand || "-",
           `${item.quantity} ${item.unit || ""}`.trim(),
           money(item.unitPrice) + (Number(item.discountPct) ? `  (less ${item.discountPct}%)` : ""),
           money(lineTotal(item)),
@@ -454,12 +454,12 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
       head: [["Additional costs, rebates & discounts", "Basis", "Amount"]],
       body: [
         ...charges.map((cost) => [
-          [cost.costType, cost.description].filter(Boolean).join(" — "),
+          [cost.costType, cost.description].filter(Boolean).join(" - "),
           cost.calcType === "percentage" ? `${cost.value}% of items` : "Fixed amount",
           money(additionalCostAmount(cost, items.total)),
         ]),
         ...deductions.map((cost) => [
-          [cost.costType, cost.description].filter(Boolean).join(" — "),
+          [cost.costType, cost.description].filter(Boolean).join(" - "),
           cost.calcType === "percentage" ? `${cost.value}% of items` : "Fixed amount",
           `-${money(Math.abs(additionalCostAmount(cost, items.total)))}`,
         ]),

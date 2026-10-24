@@ -1,6 +1,6 @@
 // Opportunity detail: hero, stage stepper, stage work and history.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock, FileStack, Send } from "lucide-react";
 import Badge from "@/components/Badge";
@@ -27,7 +27,8 @@ import { enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/cons
 import { PERMISSIONS } from "@/constants/permissions";
 import { canAdvanceFrom, stageHiddenReason, viewableStages } from "@/helpers/stageAccess";
 import { advanceState } from "@/helpers/stageTransition";
-import { slaStatus } from "@/helpers/dateTimeHelpers";
+import { dateIsoInZone, slaStatus } from "@/helpers/dateTimeHelpers";
+import { useMinDate } from "@/hooks/useMinDate";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { joinAddress } from "@/utils/text";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -52,6 +53,9 @@ export default function OpportunityPage() {
   const { selected: opp, selectedStatus, selectedError, quote } = useAppSelector((s) => s.leads);
   // Procurement and construction are let go on the procurement record (PO
   // release; then material receipt and Green Deal), so it is read here for the gate.
+  // No task date on the job before the day the lead was created.
+  const pageRef = useRef(null);
+  useMinDate(pageRef, opp ? dateIsoInZone(opp.createdAt, unit?.timezone) : "");
   const procurementRecord = useProcurementJob(opp?.id, { enabled: [6, 7].includes(Number(opp?.stage)) });
   const [tab, setTab] = useState("work");
   const [viewStage, setViewStage] = useState(stageParam);
@@ -157,7 +161,7 @@ export default function OpportunityPage() {
   };
 
   return (
-    <>
+    <div ref={pageRef}>
       <Link to={current === 1 ? "/leads" : "/pipeline"} className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}>
         {current === 1 ? "Leads" : "Pipeline"}
       </Link>
@@ -232,7 +236,7 @@ export default function OpportunityPage() {
           the detail in its tooltip at every stage. */}
       {!gate.canAdvance && viewing !== 1 && opp.lifecycle === "Active" && next !== null && !advanceError ? (
         <Alert tone="info">
-          To leave {stage.label}: {gate.missing.join(" · ")}
+          {current === 2 || current === 3 ? gate.missing.join(" ") : `To leave ${stage.label}: ${gate.missing.join(" · ")}`}
         </Alert>
       ) : null}
 
@@ -240,7 +244,7 @@ export default function OpportunityPage() {
         value={tab}
         onChange={setTab}
         items={[
-          { key: "work", label: "Stage work", icon: <FileStack size={14} /> },
+          { key: "work", label: "Stage Tasks", icon: <FileStack size={14} /> },
           { key: "history", label: "History", icon: <Clock size={14} /> },
         ]}
       />
@@ -327,6 +331,6 @@ export default function OpportunityPage() {
           }
         />
       ) : null}
-    </>
+    </div>
   );
 }

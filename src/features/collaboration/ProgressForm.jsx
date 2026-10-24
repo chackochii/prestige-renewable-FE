@@ -62,7 +62,7 @@ export default function ProgressForm({ request, onSubmit, gathered = false }) {
 
       <label className="check">
         <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-        Keep this note inside our team — don&apos;t show it to the requester
+        Keep this note inside our team - don&apos;t show it to the requester
       </label>
 
       {error ? (

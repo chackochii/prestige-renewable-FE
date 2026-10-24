@@ -81,7 +81,7 @@ export default function DnspNetworksPage() {
                     <td data-label="Network">
                       <div className="row-title">{n.name}</div>
                     </td>
-                    <td data-label="State">{n.state || "—"}</td>
+                    <td data-label="State">{n.state || "-"}</td>
                     <td data-label="Status">
                       <Badge tone={n.isActive ? "success" : "neutral"}>{n.isActive ? "active" : "inactive"}</Badge>
                     </td>

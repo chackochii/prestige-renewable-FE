@@ -52,7 +52,7 @@ export const DEPARTMENTS = [
 ];
 
 export function departmentLabel(key) {
-  return DEPARTMENTS.find((d) => d.key === key)?.label || key || "—";
+  return DEPARTMENTS.find((d) => d.key === key)?.label || key || "-";
 }
 
 /**
@@ -273,7 +273,7 @@ export function contextualAction(request, user) {
  * attending submits the form, whatever the assignment's status says.
  */
 export const SITE_VISIT_STATUSES = [
-  { key: "pending", label: "Pending — form not submitted", tone: "warning", open: true },
+  { key: "pending", label: "Pending - form not submitted", tone: "warning", open: true },
   { key: "submitted", label: "Form submitted", tone: "success", open: false },
 ];
 
