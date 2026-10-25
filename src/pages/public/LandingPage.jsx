@@ -155,7 +155,7 @@ export default function LandingPage() {
             </a>
           </div>
         </div>
-        <a href="#process" className="landing-scroll-cue" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, margin: "56px auto 0", color: "#ffffff80", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", width: "fit-content" }}>
+        <a href="#process" className="landing-scroll-cue" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, margin: "56px auto 0", color: "#ffffff80", fontSize: "calc(11px * var(--text-scale))", letterSpacing: ".08em", textTransform: "uppercase", width: "fit-content" }}>
           Scroll <ChevronDown size={16} />
         </a>
       </header>
@@ -227,7 +227,7 @@ export default function LandingPage() {
       </Reveal>
 
       <footer className="landing-footer">
-        <div className="landing-brand" style={{ fontSize: 14 }}>
+        <div className="landing-brand" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
           <BrandMark size={26} />
           {/* Prestige Renewable */}
         </div>

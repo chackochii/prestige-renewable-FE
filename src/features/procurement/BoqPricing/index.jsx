@@ -31,7 +31,7 @@ export default function BoqPricing({ job, canEdit = false, onSave }) {
     <div style={{ marginBottom: 20 }}>
       <SectionHead icon={<Tags size={13} />} title="Price the BOQ from the approved quote" />
       {total === 0 ? (
-        <p className="lede" style={{ fontSize: 14 }}>
+        <p className="lede" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
           No BOQ lines yet - add them on the BOQ vs site tab.
         </p>
       ) : quotesReceived(job) ? (

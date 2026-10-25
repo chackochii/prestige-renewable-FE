@@ -89,7 +89,7 @@ export default function BoqVerification({ job, canEdit = false, onSave }) {
       {latest ? (
         <div style={{ marginTop: 20 }}>
           <SectionHead icon={<History size={13} />} title={`Round ${round} of ${round} - revised ${formatDate(latest.at)} by ${latest.by}`} />
-          <p className="lede" style={{ fontSize: 14, marginBottom: 10 }}>
+          <p className="lede" style={{ fontSize: "calc(14px * var(--text-scale))", marginBottom: 10 }}>
             {latest.reason}
           </p>
           <RevisionDiff before={latest.lines} after={job.boq} round={latest.round} />

@@ -35,7 +35,7 @@ export default function BoqLineTable({
     <div style={{ marginTop: 20 }}>
       <SectionHead icon={icon} title={title} />
       {lines.length === 0 ? (
-        <p className="lede" style={{ fontSize: 14 }}>
+        <p className="lede" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
           {empty}
         </p>
       ) : (

@@ -3,9 +3,10 @@
 // can use the same values.
 
 export const colors = {
-  ink: "#0f1b2d",
-  inkSoft: "#5a6b80",
-  muted: "#6b7b90",
+  ink: "#000000",
+  inkSoft: "#262626",
+  muted: "#404040",
+  hint: "#6b7b90",
   line: "#dde3ea",
   lineStrong: "#c8d1dc",
   paper: "#f5f7fa",

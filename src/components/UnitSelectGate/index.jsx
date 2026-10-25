@@ -87,7 +87,7 @@ export default function UnitSelectGate({ children }) {
       <div className="gate-wrap">
         <div className="card card-pad gate-card">
           <div className="kicker">Welcome, {user?.name}</div>
-          <h2 style={{ fontSize: 22 }}>Choose a business unit</h2>
+          <h2 style={{ fontSize: "calc(22px * var(--text-scale))" }}>Choose a business unit</h2>
           <p className="lede" style={{ marginBottom: 16 }}>
             You work across several units. Pick the one to open; sign out and back in to work in another.
           </p>

@@ -32,7 +32,7 @@ export default function Deliveries({ job }) {
       )}
       <SectionHead icon={<PackageCheck size={13} />} title="Deliveries" />
       {sent.length === 0 ? (
-        <p className="lede" style={{ fontSize: 14 }}>
+        <p className="lede" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
           None yet.
         </p>
       ) : (

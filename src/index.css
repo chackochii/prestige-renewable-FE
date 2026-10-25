@@ -10,6 +10,7 @@
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-muted: var(--muted);
+  --color-hint: var(--hint);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-paper: var(--paper);
@@ -41,10 +42,15 @@
 @layer base {
   :root {
     /* Navy and teal (UAT, Oct 2026): navy carries the structure, teal is the
-       action colour, gold is for highlights only and never body text. */
-    --ink: #0f1b2d;
-    --ink-soft: #5a6b80;
-    --muted: #6b7b90;
+       action colour, gold is for highlights only and never body text.
+       Text is black (UAT): the secondary shades are near-black, kept just
+       apart from --ink so labels and their values still read as two things.
+       --hint stays grey on purpose — placeholders and hover borders, which
+       must never pass for an answer. */
+    --ink: #000000;
+    --ink-soft: #262626;
+    --muted: #404040;
+    --hint: #6b7b90;
     --line: #dde3ea;
     --line-strong: #c8d1dc;
     --paper: #f5f7fa;
@@ -88,6 +94,11 @@
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
     --fast: 0.14s var(--ease);
     --med: 0.22s var(--ease);
+
+    /* Every UI text size is written as calc(<size>px * var(--text-scale)), so
+       the whole app's text grows or shrinks from here. Display headings of
+       24px and up are left as they are. */
+    --text-scale: 1.15;
   }
 
   /*
@@ -97,9 +108,10 @@
    */
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --ink: #e6ebf2;
-    --ink-soft: #9aa8bc;
-    --muted: #7f8ea4;
+    --ink: #f8fafc;
+    --ink-soft: #d5dce6;
+    --muted: #b8c3d2;
+    --hint: #7f8ea4;
     --line: #26344f;
     --line-strong: #34445f;
     --paper: #0b1220;
@@ -135,9 +147,10 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --ink: #e6ebf2;
-      --ink-soft: #9aa8bc;
-      --muted: #7f8ea4;
+      --ink: #f8fafc;
+      --ink-soft: #d5dce6;
+      --muted: #b8c3d2;
+      --hint: #7f8ea4;
       --line: #26344f;
       --line-strong: #34445f;
       --paper: #0b1220;

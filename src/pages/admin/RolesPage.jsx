@@ -355,7 +355,7 @@ export default function RolesPage() {
                                   <button
                                     type="button"
                                     className="btn btn-sm"
-                                    style={{ padding: 0, background: "none", color: "var(--danger)", fontSize: 11 }}
+                                    style={{ padding: 0, background: "none", color: "var(--danger)", fontSize: "calc(11px * var(--text-scale))" }}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       deletePermission(p);

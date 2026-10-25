@@ -104,7 +104,7 @@ export default function SupplierQuotes({ job, canEdit = false, onAdd, onRemove }
         </div>
       ) : null}
       {quotes.length === 0 ? (
-        <p className="lede" style={{ fontSize: 14 }}>
+        <p className="lede" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
           None yet.
         </p>
       ) : (

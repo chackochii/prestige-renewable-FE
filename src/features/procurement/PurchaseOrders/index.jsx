@@ -185,7 +185,7 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
       ) : null}
 
       {orders.length === 0 ? (
-        <p className="lede" style={{ fontSize: 14 }}>
+        <p className="lede" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
           None drafted yet.
         </p>
       ) : (
