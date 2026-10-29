@@ -1,5 +1,8 @@
 // Administration → Unit settings: the parameters this business unit runs on.
 
+import { APPROVAL_TIMER_DEFAULTS } from "@/constants/approvals";
+import { approvalTimers } from "@/helpers/approvals";
+import { SUPER_ROLE_CODE } from "@/constants/roles";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Settings } from "lucide-react";
@@ -13,6 +16,7 @@ import LoadingState from "@/components/LoadingState";
 import NumberInput from "@/components/NumberInput";
 import EnquiryLinkCard from "@/features/leads/EnquiryLinkCard";
 import { STAGES } from "@/constants/stages";
+import { REBATE_OPTIONS } from "@/constants/rebates";
 import { PERMISSIONS } from "@/constants/permissions";
 import { PRIORITIES, priorityMeta } from "@/constants/notifications";
 import { getBusinessUnitConfig } from "@/services/api/businessUnitsApi";
@@ -35,6 +39,19 @@ function toForm(config) {
     approvalTypes: (config.approvalTypes || []).map((a) => ({ ...a })),
     siteWorkSubstages: (config.siteWorkSubstages || []).map((s) => ({ ...s })),
     notificationPriorities: { ...(config.notificationPriorities || {}) },
+    // The rebates a pre-approval can name: the unit's own list, or the standard one to start from.
+    metadata: { ...(config.metadata || {}) },
+    rebateOptions: (Array.isArray(config.metadata?.rebateOptions) && config.metadata.rebateOptions.length
+      ? config.metadata.rebateOptions
+      : REBATE_OPTIONS
+    ).map((option) => ({ key: option.key, label: option.label })),
+    // Stale, no-activity and expiry limits for approvals (TR-01..03).
+    approvalTimers: approvalTimers(config),
+    // Roles allowed to send to Procurement / reopen approvals; none picked: the role permissions decide.
+    approvalAccess: {
+      sendRoles: [...(config.metadata?.approvalAccess?.sendRoles ?? [])],
+      reopenRoles: [...(config.metadata?.approvalAccess?.reopenRoles ?? [])],
+    },
   };
 }
 
@@ -79,6 +96,8 @@ export default function UnitSettingsPage() {
   const canEdit = hasPermission(PERMISSIONS.ADMIN_UPDATE);
   // The notification events the priority table below is built from.
   const events = useAppSelector((s) => s.inbox.events);
+  // ADM can always send and reopen, so it is not offered.
+  const roleOptions = useAppSelector((s) => s.roles.roles).filter((role) => role.code !== SUPER_ROLE_CODE);
 
   useEffect(() => {
     if (!events.length) dispatch(fetchNotificationEvents());
@@ -125,6 +144,12 @@ export default function UnitSettingsPage() {
             approvalTypes: form.approvalTypes.filter((a) => a.key.trim()).map((a) => ({ key: a.key.trim(), label: a.label || a.key })),
             siteWorkSubstages: form.siteWorkSubstages.filter((s) => s.key.trim()).map((s) => ({ key: s.key.trim(), label: s.label || s.key })),
             notificationPriorities: form.notificationPriorities,
+            metadata: {
+              ...form.metadata,
+              rebateOptions: form.rebateOptions.filter((option) => option.key.trim()).map((option) => ({ key: option.key.trim(), label: option.label || option.key })),
+              approvalAccess: form.approvalAccess,
+              approvalTimers: Object.fromEntries(Object.entries(form.approvalTimers).map(([key, value]) => [key, Number(value) || APPROVAL_TIMER_DEFAULTS[key]])),
+            },
           },
         }),
       ).unwrap();
@@ -267,6 +292,62 @@ export default function UnitSettingsPage() {
 
           <Card title="Approval types" sub="External approvals gathered at the approvals stage. Leave empty if this unit has none." style={{ marginBottom: 20 }}>
             <KeyLabelRows rows={form.approvalTypes} keyMax={20} disabled={!canEdit} keyHint="up to 20 chars" onChange={(rows) => set("approvalTypes", rows)} />
+          </Card>
+
+          <Card
+            title="Rebate options"
+            sub="The rebates a Rebate Pre-Approval can name. Rename or remove them as schemes change, or add new ones (a new rebate is offered on every job). The standard keys keep their rules on which jobs they apply to; No Rebate is always offered."
+            style={{ marginBottom: 20 }}
+          >
+            <KeyLabelRows rows={form.rebateOptions} keyMax={30} disabled={!canEdit} keyHint="up to 30 chars" onChange={(rows) => set("rebateOptions", rows)} />
+          </Card>
+
+          <Card
+            title="Approvals access"
+            sub="Roles allowed to send a job to Procurement and to reopen its approvals afterwards. With none ticked, the role permissions decide (approvals update to send, approvals approve to reopen). Admin always can."
+            style={{ marginBottom: 20 }}
+          >
+            <div className="form-grid">
+              {[
+                ["sendRoles", "Roles allowed to Send to Procurement"],
+                ["reopenRoles", "Roles allowed to Reopen Approvals"],
+              ].map(([key, label]) => (
+                <Field key={key} label={label}>
+                  <div className="list-stack">
+                    {roleOptions.map((role) => (
+                      <label key={role.code} className="check cl-check">
+                        <input
+                          type="checkbox"
+                          disabled={!canEdit}
+                          checked={form.approvalAccess[key].includes(role.code)}
+                          onChange={(e) =>
+                            set("approvalAccess", {
+                              ...form.approvalAccess,
+                              [key]: e.target.checked ? [...form.approvalAccess[key], role.code] : form.approvalAccess[key].filter((code) => code !== role.code),
+                            })
+                          }
+                        />
+                        <span>{role.name || role.code}</span>
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="Approval timings" sub="When an approval or a job at approvals is flagged for attention." style={{ marginBottom: 20 }}>
+            <div className="form-grid auto">
+              {[
+                ["staleLodgedDays", "Flag an approval Lodged longer than (days)"],
+                ["idleDays", "Flag a job with no approvals activity for (days)"],
+                ["expiryWarningDays", "Warn before an approval expires (days)"],
+              ].map(([key, label]) => (
+                <Field key={key} label={label}>
+                  <NumberInput value={form.approvalTimers[key] ?? ""} min={1} disabled={!canEdit} onChange={(v) => set("approvalTimers", { ...form.approvalTimers, [key]: v })} />
+                </Field>
+              ))}
+            </div>
           </Card>
 
           <Card title="Site-works sub-stages" sub="Checklist blocks signed off on site. Keys are short codes such as 7a." style={{ marginBottom: 20 }}>

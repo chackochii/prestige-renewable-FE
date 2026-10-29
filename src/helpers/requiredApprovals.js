@@ -4,11 +4,27 @@
 // two together for the lead form, the estimation screen and the approvals
 // stage.
 
+/** What the standard approvals are called across the portal, whatever the unit's settings still say (UAT, Oct 2026). */
+export const APPROVAL_LABELS = {
+  dnsp: "Network Connection Approval (DNSP)",
+  da: "Council Approval (DA)",
+  finance: "Finance Approval",
+  strata: "Strata Approval",
+  heritage: "Heritage Approval",
+  landlord: "Landlord Consent",
+  rebate: "Rebate Pre-Approval",
+};
+
+/** Not an approval any more - every job needs it, and it is handled at Installation & Handover. */
+export const HANDOVER_ONLY_TYPES = ["electrical_safety"];
+
+export const approvalLabel = (key, fallback) => APPROVAL_LABELS[key] ?? fallback ?? key;
+
 /** The unit's approval types as [{ key, label }], in the unit's order. */
 export function catalogueOf(unit) {
   return (Array.isArray(unit?.approvalTypes) ? unit.approvalTypes : [])
-    .filter((type) => type && typeof type.key === "string" && type.key.trim())
-    .map((type) => ({ key: type.key.trim(), label: type.label || type.key }));
+    .filter((type) => type && typeof type.key === "string" && type.key.trim() && !HANDOVER_ONLY_TYPES.includes(type.key.trim()))
+    .map((type) => ({ key: type.key.trim(), label: approvalLabel(type.key.trim(), type.label || type.key) }));
 }
 
 /** The keys a record has ticked, as an array. */

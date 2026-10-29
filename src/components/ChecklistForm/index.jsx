@@ -20,12 +20,31 @@
 //              items (a Save button with its saved state, say); optional.
 
 import { useRef, useState } from "react";
-import { Check, ExternalLink, Leaf, Lock, Paperclip, Send, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Check, ExternalLink, Leaf, Lock, Paperclip, Send, TriangleAlert, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
 import NumberInput from "@/components/NumberInput";
-import { appliesTo, blank, checklistSummary, isNmi, itemDone, itemNumber, itemRange, sectionApplies, statusOf } from "@/helpers/checklist";
+import {
+  appliesTo,
+  blank,
+  checklistSummary,
+  dateError,
+  fieldRequired,
+  isNmi,
+  itemDone,
+  itemRange,
+  itemShown,
+  optionsOf,
+  sectionApplies,
+  shownBy,
+  statusBlockers,
+  statusOf,
+  statusRecords,
+  today,
+  validationError,
+} from "@/helpers/checklist";
 
 const ACTION_ICONS = { leaf: Leaf, send: Send };
 
@@ -52,7 +71,7 @@ function AutoRows({ rows }) {
  * Attached documents. With an uploader they go on the job and come back with a
  * link; without one they are kept by name with the checklist.
  */
-function FilePicker({ id, files = [], onChange, disabled, upload = null }) {
+export function FilePicker({ id, files = [], onChange, disabled, upload = null, emptyText = "No files attached yet." }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -100,14 +119,14 @@ function FilePicker({ id, files = [], onChange, disabled, upload = null }) {
             </div>
           ))}
         </div>
-      ) : (
-        <span className="row-meta">Nothing attached yet.</span>
-      )}
+      ) : emptyText ? (
+        <span className="row-meta">{emptyText}</span>
+      ) : null}
       {error ? <span className="row-meta cl-missing">{error}</span> : null}
       {!disabled ? (
         <>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => inputRef.current?.click()} disabled={busy}>
-            <Paperclip size={14} /> {busy ? "Uploading…" : `Attach ${files.length ? "another" : "file"}`}
+            <Paperclip size={14} /> {busy ? "Uploading…" : `Attach ${files.length ? "another file" : "file"}`}
           </button>
           <input
             ref={inputRef}
@@ -126,7 +145,7 @@ function FilePicker({ id, files = [], onChange, disabled, upload = null }) {
   );
 }
 
-function Select({ id, value, options, onChange, disabled, placeholder = "Choose…" }) {
+function Select({ id, value, options, onChange, disabled, placeholder = "Select…" }) {
   const groups = [...new Set(options.map((option) => option.group).filter(Boolean))];
   const option = (entry) => (
     <option key={entry.value} value={entry.value}>
@@ -152,7 +171,31 @@ const YES_NO = [
   { value: "no", label: "No" },
 ];
 
-export default function ChecklistForm({ section, answers = {}, ctx, canEdit = false, canApprove = canEdit, locked = null, autoRows = () => [], onChange, upload = null, intro = null, actions = null }) {
+// autoFix    — (source) => { href, label } | null: where a gap in an auto item's
+//              record is fixed (a `blockWhenMissing` item links to it)
+// flagAction — (flag) => node: the button beside a field's flag (a field's
+//              `flags: [{ when: { key, in }, text, approval }]`)
+// lapseOnly  — read only, except that the status can still be set to Revoked or
+//              Expired (with their records): approvals after the job has moved on
+// statusActions — (status, answers) => node: what can be done from a status
+//              (finance declined: resubmit, change the payment method, …)
+export default function ChecklistForm({
+  section,
+  answers = {},
+  ctx,
+  canEdit = false,
+  canApprove = canEdit,
+  locked = null,
+  autoRows = () => [],
+  autoFix = () => null,
+  flagAction = () => null,
+  statusActions = () => null,
+  lapseOnly = false,
+  onChange,
+  upload = null,
+  intro = null,
+  actions = null,
+}) {
   const summary = checklistSummary(section, answers, ctx, { locked: Boolean(locked) });
   const set = (key, value) => onChange?.({ [key]: value });
   const uploaderFor = (key) => (upload ? (files) => upload(key, files) : null);
@@ -164,13 +207,42 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
   const control = (field, value, onValue, id, disabled) => {
     switch (field.kind) {
       case "select":
-        return <Select id={id} value={value} options={field.options} onChange={onValue} disabled={disabled} />;
+        return <Select id={id} value={value} options={optionsOf(field, answers)} onChange={onValue} disabled={disabled} />;
       case "yesno":
-        return <Select id={id} value={value} options={YES_NO} onChange={onValue} disabled={disabled} placeholder="Yes or no…" />;
+        return <Select id={id} value={value} options={YES_NO} onChange={onValue} disabled={disabled} />;
       case "number":
         return <NumberInput id={id} value={value ?? ""} min={0} disabled={disabled} onChange={onValue} />;
       case "date":
-        return <input id={id} type="date" value={value ?? ""} disabled={disabled} onChange={(e) => onValue(e.target.value)} />;
+        return (
+          <input
+            id={id}
+            type="date"
+            value={value ?? ""}
+            disabled={disabled}
+            min={field.notBefore ? answers[field.notBefore] || undefined : undefined}
+            max={field.noFuture ? today() : undefined}
+            onChange={(e) => onValue(e.target.value)}
+          />
+        );
+      case "multi": {
+        // Chips; an `exclusive` choice ("None") clears the others and is cleared by them.
+        const chosen = Array.isArray(value) ? value : [];
+        const toggle = (choice) => {
+          if (chosen.includes(choice)) return onValue(chosen.filter((entry) => entry !== choice));
+          if (choice === field.exclusive) return onValue([choice]);
+          return onValue([...chosen.filter((entry) => entry !== field.exclusive), choice]);
+        };
+        return (
+          <div className="choice-grid" id={id}>
+            {field.options.map((option) => (
+              <label key={option.value} className="choice">
+                <input type="checkbox" checked={chosen.includes(option.value)} disabled={disabled} onChange={() => toggle(option.value)} />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        );
+      }
       case "time":
         return <input id={id} type="time" value={value ?? ""} disabled={disabled} onChange={(e) => onValue(e.target.value)} />;
       case "textarea":
@@ -191,8 +263,11 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
     }
   };
 
+  // Not-optional fields carry the asterisk, unless the definition says otherwise.
+  const isRequired = (field) => field.required ?? (fieldRequired(field, answers) && field.kind !== "auto" && !field.readOnly);
+
   /** A field inside a group or a status record, with its label. */
-  const labelled = (field, value, onValue, id, disabled, { span = false } = {}) =>
+  const labelled = (field, value, onValue, id, disabled, { span = false, required } = {}) =>
     field.kind === "checkbox" ? (
       <div key={field.key} className={span ? "span-2" : undefined}>
         {control(field, value, onValue, id, disabled)}
@@ -203,12 +278,31 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
         {control(field, value, onValue, id, disabled)}
       </div>
     ) : (
-      <Field key={field.key} className={span ? "span-2" : undefined} label={field.label} hint={field.optional ? "optional" : field.hint} htmlFor={id}>
+      <Field
+        key={field.key}
+        className={span ? "span-2" : undefined}
+        label={field.labels?.[answers.status] ?? field.label}
+        hint={field.optional ? "optional" : field.hint}
+        required={required ?? isRequired(field)}
+        error={dateError(field, value, answers) || validationError(field, value) || undefined}
+        htmlFor={id}
+      >
         {control(field, value, onValue, id, disabled)}
       </Field>
     );
 
-  const spans = (field) => field.kind === "files" || field.kind === "textarea" || field.kind === "checkbox" || field.kind === "auto";
+  /** A field's or an item's flags that apply now ("a tenant needs Landlord Consent"), each with its button. */
+  const flagsOf = (flags = []) =>
+    flags
+      .filter((flag) => shownBy({ showIf: flag.when }, answers))
+      .map((flag) => (
+        <Alert key={flag.text} tone="info" style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+          <span>{flag.text}</span>
+          {flagAction(flag)}
+        </Alert>
+      ));
+
+  const spans = (field) => field.kind === "files" || field.kind === "textarea" || field.kind === "checkbox" || field.kind === "auto" || field.kind === "multi" || field.span;
 
   const body = (item) => {
     const id = `cl-${section.key}-${item.key}`;
@@ -219,16 +313,38 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
       return <div className="row-meta cl-not-needed">{item.waitingOn ? `Answer ${itemRange(section, item.waitingOn)} first.` : "Answer the earlier items first."}</div>;
 
     switch (item.kind) {
-      case "auto":
+      case "auto": {
+        const rows = autoRows(item.source);
+        // Gaps are fixed where the value comes from, not here: until then it cannot be confirmed.
+        const missing = item.blockWhenMissing ? rows.filter(([, value]) => blank(value)).map(([label]) => label) : [];
+        const fix = missing.length ? autoFix(item.source) : null;
         return (
           <>
-            <AutoRows rows={autoRows(item.source)} />
+            <AutoRows rows={rows} />
+            {missing.length ? (
+              <Alert tone="warning" className="cl-lock">
+                <TriangleAlert size={14} /> Missing from the job record: {missing.join(", ")}. Fix it at the source before confirming.
+                {fix ? (
+                  <>
+                    {" "}
+                    <Link to={fix.href}>{fix.label}</Link>
+                  </>
+                ) : null}
+              </Alert>
+            ) : null}
             <label className="check cl-check">
-              <input id={id} type="checkbox" checked={answers[item.key] === true} disabled={disabled} onChange={(e) => set(item.key, e.target.checked)} />
+              <input
+                id={id}
+                type="checkbox"
+                checked={answers[item.key] === true && !missing.length}
+                disabled={disabled || missing.length > 0}
+                onChange={(e) => set(item.key, e.target.checked)}
+              />
               <span>{item.confirmLabel ?? "Shown correctly - details confirmed"}</span>
             </label>
           </>
         );
+      }
       case "checkbox":
         return control(item, answers[item.key], (value) => set(item.key, value), id, disabled);
       case "checkDetails":
@@ -264,9 +380,10 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
             ) : null}
             <div className="form-grid cl-grid">
               {item.fields
-                .filter((field) => appliesTo(field, ctx) === true)
-                .map((field) => labelled(field, answers[field.key], (value) => set(field.key, value), `${id}-${field.key}`, disabled, { span: spans(field) }))}
+                .filter((field) => appliesTo(field, ctx) === true && shownBy(field, answers))
+                .map((field) => labelled(field, answers[field.key], (value) => set(field.key, value), `${id}-${field.key}`, disabled || field.readOnly, { span: spans(field) }))}
             </div>
+            {flagsOf(item.fields.flatMap((field) => field.flags ?? []))}
           </>
         );
       }
@@ -280,7 +397,7 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
                   <span className="row-title">{slot.label}</span>
                   {documents[slot.key]?.length ? <Badge tone="success">Attached</Badge> : <Badge tone="neutral">Missing</Badge>}
                 </div>
-                <FilePicker id={`${id}-${slot.key}`} files={documents[slot.key] ?? []} disabled={disabled} upload={uploaderFor(slot.key)} onChange={(files) => set("documents", { ...documents, [slot.key]: files })} />
+                <FilePicker id={`${id}-${slot.key}`} files={documents[slot.key] ?? []} emptyText={null} disabled={disabled} upload={uploaderFor(slot.key)} onChange={(files) => set("documents", { ...documents, [slot.key]: files })} />
               </div>
             ))}
           </div>
@@ -289,23 +406,23 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
       case "files":
         return <FilePicker id={id} files={answers[item.key] ?? []} disabled={disabled} upload={uploaderFor(item.key)} onChange={(files) => set(item.key, files)} />;
       case "status": {
-        // Every status can be chosen — the coordinator's call, with nothing
-        // listed under it about what each status expects (the items above
-        // show for themselves what is still open). The records come first —
-        // reference, dates, the evidence attached — and the status last, as
-        // the decision made once those are in.
+        // The status first, then only the records that status needs; what
+        // is missing for it is listed under them and stops it counting as
+        // done (and stops Save - see the approvals workflow).
         const current = statusOf(section, answers);
+        const required = new Set(current.required ?? []);
+        // After the job has moved on only a failure can be recorded: the current status, Revoked or Expired.
+        const LAPSED = ["revoked", "expired"];
+        const lapse = disabled && lapseOnly && !locked;
+        const statuses = lapse ? item.statuses.filter((status) => status.value === current.value || LAPSED.includes(status.value)) : item.statuses;
+        const recordsDisabled = disabled && !(lapse && LAPSED.includes(current.value));
+        const problems = current.value === item.statuses[0].value ? [] : statusBlockers(section, answers, ctx);
         return (
           <>
             <div className="form-grid cl-grid">
-              {item.records
-                .filter((record) => appliesTo(record, ctx) !== false)
-                .map((record) => labelled(record, answers[record.key], (value) => set(record.key, value), `${id}-${record.key}`, disabled, { span: spans(record) }))}
-            </div>
-            <div className="form-grid cl-grid" style={{ marginTop: 12 }}>
-              <Field label="Status" htmlFor={id}>
-                <select id={id} value={current.value} disabled={disabled} onChange={(e) => set("status", e.target.value)}>
-                  {item.statuses.map((status) => (
+              <Field label={item.statusLabel ?? "Status"} required htmlFor={id}>
+                <select id={id} value={current.value} disabled={disabled && !lapse} onChange={(e) => set("status", e.target.value)}>
+                  {statuses.map((status) => (
                     <option key={status.value} value={status.value}>
                       {status.label}
                     </option>
@@ -313,6 +430,32 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
                 </select>
               </Field>
             </div>
+            {item.helper ? <div className="row-meta cl-note">{item.helper}</div> : null}
+            {(item.warnings ?? [])
+              .filter((warning) => warning.when(answers, ctx ?? {}))
+              .map((warning) => (
+                <Alert key={warning.text} tone="warning" style={{ marginTop: 10 }}>
+                  <TriangleAlert size={14} /> {warning.text}
+                </Alert>
+              ))}
+            <div className="form-grid cl-grid" style={{ marginTop: 12 }}>
+              {statusRecords(section, answers).map((record) =>
+                labelled(record, answers[record.key], (value) => set(record.key, value), `${id}-${record.key}`, recordsDisabled || record.readOnly, {
+                  span: spans(record),
+                  required: required.has(record.key),
+                }),
+              )}
+            </div>
+            {statusActions(current, answers)}
+            {problems.length ? (
+              <div className="cl-problems">
+                {problems.map((problem) => (
+                  <div key={problem} className="field-error">
+                    {problem}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </>
         );
       }
@@ -328,22 +471,25 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
     }
   };
 
-  const items = section.items.map((item) => {
+  // Items hidden until they apply are skipped, and the rest numbered without gaps.
+  const items = section.items.filter((item) => itemShown(item, ctx)).map((item, index) => {
     const done = itemDone(section, item, answers, ctx);
-    const number = itemNumber(section, item.key);
+    const number = index + 1;
     return (
       <div key={item.key} className={`cl-item ${done ? "done" : ""}`.trim()} id={`${section.key}-item-${number}`}>
         <span className="cl-no" aria-label={done ? `Item ${number} done` : `Item ${number}`}>
           {done ? <Check size={14} /> : number}
         </span>
         <div className="cl-body">
-          {item.kind !== "checkbox" || item.owner ? (
+          {item.kind !== "checkbox" || item.owner || item.tag ? (
             <div className="cl-label">
               {item.kind !== "checkbox" ? item.label : null}
+              {item.tag ? <Badge tone="neutral">{item.tag}</Badge> : null}
               {item.owner ? <Badge tone="gold">{item.owner}</Badge> : null}
             </div>
           ) : null}
           {body(item)}
+          {flagsOf(item.flags)}
           {item.note ? <div className="row-meta cl-note">{item.note}</div> : null}
         </div>
       </div>
@@ -356,14 +502,14 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
       <div className="cl-head">
         <div style={{ minWidth: 0 }}>
           <div className="cl-title">
-            <Badge tone="neutral">{section.code}</Badge>
             <strong>{section.title}</strong>
           </div>
-          <div className="row-meta">
-            Completed by the {section.owner ?? "Operations Coordinator"}
-            {owners.length ? ` · items marked ${owners.join(", ")} are theirs to sign` : ""}
-            {readOnly ? " · read only" : ""}
-          </div>
+          {owners.length || readOnly ? (
+            <div className="row-meta">
+              {owners.length ? `Items marked ${owners.join(", ")} are theirs to sign` : ""}
+              {readOnly ? `${owners.length ? " · " : ""}Read only` : ""}
+            </div>
+          ) : null}
         </div>
         <div className="cl-head-right">
           <Badge tone={summary.tone}>{summary.label}</Badge>
@@ -393,7 +539,7 @@ export default function ChecklistForm({ section, answers = {}, ctx, canEdit = fa
           ) : null}
           <div className="checklist-progress">
             <span className="cp-label">
-              {summary.done} of {summary.total} items
+              {summary.done} of {summary.total} Complete
             </span>
             <div className="cp-track">
               <i style={{ width: `${(summary.done / summary.total) * 100}%` }} />

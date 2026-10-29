@@ -3,6 +3,7 @@
 // source of truth — these only give people an early, readable list of what
 // is still missing.
 
+import { exitBlockers } from "@/helpers/approvals";
 import { CLOSED_LIFECYCLES, LAST_STAGE } from "@/constants/stages";
 import { procurementChecklistOf } from "@/constants/procurementChecklists";
 import { answersOf, procurementContext, sectionComplete } from "@/helpers/procurementChecklist";
@@ -87,14 +88,21 @@ function procurementGateItems(stage, job) {
   const checklist = job.checklist ?? {};
   const ctx = procurementContext(job, checklist);
   const done = (key) => sectionComplete(procurementChecklistOf(key), answersOf(checklist, key), ctx);
-  if (stage === 6) return done("po") ? [] : ["Complete every item on PO release (CL-13)"];
+  if (stage === 6) return done("po") ? [] : ["Complete every item on PO release"];
   const missing = [];
-  if (answersOf(checklist, "receipt").materialsReady !== true) missing.push("Materials confirmed ready (material receipt, CL-14)");
-  if (!done("jobCreation")) missing.push("Job created in Green Deal (job creation, CL-10)");
+  if (answersOf(checklist, "receipt").materialsReady !== true) missing.push("Materials confirmed ready (material receipt)");
+  if (!done("jobCreation")) missing.push("Job created in Green Deal (job creation)");
   return missing;
 }
 
-export function advanceState(opp, { quote, user, procurementJob } = {}) {
+/** Stage 5's way out: every approval that applies is complete - read from the approvals record, not just the list ticked. */
+function approvalGateItems(opp, approvalJob) {
+  if (!(Array.isArray(opp.requiredApprovals) && opp.requiredApprovals.length)) return [];
+  if (!approvalJob) return ["Open the approvals (still loading)"];
+  return exitBlockers(approvalJob);
+}
+
+export function advanceState(opp, { quote, user, procurementJob, approvalJob } = {}) {
   if (!opp) return { canAdvance: false, missing: ["No record"] };
   if (opp.lifecycle && CLOSED_LIFECYCLES.includes(opp.lifecycle))
     return { canAdvance: false, missing: [`Record is ${opp.lifecycle.toLowerCase()}`] };
@@ -109,10 +117,7 @@ export function advanceState(opp, { quote, user, procurementJob } = {}) {
           ? // The customer accepting (online, or recorded by sales) moves the job on by itself.
             ["This stage is complete when the customer accepts the proposal. The job will then move to Approvals automatically."]
           : stage === 5
-            ? // The last required approval moves the job on; with none required it is moved by hand.
-              (Array.isArray(opp.requiredApprovals) && opp.requiredApprovals.length
-                ? ["Every required approval approved - the job then moves on to Procurement by itself"]
-                : [])
+            ? approvalGateItems(opp, approvalJob)
             : stage === 6 || stage === 7
               ? procurementGateItems(stage, procurementJob)
               : [];

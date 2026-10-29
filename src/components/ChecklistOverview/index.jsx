@@ -17,7 +17,7 @@ export default function ChecklistOverview({ rows = [], onOpen }) {
             </span>
             <span style={{ minWidth: 0 }}>
               <span className="row-title">
-                {section.code} · {section.title}
+                {section.title}
               </span>
               <span className="row-meta" style={{ display: "block" }}>
                 {summary.applies ? `${summary.done} of ${summary.total} items` : "Not needed on this job"}

@@ -114,7 +114,7 @@ export default function NewLeadPage() {
             addOpportunityHistoryEntry({
               id: created.id,
               body: {
-                note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)}) - ${attempt.reason}`,
+                note: `Client not contacted (${attempt.method}, ${formatDate(attempt.contactedAt)})${attempt.reason || attempt.notes ? ` - ${attempt.reason || attempt.notes}` : ""}`,
               },
             }),
           ).unwrap();

@@ -457,6 +457,8 @@
   .alert.danger { background: var(--danger-bg); color: var(--danger); }
   .alert.success { background: var(--success-bg); color: var(--success); }
   .alert.info { background: var(--info-bg); color: var(--info); }
+  /* Grey: a job paused On Hold. */
+  .alert.neutral { background: var(--surface-2); color: var(--ink-soft); }
   .alert ul { list-style: disc; margin: 8px 0 0; padding-left: 18px; }
   .tabs { display: flex; gap: 22px; margin: 8px 0 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
   .tabs button, .tabs a {
@@ -1082,11 +1084,21 @@
 }
 
 /* ---- Approvals: the four tracks and the "All approved?" gate ------------- */
-.approval-tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+/* One full-width card per approval, stacked; the whole card opens it. */
+.approval-tracks { display: flex; flex-direction: column; gap: 10px; }
 .approval-track {
   border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--surface);
-  display: flex; flex-direction: column; gap: 10px; align-items: flex-start; min-width: 0;
+  display: flex; flex-direction: column; gap: 10px; align-items: stretch; min-width: 0;
 }
+.approval-track-main { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-width: 0; border-radius: 10px; }
+.approval-track.is-clickable .approval-track-main { cursor: pointer; }
+.approval-track.is-clickable:hover { border-color: var(--hint); }
+.approval-track-main:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
+.approval-track-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--muted); }
+/* The × on a required-approval chip. */
+.chip-remove { display: inline-flex; align-items: center; margin-left: 6px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; opacity: 0.7; }
+.chip-remove:hover { opacity: 1; }
+.cl-problems { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .approval-track.not_applicable { opacity: 0.6; border-style: dashed; }
 .approval-track.approved { border-color: var(--success); }
 .approval-track.rejected { border-color: var(--danger); }
@@ -1094,9 +1106,14 @@
 .approval-track-head { display: flex; gap: 10px; align-items: center; min-width: 0; }
 .approval-track-body { display: flex; flex-direction: column; gap: 4px; }
 .approval-track-note { font-size: calc(12.5px * var(--text-scale)); color: var(--ink-soft); white-space: normal; }
+/* Documents and notes added to an approval after the job was sent on. */
+.approval-addenda { display: flex; flex-direction: column; gap: 8px; }
+.approval-addendum { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
 /* Recording a plain approval inside its track card. */
 .approval-item-form { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .approval-item-form .form-grid { gap: 10px; }
+/* One column: labels and placeholders never squeeze, whatever the card width. */
+.approval-item-fields { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
 .approval-gate { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .approval-gate-diamond {
   width: 104px; height: 104px; transform: rotate(45deg); border: 2px solid var(--accent); border-radius: 14px;
@@ -1271,3 +1288,14 @@
     .pagination-step-label { display: none; }
   }
 }
+
+/* A stat card that filters the table under it. */
+.stat.stat-filter { cursor: pointer; transition: border-color var(--fast, 0.15s), box-shadow var(--fast, 0.15s); }
+.stat.stat-filter:hover { border-color: var(--hint); }
+.stat.stat-filter.is-active { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.stat .hint.tone-success { color: var(--success); }
+.stat .hint.tone-danger { color: var(--danger); }
+/* A small progress bar in a table cell ("2 of 4 Complete"). */
+.mini-progress { display: block; width: 90px; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 4px; }
+.mini-progress > i { display: block; height: 100%; background: var(--success); }
+.table-toolbar { display: flex; justify-content: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }

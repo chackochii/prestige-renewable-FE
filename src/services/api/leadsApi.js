@@ -23,8 +23,9 @@ export async function updateLead(id, body) {
 }
 
 /** Moves to the next stage the unit runs; stage gates apply server-side. */
-export async function advanceOpportunity(id) {
-  return unwrap(await apiClient.post(`/opportunities/${id}/advance`));
+/** body: optional - { conditionsReviewed } when sending a job on from approvals. */
+export async function advanceOpportunity(id, body = undefined) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/advance`, body));
 }
 
 /**

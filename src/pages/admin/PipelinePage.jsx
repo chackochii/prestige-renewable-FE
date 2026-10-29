@@ -25,7 +25,7 @@ import Pagination from "@/components/Pagination";
 import { oppTitle, oppValue } from "@/helpers/opportunity";
 import { enabledStagesFor, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
-import { advanceableStages, canAdvanceFrom, canViewStage, viewableStages } from "@/helpers/stageAccess";
+import { canAdvanceFrom, canViewStage, viewableStages } from "@/helpers/stageAccess";
 import { createdById, jobStatus, JOB_STATUS_OPTIONS } from "@/helpers/jobStatus";
 
 /** The board has no pages: it shows this many of the newest jobs, every column at once. */
@@ -106,8 +106,8 @@ export default function PipelinePage() {
   // Moving a card is per stage, not one permission for the whole board: the
   // stage being left decides (see helpers/stageAccess). Someone may own
   // Estimation and nothing else, so only those cards are draggable for them.
-  const canMoveFrom = useCallback((stage) => canAdvanceFrom(user, stage), [user]);
-  const movableStages = useMemo(() => advanceableStages(user, stages), [user, stages]);
+  // Approvals is left with Send to Procurement on the job (conditions reviewed, confirmed), not by dragging.
+  const canMoveFrom = useCallback((stage) => Number(stage) !== 5 && canAdvanceFrom(user, stage), [user]);
 
   // The API filters and orders them, newest first.
   const rows = items;
@@ -158,15 +158,8 @@ export default function PipelinePage() {
     <>
       <PageHeader
         title="Jobs Board"
-        description={
-          ready
-            ? `${total} opportunit${total === 1 ? "y" : "ies"}.${
-                view === "board" && movableStages.length
-                  ? ` Drag a card to move it into the next stage - you can move ${movableStages.map((s) => s.short).join(", ")}.`
-                  : ""
-              }`
-            : "Loading the pipeline…"
-        }
+        // The board speaks for itself; the list says how many there are.
+        description={view === "board" ? undefined : ready ? `${total} opportunit${total === 1 ? "y" : "ies"}.` : "Loading the pipeline…"}
         actions={
           hasPermission(PERMISSIONS.LEADS_CREATE) ? (
             <Link className="btn btn-primary" to="/leads/new">
