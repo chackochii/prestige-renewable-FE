@@ -50,7 +50,7 @@ export default function LeadsPage() {
     <>
       <PageHeader
         title="Leads"
-        description="Not yet in the pipeline. Complete the lead pack, mark the lead Qualified and assign an estimator to move it on."
+        description="Leads that haven't entered the pipeline yet. Complete the lead pack, mark as Qualified and assign an estimator to progress them."
         actions={
           hasPermission(PERMISSIONS.LEADS_CREATE) ? (
             <>

@@ -15,6 +15,7 @@ export const PERMISSIONS = {
 
   APPROVALS_READ: "approvals.read",
   APPROVALS_UPDATE: "approvals.update",
+  APPROVALS_APPROVE: "approvals.approve", // reopening a job's approvals after it was sent to procurement
 
   PROCUREMENT_READ: "procurement.read",
   PROCUREMENT_UPDATE: "procurement.update",

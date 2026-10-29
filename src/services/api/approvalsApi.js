@@ -47,3 +47,39 @@ export async function setRequiredApprovals(opportunityId, keys, { view, custom }
 export async function updateApproval(opportunityId, type, body) {
   return unwrap(await apiClient.patch(`/opportunities/${opportunityId}/approvals/${encodeURIComponent(type)}`, body));
 }
+
+/** After the job is sent on: a document or note on an approval, its status untouched. body: { note?, files?: [{ id, filename, url }] } → the job's approvals */
+export async function addApprovalAddendum(opportunityId, type, body) {
+  return unwrap(await apiClient.post(`/opportunities/${opportunityId}/approvals/${encodeURIComponent(type)}/addenda`, body));
+}
+
+/**
+ * Resolve a rejected approval: body { option: resubmit | return_estimation |
+ * return_sales | change_approach | close_lost, reason, newKey? | newLabel?
+ * (change_approach), lostReason? (close_lost), changes?: ["system" | "total" |
+ * "layout"] (return_estimation - which approvals reset, constants/approvals.js
+ * APPROVAL_RESETS; empty: no relevant change) } → the job's approvals.
+ */
+export async function resolveRejection(opportunityId, type, body) {
+  return unwrap(await apiClient.post(`/opportunities/${opportunityId}/approvals/${encodeURIComponent(type)}/resolve`, body));
+}
+
+/** Reopen the approvals of a job in procurement or construction (approvals.approve) → the job's approvals, back at stage 5. */
+export async function reopenApprovals(opportunityId, reason) {
+  return unwrap(await apiClient.post(`/opportunities/${opportunityId}/approvals/reopen`, { reason }));
+}
+
+/** Put a job at approvals On Hold, with a reason → the job's approvals. */
+export async function holdApprovals(opportunityId, reason) {
+  return unwrap(await apiClient.post(`/opportunities/${opportunityId}/approvals/hold`, { reason }));
+}
+
+/** Take a job off hold → the job's approvals. */
+export async function resumeApprovals(opportunityId) {
+  return unwrap(await apiClient.post(`/opportunities/${opportunityId}/approvals/resume`));
+}
+
+/** Clear Approval Review Needed (a quote revised after approvals were lodged) → the job's approvals. */
+export async function markApprovalsReviewed(opportunityId, note) {
+  return unwrap(await apiClient.post(`/opportunities/${opportunityId}/approvals/review`, note ? { note } : {}));
+}

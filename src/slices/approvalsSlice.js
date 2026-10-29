@@ -93,6 +93,58 @@ export const updateApproval = createAsyncThunk("approvals/update", async ({ id, 
   }
 });
 
+/** A document or note on an approval once the job is sent on: { id, type, body }. */
+export const addApprovalAddendum = createAsyncThunk("approvals/addendum", async ({ id, type, body }, { rejectWithValue }) => {
+  try {
+    return await api.addApprovalAddendum(id, type, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/** A rejected approval resolved: { id, type, body } (approvalsApi.resolveRejection). */
+export const resolveRejection = createAsyncThunk("approvals/resolve", async ({ id, type, body }, { rejectWithValue }) => {
+  try {
+    return await api.resolveRejection(id, type, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/** { id, reason } → the job back at approvals. */
+export const reopenApprovals = createAsyncThunk("approvals/reopen", async ({ id, reason }, { rejectWithValue }) => {
+  try {
+    return await api.reopenApprovals(id, reason);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/** { id, reason } → the job On Hold; { id } → resumed. */
+export const holdApprovals = createAsyncThunk("approvals/hold", async ({ id, reason }, { rejectWithValue }) => {
+  try {
+    return await api.holdApprovals(id, reason);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+export const resumeApprovals = createAsyncThunk("approvals/resume", async ({ id }, { rejectWithValue }) => {
+  try {
+    return await api.resumeApprovals(id);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/** { id, note? } → Approval Review Needed cleared. */
+export const markApprovalsReviewed = createAsyncThunk("approvals/reviewed", async ({ id, note }, { rejectWithValue }) => {
+  try {
+    return await api.markApprovalsReviewed(id, note);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
 /** One job, fresh from the API, into its entry and its board row. */
 const putJob = (state, job) => {
   if (!job?.id) return;
@@ -167,6 +219,13 @@ const approvalsSlice = createSlice({
         const { id, fromChecklist } = action.meta.arg ?? {};
         if (id && fromChecklist) state.saveError[id] = action.payload || "Your last checklist answers could not be saved.";
       })
+      // The API's copy is the whole record here (addenda, stage): nothing typed is waiting to be kept.
+      .addCase(addApprovalAddendum.fulfilled, (state, action) => putJob(state, action.payload))
+      .addCase(reopenApprovals.fulfilled, (state, action) => putJob(state, action.payload))
+      .addCase(resolveRejection.fulfilled, (state, action) => putJob(state, action.payload))
+      .addCase(holdApprovals.fulfilled, (state, action) => putJob(state, action.payload))
+      .addCase(resumeApprovals.fulfilled, (state, action) => putJob(state, action.payload))
+      .addCase(markApprovalsReviewed.fulfilled, (state, action) => putJob(state, action.payload))
       .addCase(setRequiredApprovals.fulfilled, (state, action) => {
         putJob(state, keepLocalAnswers(state.jobs[action.payload?.id], action.payload));
       })

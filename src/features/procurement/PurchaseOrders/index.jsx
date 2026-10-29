@@ -6,10 +6,12 @@
 // `onCreate(body)` drafts an order against BOQ lines; `onUpdate(poId, body)`
 // moves it on — sent, delivery scheduled, received — and `onDelete(poId)`
 // removes a draft. The API refuses to send one while the variation is
-// unapproved, and the CL-13 release tick sends every draft at once.
+// unapproved, and the CL-13 release tick sends every draft at once. An order
+// raised before the job's approvals were reopened is flagged for review
+// (`reviewFlag`) and held until it is marked reviewed.
 
 import { useState } from "react";
-import { CalendarClock, PackageCheck, Plus, Send, Truck, X } from "lucide-react";
+import { CalendarClock, CheckCheck, PackageCheck, Plus, Send, Truck, X } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -49,6 +51,7 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
   const lines = boqLines(job);
   const ready = readyToOrder(job);
   const held = pendingApprovals(job).map(roleLabel).join(" and ");
+  const flagged = orders.filter((order) => order.reviewFlag);
 
   const [drafting, setDrafting] = useState(false);
   const [draft, setDraft] = useState({ supplier: "", lines: [], total: "", deliveryEta: "" });
@@ -115,6 +118,15 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
           is not waiting on stock.
         </Alert>
       )}
+
+      {flagged.length ? (
+        <Alert tone="warning" style={{ marginTop: 12 }}>
+          <strong>
+            {flagged.length} purchase order{flagged.length === 1 ? "" : "s"} flagged for review:
+          </strong>{" "}
+          {flagged[0].reviewFlag.reason}. Check each one still matches the approvals, then mark it reviewed.
+        </Alert>
+      ) : null}
 
       <div className="stats" style={{ margin: "20px 0" }}>
         <StatCard label="Orders sent" value={`${sent.length} / ${orders.length}`} icon={<Send size={14} />} hint="Of those drafted" />
@@ -239,6 +251,11 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
                     </td>
                     <td>
                       <Badge tone={status.tone}>{status.label}</Badge>
+                      {order.reviewFlag ? (
+                        <div style={{ marginTop: 4 }}>
+                          <Badge tone="warning">Needs Review</Badge>
+                        </div>
+                      ) : null}
                     </td>
                     {canEdit ? (
                       <td>
@@ -272,13 +289,18 @@ export default function PurchaseOrders({ job, canEdit = false, onCreate, onUpdat
                           </div>
                         ) : (
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {order.reviewFlag ? (
+                              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => run(() => onUpdate?.(order.id, { reviewed: true }))} title={order.reviewFlag.reason}>
+                                <CheckCheck size={14} /> Mark reviewed
+                              </button>
+                            ) : null}
                             {order.status === "draft" ? (
                               <>
                                 <button
                                   type="button"
                                   className="btn btn-primary btn-sm"
-                                  disabled={busy || !ready}
-                                  title={ready ? undefined : `Held until ${held || "every line is quoted"}`}
+                                  disabled={busy || !ready || Boolean(order.reviewFlag)}
+                                  title={order.reviewFlag ? "Mark it reviewed first" : ready ? undefined : `Held until ${held || "every line is quoted"}`}
                                   onClick={() => run(() => onUpdate?.(order.id, { status: "sent" }))}
                                 >
                                   <Send size={14} /> Send to supplier

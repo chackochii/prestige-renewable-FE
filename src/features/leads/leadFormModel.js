@@ -411,9 +411,7 @@ export function validateLeadForm(form, { minDate = "" } = {}) {
     errors.referrerId = "Enter the referrer who introduced this lead.";
   const logged = (form.contactAttempts || []).filter(isLoggedAttempt);
   if (form.needsClientContact === "yes" && !logged.length)
-    errors.contactAttempts = "Log at least one contact attempt - how you tried and when.";
-  if (logged.some((a) => a.reached === false && isBlank(a.reason)))
-    errors.contactAttempts = "Enter a reason for every attempt where the client wasn't reached.";
+    errors.contactAttempts = "Log at least one contact attempt - the contact method and the date.";
   if (minDate && logged.some((a) => String(a.contactedAt).slice(0, 10) < minDate))
     errors.contactAttempts = "A contact attempt cannot be dated before the lead was created."; 
   if (!isBlank(form.customerBudget) && Number(form.customerBudget) < 0)

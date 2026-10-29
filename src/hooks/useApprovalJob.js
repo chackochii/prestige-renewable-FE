@@ -20,8 +20,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { clearSaveError, fetchJobApprovals, patchChecklistLocally, setRequiredApprovals, updateApproval } from "@/slices/approvalsSlice";
+import {
+  addApprovalAddendum,
+  clearSaveError,
+  fetchJobApprovals,
+  holdApprovals,
+  markApprovalsReviewed,
+  patchChecklistLocally,
+  reopenApprovals,
+  resolveRejection,
+  resumeApprovals,
+  setRequiredApprovals,
+  updateApproval,
+} from "@/slices/approvalsSlice";
 import { applyChecklist, derivedTrack, sectionOf } from "@/helpers/approvalChecklist";
+import { uploadOpportunityAttachment } from "@/services/api/leadsApi";
 
 const SEND_AFTER_MS = 700;
 
@@ -44,6 +57,22 @@ export function useApprovalJob(opportunityId) {
   }, [id, status, dispatch]);
 
   const reload = useCallback(() => (id ? dispatch(fetchJobApprovals(id)) : null), [id, dispatch]);
+
+  /**
+   * Evidence attached on an approval goes on the job's attachments (category
+   * "approval") and comes back as { id, filename, url } for the answer.
+   */
+  const upload = useCallback(
+    async (files) => {
+      const uploaded = [];
+      for (const file of Array.from(files || [])) {
+        const saved = await uploadOpportunityAttachment(id, "approval", file);
+        uploaded.push({ id: saved.id, filename: saved.filename ?? file.name, url: saved.url ?? null });
+      }
+      return uploaded;
+    },
+    [id],
+  );
   const job = useMemo(() => (raw ? applyChecklist(raw) : null), [raw]);
 
   const pending = useRef(new Map()); // "jobId:type" → the answers changed since the last send
@@ -159,5 +188,33 @@ export function useApprovalJob(opportunityId) {
 
   const dismissSaveError = useCallback(() => (id ? dispatch(clearSaveError(id)) : null), [id, dispatch]);
 
-  return { job, status, error, saveError, dismissSaveError, reload, updateChecklist, saveChecklist, checklistSaveState, updateItem, setRequired };
+  // After the job is sent to procurement: a document or note on an approval, reopening, and clearing a review.
+  const addAddendum = useCallback((type, body) => dispatch(addApprovalAddendum({ id, type, body })).unwrap(), [id, dispatch]);
+  const reopen = useCallback((reason) => dispatch(reopenApprovals({ id, reason })).unwrap(), [id, dispatch]);
+  const markReviewed = useCallback((note) => dispatch(markApprovalsReviewed({ id, note })).unwrap(), [id, dispatch]);
+  // A rejected approval resolved (resubmit, return to estimation or sales, change approach, close as lost).
+  const resolve = useCallback((type, body) => dispatch(resolveRejection({ id, type, body })).unwrap(), [id, dispatch]);
+  const hold = useCallback((reason) => dispatch(holdApprovals({ id, reason })).unwrap(), [id, dispatch]);
+  const resume = useCallback(() => dispatch(resumeApprovals({ id })).unwrap(), [id, dispatch]);
+
+  return {
+    job,
+    status,
+    error,
+    saveError,
+    dismissSaveError,
+    reload,
+    upload,
+    updateChecklist,
+    saveChecklist,
+    checklistSaveState,
+    updateItem,
+    setRequired,
+    addAddendum,
+    reopen,
+    markReviewed,
+    resolve,
+    hold,
+    resume,
+  };
 }

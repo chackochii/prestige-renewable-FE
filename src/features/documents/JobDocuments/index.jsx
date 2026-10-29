@@ -26,6 +26,7 @@ const CATEGORIES = [
   { key: "sketch", label: "Sketches & drawings" },
   { key: "document", label: "Lead documents" },
   { key: "client_document", label: "Client documents" },
+  { key: "approval", label: "Approval evidence" },
   { key: "supplier_quote", label: "Supplier quotes" },
   { key: "purchase_order", label: "Purchase orders" },
   { key: "delivery_receipt", label: "Delivery receipts" },

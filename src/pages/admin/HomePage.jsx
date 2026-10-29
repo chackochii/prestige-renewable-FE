@@ -15,6 +15,7 @@ import { waitingForCount, waitingForGroups } from "@/helpers/waitingFor";
 import { enabledStagesFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { isOverdue, periodStart, slaStatus, timeAgo } from "@/helpers/dateTimeHelpers";
+import { approvalTimers } from "@/helpers/approvals";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { firstName } from "@/utils/text";
 import { useAuth } from "@/hooks/useAuth";
@@ -130,6 +131,19 @@ export default function HomePage() {
           title: oppTitle(o),
           meta: `Next action overdue · ${o.nextAction || "no action set"}`,
           cta: "Review lead",
+        })),
+      // Jobs sitting at approvals with nothing happening (TR-02, the unit's limit).
+      ...active
+        .filter((o) => Number(o.stage) === 5 && !isOverdue(o.slaDueAt))
+        .map((o) => ({ o, days: Math.floor((Date.now() - new Date(o.lastActivityAt || o.updatedAt).getTime()) / 86400000) }))
+        .filter(({ days }) => days > approvalTimers(unit).idleDays)
+        .map(({ o, days }) => ({
+          id: `idle-${o.id}`,
+          oppId: o.id,
+          tone: "warning",
+          title: oppTitle(o),
+          meta: `Approvals · no activity for ${days} days`,
+          cta: "Open approvals",
         })),
       ...leads
         .filter((o) => o.qualification === "qualified")

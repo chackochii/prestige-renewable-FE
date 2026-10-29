@@ -454,11 +454,11 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             />
             {canEdit ? (
               <div style={{ marginTop: 10 }}>
-                <AddCustomApproval onAdd={addCustomApproval} disabled={saving} />
+                <AddCustomApproval onAdd={addCustomApproval} disabled={saving} placeholder="Any other approvals required" />
               </div>
             ) : null}
             <div style={{ marginTop: 12 }}>
-              <Field label="Permit / approval notes" hint="reference numbers, who is lodging, what is outstanding">
+              <Field label="Additional Notes" hint="optional">
                 <textarea
                   rows={2}
                   value={permitNotes}

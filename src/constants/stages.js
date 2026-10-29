@@ -40,7 +40,7 @@ export const STAGES = [
     key: "approvals",
     short: "Approvals",
     label: "Approvals",
-    description: "Council, network, facility and rebate approvals gathered before delivery can start.",
+    description: "Gather the approvals this job needs, such as council, network, finance or rebate, before it moves to Procurement.",
   },
   {
     id: 6,

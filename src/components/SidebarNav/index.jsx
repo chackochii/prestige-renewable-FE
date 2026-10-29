@@ -47,19 +47,23 @@ const ICONS = {
   superadmin: Building2,
 };
 
+const NAV_ORDER = ["home", "pipeline", "leads", "approvals", "procurement", "quotes", "admin"];
+const NAV_LABELS = { pipeline: "Jobs Board", admin: "Control Centre" };
+
 export default function SidebarNav({ open, onClose, onSearch }) {
   const { user } = useAuth();
   const { unit } = useBusinessUnit();
   const pages = useAppSelector((s) => s.pages.items);
-  // The pipeline is the Jobs Board, straight under Home (UAT, Oct 2026).
+  // The order and names the business asked for (UAT, Oct 2026): these first,
+  // in this order, then any other page the person can open, as the registry
+  // lists them.
   const items = useMemo(() => {
-    const built = buildNav({ pages, user, unit }).map((item) => (item.code === "pipeline" ? { ...item, label: "Jobs Board" } : item));
-    const board = built.find((item) => item.code === "pipeline");
-    if (!board) return built;
-    const rest = built.filter((item) => item !== board);
-    const home = rest.findIndex((item) => item.code === "home");
-    rest.splice(home + 1, 0, board);
-    return rest;
+    const built = buildNav({ pages, user, unit }).map((item) => (NAV_LABELS[item.code] ? { ...item, label: NAV_LABELS[item.code] } : item));
+    const rank = (item) => {
+      const at = NAV_ORDER.indexOf(item.code);
+      return at === -1 ? NAV_ORDER.length : at;
+    };
+    return built.map((item, index) => ({ item, index })).sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index).map(({ item }) => item);
   }, [pages, user, unit]);
 
   return (

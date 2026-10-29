@@ -78,9 +78,12 @@ const BILLING_OPTIONS = [
  * behind it.
  */
 const CONTACT_OPTIONS = [
-  { key: "yes", label: "Yes - log every attempt below" },
-  { key: "no", label: "No - we already had everything" },
+  { key: "yes", label: "Yes, Log Contact Attempts" },
+  { key: "no", label: "No, All Details Provided" },
 ];
+
+/** How an attempt was made. Attempts logged before this list keep what was typed. */
+const CONTACT_METHODS = ["Phone Call", "Email", "SMS", "In Person", "Other"];
 
 /**
  * Radio group for a short set of answers (storeys, roof, phase, …). Only the
@@ -576,9 +579,9 @@ export default function LeadForm({
                 ) : null}
               </ChecklistRow>
 
-              <ChecklistRow done={doneContact} label="Have you contacted the client?" required>
+              <ChecklistRow done={doneContact} label="Client Contact Needed?" required>
                 <p className="lede" style={{ margin: "0 0 10px" }}>
-                  Did you have to contact the client to collect the mandatory details?
+                  Did you need to contact the client for any required details?
                 </p>
                 <ChoiceGroup
                   name="lf-contact"
@@ -606,7 +609,7 @@ export default function LeadForm({
                           <span className={`status-icon ${a.reached === false ? "failed" : "done"}`}>
                             <PhoneCall size={14} />
                           </span>
-                          <span className="row-title">Attempt {i + 1}</span>
+                          <span className="row-title">Contact Attempt {i + 1}</span>
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
@@ -618,16 +621,18 @@ export default function LeadForm({
                           </button>
                         </div>
                         <div className="form-grid">
-                          <Field label="How you tried" required>
-                            <input
-                              value={a.method || ""}
-                              disabled={disabled}
-                              placeholder="e.g. Phone call, email"
-                              onChange={(e) => setAttempt(i, "method", e.target.value)}
-                            />
+                          <Field label="Contact Method" required>
+                            <select value={a.method || ""} disabled={disabled} onChange={(e) => setAttempt(i, "method", e.target.value)}>
+                              <option value="">Select…</option>
+                              {[...CONTACT_METHODS, ...(a.method && !CONTACT_METHODS.includes(a.method) ? [a.method] : [])].map((method) => (
+                                <option key={method} value={method}>
+                                  {method}
+                                </option>
+                              ))}
+                            </select>
                           </Field>
                           <Field
-                            label="When"
+                            label="Attempted Date"
                             required
                             error={
                               minDate && a.contactedAt && String(a.contactedAt).slice(0, 10) < minDate
@@ -644,31 +649,31 @@ export default function LeadForm({
                             />
                           </Field>
                         </div>
-                        <label className="check" style={{ marginTop: 10 }}>
-                          <input
-                            type="checkbox"
-                            checked={a.reached !== false}
-                            disabled={disabled}
-                            onChange={(e) => setAttempt(i, "reached", e.target.checked)}
-                          />
-                          Client was reached
-                        </label>
-                        {a.reached === false ? (
-                          <Field label="Reason not reached" required>
-                            <textarea
-                              rows={2}
-                              value={a.reason || ""}
-                              disabled={disabled}
-                              placeholder="e.g. No answer, voicemail left"
-                              onChange={(e) => setAttempt(i, "reason", e.target.value)}
-                            />
-                          </Field>
-                        ) : null}
-                        <Field label="Notes" hint="what was discussed on this attempt">
+                        <Field label="Client Reached">
+                          <div className="choice-grid">
+                            {[
+                              { key: true, label: "Yes" },
+                              { key: false, label: "No" },
+                            ].map((option) => (
+                              <label key={option.label} className="choice">
+                                <input
+                                  type="radio"
+                                  name={`lf-reached-${i}`}
+                                  checked={(a.reached !== false) === option.key}
+                                  disabled={disabled}
+                                  onChange={() => setAttempt(i, "reached", option.key)}
+                                />
+                                <span>{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </Field>
+                        <Field label="Notes">
                           <textarea
                             rows={2}
                             value={a.notes || ""}
                             disabled={disabled}
+                            placeholder="What was discussed or left as a message"
                             onChange={(e) => setAttempt(i, "notes", e.target.value)}
                           />
                         </Field>
@@ -681,10 +686,10 @@ export default function LeadForm({
                       disabled={disabled}
                       onClick={addContactAttempt}
                     >
-                      <Plus size={14} /> Add attempt
+                      <Plus size={14} /> Add Another Attempt
                     </button>
                     <p className="lede" style={{ margin: "8px 0 0" }}>
-                      No response yet? Add another - every attempt is kept.
+                      No response? Add another attempt. All attempts are saved.
                     </p>
                   </div>
                 ) : null}
@@ -763,7 +768,7 @@ export default function LeadForm({
 
               <div className="checklist" style={{ marginBottom: 20 }}>
               <GroupHead
-                title="Mandatory information"
+                title="Required Information"
                 count={`${doneCount}/${checklistRows.length}`}
                 open={isOpen("mandatory")}
                 onToggle={() => toggleGroup("mandatory")}

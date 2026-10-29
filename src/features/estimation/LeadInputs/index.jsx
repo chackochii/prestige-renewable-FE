@@ -291,7 +291,7 @@ export default function LeadInputs({
         {/* Headed the way the lead checklist heads its groups. */}
         <div className="input-group-head">
           <SectionToggle open={isOpen("mandatory")} onToggle={() => toggleSection("mandatory")}>
-            <h4>Mandatory information</h4>
+            <h4>Required Information</h4>
           </SectionToggle>
           <span>
             {mandatoryDone}/{mandatory.length}

@@ -6,7 +6,7 @@
 //     ├─ Finance approval       │ sales on the lead or by estimation, from the
 //     └─ Other approvals        ┘ unit's catalogue (Admin → Unit settings)
 //   All approved?
-//     yes → Procurement & delivery, and procurement is told
+//     yes → ready: Send to Procurement (by hand), and procurement is told
 //     no  → back with the salesperson; sales manager + owner told; in the history
 //
 // Jobs and their approvals come from prestige-be (services/api/approvalsApi.js).
@@ -32,6 +32,82 @@ export const ITEM_STATUSES = {
   rejected: { key: "rejected", label: "Rejected", tone: "danger" },
 };
 
+/**
+ * What can be done about a rejected approval (UAT exit logic RJ-01..05, Oct
+ * 2026) - a reason is required for each. `effect` is shown once it is picked,
+ * `action` is its confirm button.
+ */
+export const REJECTION_OPTIONS = [
+  {
+    value: "resubmit",
+    label: "Resubmit",
+    when: "The rejection can be fixed (missing document, wrong form).",
+    effect: "The status returns to Not Started. The previous submission stays in History.",
+    action: "Resubmit",
+    placeholder: "What will be fixed before it is lodged again",
+  },
+  {
+    value: "return_estimation",
+    label: "Return to Estimation",
+    when: "The design must change (e.g. export limit refused, so a smaller system or export limiting is needed).",
+    effect: "The job goes back to Estimation. The quote is revised, the customer re-accepts it, and the affected approvals are reset.",
+    action: "Return to Estimation",
+    placeholder: "What has to change in the design",
+  },
+  {
+    value: "return_sales",
+    label: "Return to Sales",
+    when: "The customer needs to decide something (e.g. finance declined, so cash or a different product).",
+    effect: "The job goes back to Proposal and Negotiation, with this reason shown.",
+    action: "Return to Sales",
+    placeholder: "What the customer needs to decide",
+  },
+  {
+    value: "change_approach",
+    label: "Change Approach",
+    when: "Another path exists (e.g. DA refused but CDC possible, or another finance provider).",
+    effect: "The rejected approval is closed and the new one is added. Both stay in History.",
+    action: "Change Approach",
+    placeholder: "Why the new approach will work",
+  },
+  {
+    value: "close_lost",
+    label: "Close Job as Lost",
+    when: "The job can't proceed.",
+    effect: "The job moves to Closed Lost.",
+    action: "Close Job as Lost",
+    placeholder: "Anything else to record",
+  },
+];
+
+/**
+ * Which approvals restart from Not Started when the job comes back from a
+ * redesign (Return to Estimation; UAT RS-01..03, Oct 2026). Nothing relevant
+ * changed (RS-04): the approvals on the job are kept.
+ */
+export const APPROVAL_RESETS = [
+  { value: "system", label: "System size, inverter or battery", resets: ["dnsp", "rebate"] },
+  { value: "total", label: "Quote total", resets: ["finance"] },
+  { value: "layout", label: "Panel layout or mounting", resets: ["da", "heritage", "strata"] },
+];
+
+/**
+ * Time-based approval rules (UAT TR-01..03, Oct 2026), set per unit on Unit
+ * settings (unit.metadata.approvalTimers):
+ *   staleLodgedDays    - an approval Lodged longer than this is flagged amber (TR-01)
+ *   idleDays           - a job at approvals with no activity this long goes on the home page's list (TR-02)
+ *   expiryWarningDays  - an approval with a Valid Until date is warned about this long before (TR-03)
+ */
+// Stale after 5 days and expiry warned 15 days before, as confirmed with the business (CNF-02).
+export const APPROVAL_TIMER_DEFAULTS = { staleLodgedDays: 5, idleDays: 7, expiryWarningDays: 15 };
+
+/** Why a job closed as lost from a rejected approval. */
+export const LOST_REASONS = [
+  { value: "approval_refused", label: "Approval Refused" },
+  { value: "customer_withdrew", label: "Customer Withdrew" },
+  { value: "other", label: "Other" },
+];
+
 /** The statuses a plain (non-checklist) approval can be set to, in the order the form offers them. */
 export const EDITABLE_STATUSES = ["not_started", "submitted", "approved", "rejected"];
 
@@ -55,9 +131,9 @@ export const APPROVAL_RULES = [
   },
   {
     key: "approvals.complete",
-    when: "Every approval is received",
-    then: "The job moves on to procurement by itself; procurement is told to create the job and start.",
-    notifies: "Procurement manager · everyone on the job",
+    when: "Every applicable approval is complete, then the job is sent to Procurement",
+    then: "The coordinator and owners are told it is ready to send; once someone sends it (Send to Procurement), procurement is told to create the job and start.",
+    notifies: "Operations coordinators · business owners · then the procurement manager",
   },
   {
     key: "approvals.rejected",

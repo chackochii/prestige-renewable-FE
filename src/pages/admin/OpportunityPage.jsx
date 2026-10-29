@@ -1,5 +1,8 @@
 // Opportunity detail: hero, stage stepper, stage work and history.
 
+import { useApprovalJob } from "@/hooks/useApprovalJob";
+import { reviewNeeded, reviewReasons } from "@/helpers/approvals";
+import { approvalConditions } from "@/helpers/approvalChecklist";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock, FileStack, FolderOpen, Send } from "lucide-react";
@@ -58,6 +61,8 @@ export default function OpportunityPage() {
   const pageRef = useRef(null);
   useMinDate(pageRef, opp ? dateIsoInZone(opp.createdAt, unit?.timezone) : "");
   const procurementRecord = useProcurementJob(opp?.id, { enabled: [6, 7].includes(Number(opp?.stage)) });
+  // Approvals are read from the approvals stage on: the stage-5 gate is their states, and later a failed one needs a review.
+  const approvalRecord = useApprovalJob(Number(opp?.stage) >= 5 ? opp?.id : null);
   const [tab, setTab] = useState("work");
   const [viewStage, setViewStage] = useState(stageParam);
   const [advanceError, setAdvanceError] = useState("");
@@ -120,7 +125,7 @@ export default function OpportunityPage() {
   const viewing = viewStage && viewStage <= current ? viewStage : current;
   const stage = stageById(current);
   const next = nextStageFor(current, unit);
-  const gate = advanceState(opp, { quote, user, procurementJob: procurementRecord.job });
+  const gate = advanceState(opp, { quote, user, procurementJob: procurementRecord.job, approvalJob: approvalRecord.job });
   const stageHidden = stageHiddenReason(user, viewing);
   const sla = slaStatus(opp.slaDueAt);
   const life = lifecycleMeta(opp.lifecycle);
@@ -165,7 +170,7 @@ export default function OpportunityPage() {
   return (
     <div ref={pageRef}>
       <Link to={current === 1 ? "/leads" : "/pipeline"} className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}>
-        {current === 1 ? "Leads" : "Pipeline"}
+        {current === 1 ? "Leads" : "Jobs Board"}
       </Link>
 
       <div className="opp-hero">
@@ -190,7 +195,8 @@ export default function OpportunityPage() {
               Delete
             </button>
           ) : null}
-          {canAdvanceFrom(user, current) && next !== null && opp.lifecycle === "Active" ? (
+          {/* Approvals has its own way out (Send to Procurement, with its checks and confirmation). */}
+          {canAdvanceFrom(user, current) && next !== null && opp.lifecycle === "Active" && current !== 5 ? (
             current === 2 ? (
               <button type="button" className="btn btn-primary" onClick={openHandover}>
                 <Send size={16} /> Send to {stageById(next).short} <ArrowRight size={16} />
@@ -238,7 +244,42 @@ export default function OpportunityPage() {
           the detail in its tooltip at every stage. */}
       {!gate.canAdvance && viewing !== 1 && opp.lifecycle === "Active" && next !== null && !advanceError ? (
         <Alert tone="info">
-          {current === 2 || current === 3 ? gate.missing.join(" ") : `To leave ${stage.label}: ${gate.missing.join(" · ")}`}
+          {current === 5
+            ? `When all required approvals are approved, the job is ready to send to Procurement. Still open: ${gate.missing.join(" · ")}`
+            : current === 2 || current === 3
+              ? gate.missing.join(" ")
+              : `To leave ${stage.label}: ${gate.missing.join(" · ")}`}
+        </Alert>
+      ) : null}
+      {/* Sent back from approvals (Return to Estimation / Sales): why, until it is back at approvals. */}
+      {opp.approvalReturn && current < 5 ? (
+        <Alert tone="warning">
+          <strong>{opp.approvalReturn.to === "sales" ? "Returned to Sales" : "Returned to Estimation"} from Approvals</strong>
+          {opp.approvalReturn.approval ? ` (${opp.approvalReturn.approval} rejected)` : ""}: {opp.approvalReturn.reason}
+          {opp.approvalReturn.by ? ` - ${opp.approvalReturn.by}` : ""}
+          {Array.isArray(opp.approvalReturn.resets) && opp.approvalReturn.resets.length ? (
+            <div style={{ marginTop: 4 }}>Approvals that will reset to Not Started: {opp.approvalReturn.resets.join(", ")}</div>
+          ) : null}
+        </Alert>
+      ) : null}
+      {/* The conditions approvals were given with, for procurement and installation to work to. */}
+      {approvalRecord.job && [6, 7].includes(current) && approvalConditions(approvalRecord.job).length ? (
+        <Alert tone="warning">
+          <strong>Approval conditions:</strong>{" "}
+          {approvalConditions(approvalRecord.job)
+            .map((entry) => `${entry.label}: ${entry.conditions}`)
+            .join(" · ")}
+        </Alert>
+      ) : null}
+      {/* The quote revised after approvals were lodged, or an approval revoked or expired after the job moved on. */}
+      {approvalRecord.job && reviewNeeded(approvalRecord.job) ? (
+        <Alert tone="warning" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <span>
+            <strong>Approval Review Needed:</strong> {reviewReasons(approvalRecord.job).join(" · ")}
+          </span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setViewStage(5)}>
+            Open Approvals
+          </button>
         </Alert>
       ) : null}
 
@@ -304,7 +345,7 @@ export default function OpportunityPage() {
               Save button to rename — so the step that ends the stage sits under
               the work: Proceed to the next stage, once the stage can be left.
               The lead pack and estimation's hand-over carry their own. */}
-          {!stageHidden && viewing === current && current > 2 && next !== null && opp.lifecycle === "Active" && canAdvanceFrom(user, current) && gate.canAdvance ? (
+          {!stageHidden && viewing === current && current > 2 && current !== 5 && next !== null && opp.lifecycle === "Active" && canAdvanceFrom(user, current) && gate.canAdvance ? (
             <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
               <button type="button" className="btn btn-primary" onClick={advance} disabled={advancing}>
                 {advancing ? "Moving…" : `Proceed to ${stageById(next).label}`} <ArrowRight size={16} />

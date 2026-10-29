@@ -62,12 +62,11 @@ export function inspectionStatusLabel(key) {
 
 /** Permits and approvals this job may need, ticked as they are identified. */
 export const PERMIT_OPTIONS = [
-  { key: "dnsp", label: "DNSP / network connection approval" },
-  { key: "da", label: "Council DA" },
-  { key: "strata", label: "Strata / body corporate approval" },
-  { key: "heritage", label: "Heritage overlay approval" },
-  { key: "landlord", label: "Landlord consent" },
-  { key: "electrical_safety", label: "Electrical safety / CES notification" },
+  { key: "dnsp", label: "Network Connection Approval (DNSP)" },
+  { key: "da", label: "Council Approval (DA)" },
+  { key: "strata", label: "Strata Approval" },
+  { key: "heritage", label: "Heritage Approval" },
+  { key: "landlord", label: "Landlord Consent" },
 ];
 
 export const VPP_OPTIONS = [

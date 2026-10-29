@@ -23,13 +23,60 @@ export const hasFiles = (value) => Array.isArray(value) && value.length > 0;
 export const normaliseNmi = (value) => String(value ?? "").replace(/\s+/g, "").toUpperCase();
 export const isNmi = (value) => /^[A-Z0-9]{10,11}$/.test(normaliseNmi(value));
 
-const VALIDATORS = { nmi: isNmi };
+/** An ABN is 11 digits; spaces are ignored. */
+export const isAbn = (value) => /^\d{11}$/.test(String(value ?? "").replace(/\s+/g, ""));
+
+const VALIDATORS = { nmi: isNmi, abn: isAbn };
+
+/** What is wrong with a typed answer (`validate`), or "". */
+export function validationError(field, value) {
+  if (!field?.validate || blank(value) || VALIDATORS[field.validate]?.(value)) return "";
+  return field.invalidText ?? "Check this value.";
+}
+
+/** A field's options - fixed, or worked out from the other answers (`optionsFor`). */
+export const optionsOf = (field, answers) => (field.optionsFor ? field.optionsFor(answers ?? {}) : (field.options ?? []));
+
+/** Required: not optional, or optional until the answer it goes with is given (`requiredWith`). */
+export const fieldRequired = (field, answers) => !field.optional || (Boolean(field.requiredWith) && !blank(answers?.[field.requiredWith]));
 
 /** Whether an item (or field, or record) applies: true, false, or null while that is not yet known. */
 export function appliesTo(entry, ctx) {
   if (!entry?.onlyIf) return true;
   const value = ctx?.conditions?.[entry.onlyIf];
   return value === undefined ? null : value;
+}
+
+/**
+ * Whether a field shows, from another answer in the same section:
+ * `showIf: { key, in: [values] }` - shown when that answer (or, for a
+ * multi-select, any of its choices) is one of the values.
+ */
+export function shownBy(entry, answers) {
+  // `showWhen(answers)` - shown while a worked-out condition holds (an approved amount below the finance amount).
+  if (entry?.showWhen && !entry.showWhen(answers ?? {})) return false;
+  if (!entry?.showIf) return true;
+  const { key, in: values = [] } = entry.showIf;
+  const value = answers?.[key];
+  return Array.isArray(value) ? value.some((choice) => values.includes(choice)) : values.includes(value);
+}
+
+/** Today as yyyy-mm-dd, in local time - the latest an approval date can be. */
+export const today = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
+
+/**
+ * What is wrong with a date answer, or "": `noFuture` dates cannot be after
+ * today, and `notBefore` names the answer they cannot be earlier than.
+ */
+export function dateError(field, value, answers) {
+  if (field?.kind !== "date" || blank(value)) return "";
+  if (field.noFuture && value > today()) return "Cannot be in the future.";
+  const floor = field.notBefore ? answers?.[field.notBefore] : null;
+  if (floor && value < floor) return `Cannot be earlier than the ${field.notBeforeLabel ?? "submission date"}.`;
+  return "";
 }
 
 /** Is one answer filled in, for a field of this kind? */
@@ -39,6 +86,8 @@ export function answered(field, value, ctx) {
       return value === true;
     case "files":
       return hasFiles(value);
+    case "multi":
+      return Array.isArray(value) && value.length > 0;
     case "number":
       return !blank(value) && Number.isFinite(Number(value));
     case "auto": {
@@ -82,56 +131,77 @@ export function itemDone(section, item, answers, ctx) {
   const value = answers?.[item.key];
   switch (item.kind) {
     case "auto":
+      // A confirmation that cannot be given while the record it confirms has gaps.
+      return value === true && !(item.blockWhenMissing && ctx?.autoMissing?.(item.source));
     case "checkbox":
       return value === true;
     case "checkDetails":
       return value === true && (!item.detailsRequired || !blank(answers?.[item.detailsKey]));
     case "group":
       return item.fields
-        .filter((field) => !field.optional)
+        .filter((field) => fieldRequired(field, answers) && shownBy(field, answers))
         .every((field) => {
           const fieldApplies = appliesTo(field, ctx);
           if (fieldApplies === false) return true;
           if (fieldApplies === null) return false;
-          return answered(field, answers?.[field.key], ctx);
+          return answered(field, answers?.[field.key], ctx) && !validationError(field, answers?.[field.key]);
         });
     case "documents":
       return item.slots.every((slot) => hasFiles(answers?.documents?.[slot.key]));
     case "status": {
-      // The status is the coordinator's call: a finishing status is done
-      // whatever else is still open (those items stay open on their own).
+      // A finishing status is done once the records it needs are in.
       const status = statusOf(section, answers);
-      return Boolean(status?.done);
+      return Boolean(status?.done) && !statusBlockers(section, answers, ctx).length;
     }
     default:
       return answered(item, value, ctx);
   }
 }
 
-/**
- * What stops `statusValue` being chosen, as short phrases ("finish items 2, 7",
- * "record the reference number"). Empty when it can be chosen.
- */
-export function statusBlockers(section, answers, ctx, statusValue) {
+/** The records the chosen status shows: its `fields`, less any hidden by another answer. */
+export function statusRecords(section, answers, statusValue = statusOf(section, answers)?.value) {
   const item = statusItemOf(section);
   const status = item?.statuses.find((candidate) => candidate.value === statusValue);
-  const requires = status?.requires;
-  if (!requires) return [];
-  const reasons = [];
+  const keys = status?.fields ?? [];
+  return keys.map((key) => item.records.find((record) => record.key === key)).filter((record) => record && shownBy(record, answers));
+}
 
-  if (requires.items) {
-    const open = section.items.filter((entry) => entry.kind !== "status" && !itemDone(section, entry, answers, ctx)).map((entry) => entry.key);
-    if (open.length) reasons.push(`finish ${itemRange(section, open)}`);
+/**
+ * Why the chosen status cannot be saved yet, one sentence per missing or
+ * wrong record ("Attach the approval evidence to mark this as Approved.").
+ * Empty when it can.
+ */
+export function statusBlockers(section, answers, ctx, statusValue = statusOf(section, answers)?.value) {
+  const item = statusItemOf(section);
+  const status = item?.statuses.find((candidate) => candidate.value === statusValue);
+  if (!status) return [];
+  const required = new Set(status.required ?? []);
+  const reasons = [];
+  for (const record of statusRecords(section, answers, statusValue)) {
+    const value = answers?.[record.key];
+    const label = record.labels?.[status.value] ?? record.label;
+    // "Approved Export Limit (kW)" → "approved export limit (kW)": capitalised words lowered, units and acronyms kept.
+    const named = label.replace(/\b[A-Z][a-z]+\b/g, (word) => word.toLowerCase());
+    if (required.has(record.key) && !answered(record, value, ctx))
+      reasons.push(
+        record.kind === "checkbox"
+          ? `Tick "${label}" to mark this as ${status.label}.`
+          : `${record.kind === "files" ? "Attach" : "Record"} the ${named} to mark this as ${status.label}.`,
+      );
+    const wrong = dateError(record, value, answers);
+    if (wrong) reasons.push(`${label}: ${wrong}`);
   }
-  for (const [name, wanted] of Object.entries(requires.conditions ?? {})) {
-    if ((ctx?.conditions?.[name] ?? null) === wanted) continue;
-    const definition = section.conditions?.[name];
-    const text = definition ? (wanted ? definition.whenTrue : definition.whenFalse) : `${name} must be ${wanted}`;
-    reasons.push(definition?.items ? `${text} (${itemRange(section, definition.items)})` : text);
+  // A rule of the status's own (`check(answers, ctx)` → why not, or null).
+  const failed = status.check?.(answers ?? {}, ctx ?? {});
+  if (failed) reasons.push(failed);
+  // Items above that must be complete first (finance: Sections 1 and 2 before lodging).
+  for (const key of status.requiresItems ?? []) {
+    const item = section.items.find((entry) => entry.key === key);
+    if (item && !itemDone(section, item, answers, ctx)) reasons.push(`Complete ${item.label} first to mark this as ${status.label}.`);
   }
-  for (const key of requires.fields ?? []) {
-    const record = item.records.find((candidate) => candidate.key === key);
-    if (record && !answered(record, answers?.[key], ctx)) reasons.push(`record the ${record.label.toLowerCase()}`);
+  // Answers from the items above that this status cannot be saved without.
+  for (const { key, label } of status.requiredAnswers ?? []) {
+    if (blank(answers?.[key])) reasons.push(`Record the ${label} to mark this as ${status.label}.`);
   }
   return reasons;
 }
@@ -145,9 +215,13 @@ const TRACK_TONES = { not_started: "neutral", submitted: "warning", approved: "s
  * One checklist at a glance: { applies, locked, done, total, label, tone }.
  * `locked` — the checklist cannot be worked yet (its gate is not open).
  */
+/** Items hidden until they apply (`hideUnlessApplies`) are left out of the count while hidden. */
+export const itemShown = (item, ctx) => !item.hideUnlessApplies || appliesTo(item, ctx) === true;
+
 export function checklistSummary(section, answers, ctx, { locked = false, lockedLabel = "Not open yet" } = {}) {
-  const total = section.items.length;
-  const done = section.items.filter((item) => itemDone(section, item, answers, ctx)).length;
+  const shown = section.items.filter((item) => itemShown(item, ctx));
+  const total = shown.length;
+  const done = shown.filter((item) => itemDone(section, item, answers, ctx)).length;
   if (!sectionApplies(section, answers)) return { applies: false, locked: false, done: 0, total, label: "Not needed on this job", tone: "neutral" };
   if (locked) return { applies: true, locked: true, done, total, label: lockedLabel, tone: "neutral" };
   const status = statusOf(section, answers);

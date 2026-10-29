@@ -134,9 +134,11 @@ export const updateLead = createAsyncThunk("leads/update", async ({ id, body }, 
   }
 });
 
-export const advanceStage = createAsyncThunk("leads/advance", async (id, { rejectWithValue }) => {
+/** `arg`: the record's id, or { id, body } when the move carries something (approvals: { conditionsReviewed }). */
+export const advanceStage = createAsyncThunk("leads/advance", async (arg, { rejectWithValue }) => {
+  const { id, body } = arg && typeof arg === "object" ? arg : { id: arg };
   try {
-    return await api.advanceOpportunity(id);
+    return await api.advanceOpportunity(id, body);
   } catch (err) {
     return reject(err, rejectWithValue);
   }

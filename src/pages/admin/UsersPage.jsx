@@ -84,7 +84,7 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Administration"
+        title="Control Centre"
         description="Users, their roles and business units. A person can hold several roles; their access is the union of every role's permissions."
         actions={
           canCreate ? (
