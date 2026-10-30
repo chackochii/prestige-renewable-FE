@@ -75,9 +75,9 @@ export default function QuotesPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <div className="card card-pad">
         <div className="table-toolbar">
-          <div className="search-wrap" style={{ position: "relative" }}>
+          <div className="search-wrap" style={{ position: "relative", width: "calc(300px * var(--text-scale))", maxWidth: "100%" }}>
             <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.6 }} />
-            <input className="search" style={{ paddingLeft: 30 }} placeholder="Search job or customer" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="search" style={{ paddingLeft: 30, maxWidth: "none" }} placeholder="Search job or customer" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
         {loading && !rows.length ? (

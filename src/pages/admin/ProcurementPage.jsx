@@ -70,22 +70,13 @@ export default function ProcurementPage() {
         title="Jobs in procurement"
         icon={<PackageSearch size={16} />}
         sub="Pick a job to see where it is in the flow."
-        actions={
-          <div className="search-wrap" style={{ position: "relative" }}>
-            <Search
-              size={14}
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                opacity: 0.6,
-              }}
-            />
-            <input className="search" style={{ paddingLeft: 30 }} placeholder="Search job, customer, suburb" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-        }
       >
+        <div className="table-toolbar">
+          <div className="search-wrap" style={{ position: "relative", width: "calc(300px * var(--text-scale))", maxWidth: "100%" }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.6 }} />
+            <input className="search" style={{ paddingLeft: 30, maxWidth: "none" }} placeholder="Search job, customer, suburb" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
         {boardError ? <Alert tone="danger">{boardError}</Alert> : null}
         {loading && !rows.length ? (
           <LoadingState label="Loading procurement…" />

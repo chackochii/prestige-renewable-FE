@@ -85,9 +85,9 @@ export default function ApprovalsPage() {
 
       <Card>
         <div className="table-toolbar">
-          <div className="search-wrap" style={{ position: "relative" }}>
+          <div className="search-wrap" style={{ position: "relative", width: "calc(300px * var(--text-scale))", maxWidth: "100%" }}>
             <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.6 }} />
-            <input className="search" style={{ paddingLeft: 30 }} placeholder="Search job, customer or approval" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="search" style={{ paddingLeft: 30, maxWidth: "none" }} placeholder="Search job, customer or approval" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           {filter ? (
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFilter("")}>
