@@ -59,12 +59,8 @@ export default function LoginPage() {
     <div className="login-wrap">
       <section className="login-art">
         <div>
-          <Link to="/" className="brand" style={{ width: "fit-content" }}>
-            <BrandMark size={40} />
-            <div>
-              {/* <div className="brand-name">Prestige Renewable</div>
-              <div className="brand-sub">Sales &amp; delivery</div> */}
-            </div>
+          <Link to="/">
+            <img src="/brand/prestige-logo-wide.png" alt="Prestige Renewable Solutions" style={{ height: 84 }} />
           </Link>
           <h2>Every job, every stage, one place.</h2>
           <p>

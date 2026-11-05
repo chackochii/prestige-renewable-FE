@@ -1299,3 +1299,9 @@
 .mini-progress { display: block; width: 90px; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 4px; }
 .mini-progress > i { display: block; height: 100%; background: var(--success); }
 .table-toolbar { display: flex; justify-content: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* A unit's logo has dark lettering: on a dark theme it sits on a white tile (helpers/brand.js). */
+:root[data-theme="dark"] .unit-logo { background: #fff; padding: 4px 8px; border-radius: 8px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .unit-logo { background: #fff; padding: 4px 8px; border-radius: 8px; }
+}

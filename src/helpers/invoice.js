@@ -42,6 +42,7 @@ import {
 import { formatCurrency } from "@/utils/formatCurrency";
 import { addDaysIso, formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { joinAddress } from "@/utils/text";
+import { logoDataUrl } from "@/helpers/brand";
 
 const TAX_TREATMENT_LABEL = {
   exclusive: "Prices are GST-exclusive - GST is added on top.",
@@ -170,17 +171,23 @@ function stableJson(value) {
 // ---- Drawing ----------------------------------------------------------------
 
 /** Letterhead and footer, drawn on every page once the page count is known. */
-function drawFurniture(doc, company) {
+function drawFurniture(doc, company, logo) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pages = doc.internal.getNumberOfPages();
 
   for (let page = 1; page <= pages; page += 1) {
     doc.setPage(page);
 
-    doc.setFont("times", "bold");
-    doc.setFontSize(15);
-    doc.setTextColor(...INK);
-    doc.text(company.wordmark, MARGIN, HEADER_Y);
+    // The unit's logo (helpers/brand.js), or the wordmark if it could not be loaded.
+    if (logo) {
+      const { width, height } = doc.getImageProperties(logo);
+      doc.addImage(logo, "PNG", MARGIN, HEADER_Y - 24, (30 * width) / height, 30, "unit-logo");
+    } else {
+      doc.setFont("times", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(...INK);
+      doc.text(company.wordmark, MARGIN, HEADER_Y);
+    }
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
@@ -562,7 +569,7 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
     styles: { ...TABLE_STYLES, minCellHeight: 34 },
   });
 
-  drawFurniture(doc, company);
+  drawFurniture(doc, company, await logoDataUrl(company.unit).catch(() => null));
   return doc;
 }
 
@@ -573,6 +580,7 @@ function sourceFor({ opp, quote, unit, version }) {
     ...(unit?.name ? { name: unit.name } : {}),
     ...(unit?.abn ? { abn: unit.abn } : {}),
     ...(unit?.address ? { address: unit.address } : {}),
+    unit,
   };
   if (version?.snapshot?.quote) {
     const snap = version.snapshot;

@@ -1,6 +1,6 @@
-// The Prestige Renewable mark (public/icon.svg), used wherever the brand shows.
+// The Prestige Renewable mark (public/brand/prestige-mark.png), used wherever the brand shows.
 
-const ICON_URL = "/icon.svg";
+const ICON_URL = "/brand/prestige-mark.png";
 
 export default function BrandMark({ size = 36, className = "" }) {
   return (

@@ -18,6 +18,7 @@ import { downloadInvoice, invoicePreviewUrl } from "@/helpers/invoice";
 import { getErrorMessage } from "@/services/api/client";
 import { getPublicProposal, respondToProposal } from "@/services/api/proposalsApi";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { unitLogo } from "@/helpers/brand";
 
 const CHOICES = [
   { key: "accept", label: "Accept Proposal", icon: ThumbsUp, tone: "primary", blurb: "Go ahead with this proposal as quoted." },
@@ -229,13 +230,12 @@ export default function ProposalPage() {
     document.title = proposal ? `Proposal ${proposal.number} - ${proposal.business?.name ?? ""}` : "Your proposal";
   }, [proposal]);
 
-  const business = proposal?.business?.name || "Your proposal";
 
   return (
     <div className="proposal-public">
       <header className="proposal-public-head">
         <div className="proposal-public-inner">
-          <span className="proposal-public-brand">{business}</span>
+          <img {...unitLogo(proposal?.business?.name)} className="unit-logo" style={{ height: 48 }} />
         </div>
       </header>
 

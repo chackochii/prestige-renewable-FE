@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import BrandMark from "@/components/BrandMark";
 import {
   ArrowRight,
   Bell,
@@ -117,10 +116,7 @@ export default function LandingPage() {
   return (
     <div className="landing">
       <nav className="landing-nav">
-        <div className="landing-brand">
-          <BrandMark size={32} />
-          {/* Prestige Renewable */}
-        </div>
+        <img src="/brand/prestige-logo-light.png" alt="Prestige Renewable Solutions" style={{ height: 52, content: "var(--landing-logo)" }} />
         <div className="landing-nav-links">
           <a href="#process">Process</a>
           <a href="#platform">Platform</a>
@@ -227,10 +223,7 @@ export default function LandingPage() {
       </Reveal>
 
       <footer className="landing-footer">
-        <div className="landing-brand" style={{ fontSize: "calc(14px * var(--text-scale))" }}>
-          <BrandMark size={26} />
-          {/* Prestige Renewable */}
-        </div>
+        <img src="/brand/prestige-logo-light.png" alt="Prestige Renewable Solutions" style={{ height: 52, content: "var(--landing-logo)" }} />
         <span>© {new Date().getFullYear()} Prestige · Sales &amp; Delivery</span>
       </footer>
     </div>
