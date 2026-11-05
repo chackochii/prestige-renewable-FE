@@ -26,7 +26,7 @@ export const serviceRequirementKeys = (value) =>
 
 export const STOREY_OPTIONS = [
   { key: "single", label: "Single storey" },
-  { key: "double", label: "Double storey" },
+  { key: "double", label: "Multi-Storey" },
 ];
 
 export const ROOF_TYPES = [

@@ -10,10 +10,12 @@ import { itemDone } from "@/helpers/checklist";
 import { downloadBoqOrderList, orderListLines } from "@/helpers/boqOrderPdf";
 import { answersOf, procurementContext } from "@/helpers/procurementChecklist";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 
 export default function BoqOrderList({ job }) {
   const { error: notifyError } = useNotifications();
   const [busy, setBusy] = useState(false);
+  const { unit } = useBusinessUnit();
 
   const section = procurementChecklistOf("boq");
   const item = section.items.find((entry) => entry.key === "changesApproved");
@@ -24,7 +26,7 @@ export default function BoqOrderList({ job }) {
   const download = async () => {
     setBusy(true);
     try {
-      await downloadBoqOrderList(job, { approvedDetails: answers[item.detailsKey] });
+      await downloadBoqOrderList(job, { approvedDetails: answers[item.detailsKey], unit });
     } catch {
       notifyError("The quote list PDF could not be created.");
     } finally {

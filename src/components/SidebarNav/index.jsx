@@ -27,6 +27,7 @@ import { useAppSelector } from "@/store";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { buildNav } from "@/helpers/navigation";
+import { unitLogo } from "@/helpers/brand";
 
 const ICONS = {
   home: House,
@@ -73,8 +74,7 @@ export default function SidebarNav({ open, onClose, onSearch }) {
       </button>
 
       <div className="brand">
-        {/* The unit's name, once. */}
-        <div className="brand-name">{unit?.name || "Prestige Portal"}</div>
+        <img {...unitLogo(unit, { dark: true })} style={{ width: "100%" }} />
       </div>
 
       <button type="button" className="sidebar-search" onClick={onSearch}>

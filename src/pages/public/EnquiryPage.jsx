@@ -12,7 +12,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Field from "@/components/Field";
 import Alert from "@/components/Alert";
-import BrandMark from "@/components/BrandMark";
+import { unitLogo } from "@/helpers/brand";
 import { AU_STATES } from "@/constants/stages";
 import { submitPublicLead } from "@/services/api/publicLeadsApi";
 import { getErrorMessage } from "@/services/api/client";
@@ -119,7 +119,7 @@ export default function EnquiryPage() {
       <section className="login-art">
         <div>
           <Link to="/" className="brand" style={{ width: "fit-content" }}>
-            <BrandMark size={40} />
+            <img {...unitLogo(linkedUnit, { dark: true })} style={{ height: 72, boxShadow: "none" }} />
             <div>
               {/* <div className="brand-name">Prestige Renewable</div>
               <div className="brand-sub">Sales &amp; delivery</div> */}
@@ -138,7 +138,7 @@ export default function EnquiryPage() {
         {done ? (
           <div className="login-card route-fade">
             <Link to="/" className="brand login-brand">
-              <BrandMark size={34} />
+              <img {...unitLogo(linkedUnit)} className="unit-logo" style={{ height: 44 }} />
               <div>
                 {/* <div className="brand-name">Prestige Renewable</div>
                 <div className="brand-sub">Sales &amp; delivery</div> */}
@@ -172,7 +172,7 @@ export default function EnquiryPage() {
         ) : (
           <form className="login-card route-fade" onSubmit={submit} noValidate>
             <Link to="/" className="brand login-brand">
-              <BrandMark size={34} />
+              <img {...unitLogo(linkedUnit)} className="unit-logo" style={{ height: 44 }} />
               <div>
                 {/* <div className="brand-name">Prestige Renewable</div>
                 <div className="brand-sub">Sales &amp; delivery</div> */}

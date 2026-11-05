@@ -10,6 +10,7 @@
 import { materialLines, serviceLines } from "@/helpers/procurement";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { formatNumber } from "@/utils/formatCurrency";
+import { logoDataUrl } from "@/helpers/brand";
 
 const MARGIN = 40;
 const INK = [33, 37, 41];
@@ -26,7 +27,7 @@ export function orderListLines(job) {
 
 export const orderListFileName = (job) => `${job?.number || "job"}-BOQ-BOS-quote-list.pdf`;
 
-export async function downloadBoqOrderList(job, { approvedDetails = "" } = {}) {
+export async function downloadBoqOrderList(job, { approvedDetails = "", unit } = {}) {
   const [pdfModule, tableModule] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const jsPDF = pdfModule.jsPDF || pdfModule.default;
   const autoTable = tableModule.default || tableModule.autoTable;
@@ -34,6 +35,13 @@ export async function downloadBoqOrderList(job, { approvedDetails = "" } = {}) {
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   let y = MARGIN + 10;
+
+  const logo = await logoDataUrl(unit).catch(() => null);
+  if (logo) {
+    const { width, height } = doc.getImageProperties(logo);
+    doc.addImage(logo, "PNG", MARGIN, MARGIN - 16, (36 * width) / height, 36);
+    y += 44;
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);

@@ -18,7 +18,7 @@ import { useParams } from "react-router-dom";
 import { Camera, CheckCircle2, ImagePlus, Loader2 } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
-import BrandMark from "@/components/BrandMark";
+import { unitLogo } from "@/helpers/brand";
 import Field from "@/components/Field";
 import FileDropzone from "@/components/FileDropzone";
 import LoadingState from "@/components/LoadingState";
@@ -358,7 +358,7 @@ export default function SiteVisitPage() {
     <header className="site-form-head">
       <div className="site-form-inner site-form-head-row">
         <div className="brand" style={{ width: "fit-content" }}>
-          <BrandMark size={30} />
+          <img {...unitLogo(task?.jobNumber)} className="unit-logo" style={{ height: 40 }} />
           <div>
             <div className="brand-name">Pre-site inspection</div>
             <div className="brand-sub">{task?.jobNumber || "Site visit"}</div>

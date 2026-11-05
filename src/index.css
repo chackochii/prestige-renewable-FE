@@ -48,8 +48,8 @@
        --hint stays grey on purpose — placeholders and hover borders, which
        must never pass for an answer. */
     --ink: #000000;
-    --ink-soft: #262626;
-    --muted: #404040;
+    --ink-soft: #171717;
+    --muted: #2e2e2e;
     --hint: #6b7b90;
     --line: #dde3ea;
     --line-strong: #c8d1dc;
@@ -80,6 +80,7 @@
     --accent-ink: #8a6508;
     --topbar-bg: #f5f7fae6;
     --landing-nav-bg: #ffffffbf;
+    --landing-logo: url("/brand/prestige-logo-light.png");
 
     --shadow: 0 1px 2px rgba(15, 27, 45, 0.05), 0 8px 24px rgba(15, 27, 45, 0.07);
     --shadow-lift: 0 4px 10px rgba(15, 27, 45, 0.07), 0 20px 40px rgba(15, 27, 45, 0.14);
@@ -98,7 +99,7 @@
     /* Every UI text size is written as calc(<size>px * var(--text-scale)), so
        the whole app's text grows or shrinks from here. Display headings of
        24px and up are left as they are. */
-    --text-scale: 1.15;
+    --text-scale: 1.22;
   }
 
   /*
@@ -108,9 +109,9 @@
    */
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --ink: #f8fafc;
-    --ink-soft: #d5dce6;
-    --muted: #b8c3d2;
+    --ink: #ffffff;
+    --ink-soft: #e6ebf2;
+    --muted: #cdd5e0;
     --hint: #7f8ea4;
     --line: #26344f;
     --line-strong: #34445f;
@@ -140,6 +141,7 @@
     --accent-ink: #e5c158;
     --topbar-bg: #0b1220e6;
     --landing-nav-bg: #0b1220bf;
+    --landing-logo: url("/brand/prestige-logo-wide.png");
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
     --shadow-lift: 0 4px 10px rgba(0, 0, 0, 0.35), 0 20px 40px rgba(0, 0, 0, 0.5);
   }
@@ -147,9 +149,9 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --ink: #f8fafc;
-      --ink-soft: #d5dce6;
-      --muted: #b8c3d2;
+      --ink: #ffffff;
+      --ink-soft: #e6ebf2;
+      --muted: #cdd5e0;
       --hint: #7f8ea4;
       --line: #26344f;
       --line-strong: #34445f;
@@ -179,6 +181,7 @@
       --accent-ink: #e5c158;
       --topbar-bg: #0b1220e6;
       --landing-nav-bg: #0b1220bf;
+      --landing-logo: url("/brand/prestige-logo-wide.png");
       --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
       --shadow-lift: 0 4px 10px rgba(0, 0, 0, 0.35), 0 20px 40px rgba(0, 0, 0, 0.5);
     }
