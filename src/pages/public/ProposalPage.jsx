@@ -68,7 +68,8 @@ function PdfPanel({ proposal }) {
   const [url, setUrl] = useState(null);
   const [error, setError] = useState("");
   const version = proposal.quoteVersion;
-  const unit = { name: proposal.business?.name };
+  // The business sending it: its name for the letterhead, its brand for the logo.
+  const unit = proposal.business || {};
 
   useEffect(() => {
     if (!version?.snapshot) return undefined;
@@ -235,7 +236,7 @@ export default function ProposalPage() {
     <div className="proposal-public">
       <header className="proposal-public-head">
         <div className="proposal-public-inner">
-          <img {...unitLogo(proposal?.business?.name)} className="unit-logo" style={{ height: 48 }} />
+          <img {...unitLogo(proposal?.business)} className="unit-logo" style={{ height: 48 }} />
         </div>
       </header>
 

@@ -7,14 +7,14 @@
 // goes to the default unit the server is configured with. Either way the
 // sender just fills in their details and sends.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Field from "@/components/Field";
 import Alert from "@/components/Alert";
 import { unitLogo } from "@/helpers/brand";
 import { AU_STATES } from "@/constants/stages";
-import { submitPublicLead } from "@/services/api/publicLeadsApi";
+import { getPublicLeadBrand, submitPublicLead } from "@/services/api/publicLeadsApi";
 import { getErrorMessage } from "@/services/api/client";
 import { isBlank, isEmail } from "@/utils/validators";
 
@@ -75,6 +75,20 @@ export default function EnquiryPage() {
   // Set by the link, never by the visitor. An unknown code is rejected by the
   // server, so there is nothing to validate here.
   const linkedUnit = (searchParams.get("unit") || "").trim().toUpperCase();
+  // Whose logo the page shows: the brand of the unit the enquiry will land in,
+  // from the server (the default unit for a bare link). Until it answers — or
+  // if the code is bad, which the submit will say — the code itself decides.
+  const [brand, setBrand] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    getPublicLeadBrand(linkedUnit)
+      .then((result) => !cancelled && setBrand(result?.brand ?? null))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedUnit]);
+  const brandUnit = { brand, code: linkedUnit };
   const [form, setForm] = useState(emptyForm);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
@@ -119,7 +133,7 @@ export default function EnquiryPage() {
       <section className="login-art">
         <div>
           <Link to="/" className="brand" style={{ width: "fit-content" }}>
-            <img {...unitLogo(linkedUnit, { dark: true })} style={{ height: 72, boxShadow: "none" }} />
+            <img {...unitLogo(brandUnit, { dark: true })} style={{ height: 72, boxShadow: "none" }} />
             <div>
               {/* <div className="brand-name">Prestige Renewable</div>
               <div className="brand-sub">Sales &amp; delivery</div> */}
@@ -138,7 +152,7 @@ export default function EnquiryPage() {
         {done ? (
           <div className="login-card route-fade">
             <Link to="/" className="brand login-brand">
-              <img {...unitLogo(linkedUnit)} className="unit-logo" style={{ height: 44 }} />
+              <img {...unitLogo(brandUnit)} className="unit-logo" style={{ height: 44 }} />
               <div>
                 {/* <div className="brand-name">Prestige Renewable</div>
                 <div className="brand-sub">Sales &amp; delivery</div> */}
@@ -172,7 +186,7 @@ export default function EnquiryPage() {
         ) : (
           <form className="login-card route-fade" onSubmit={submit} noValidate>
             <Link to="/" className="brand login-brand">
-              <img {...unitLogo(linkedUnit)} className="unit-logo" style={{ height: 44 }} />
+              <img {...unitLogo(brandUnit)} className="unit-logo" style={{ height: 44 }} />
               <div>
                 {/* <div className="brand-name">Prestige Renewable</div>
                 <div className="brand-sub">Sales &amp; delivery</div> */}

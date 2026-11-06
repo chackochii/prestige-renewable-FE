@@ -17,6 +17,8 @@ import { apiClient, unwrap } from "./client";
  *      siteAddress,                 // where to go
  *      scheduledFor,                // when, if it is scheduled
  *      assigneeName,                // who it was handed to, for confirmation
+ *      jobNumber, quoteNumber,      // the job the form heads itself with
+ *      brand,                       // "prestige" | "sydpro" — whose logo it shows
  *      requestedFields: [{ key, label }],
  *      requestedDocuments: [{ key, label, type, comment }],
  *      photos: [{ id, filename, url, documentKey }]

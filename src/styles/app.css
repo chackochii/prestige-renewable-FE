@@ -1301,6 +1301,7 @@
 .table-toolbar { display: flex; justify-content: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 
 /* A unit's logo has dark lettering: on a dark theme it sits on a white tile (helpers/brand.js). */
+.unit-logo-tile { background: #fff; padding: 6px 10px; border-radius: 8px; box-sizing: border-box; } /* the same tile on an always-dark surface: the sidebar, the sign-in art */
 :root[data-theme="dark"] .unit-logo { background: #fff; padding: 4px 8px; border-radius: 8px; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .unit-logo { background: #fff; padding: 4px 8px; border-radius: 8px; }

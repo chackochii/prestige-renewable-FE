@@ -85,7 +85,7 @@ export async function requestRequote(opportunityId, body) {
 /**
  * → { state: "open" | "expired" | "accepted" | "rejected" | "negotiation" | "re-estimated" | "withdrawn",
  *     number, version, sentAt, expiresAt, grandTotal, customerName,
- *     business: { name, legalName }, contact: { name, email, phone } | null, message,
+ *     business: { code, name, legalName, brand }, contact: { name, email, phone } | null, message,
  *     quoteVersion: { version, snapshot, createdAt } | null,
  *     response: { decision, at, name, note } | null }
  */

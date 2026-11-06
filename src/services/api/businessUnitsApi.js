@@ -11,12 +11,12 @@ export async function getBusinessUnit(id) {
   return unwrap(await apiClient.get(`/business-units/${id}`));
 }
 
-/** Superadmin only. body: { code, name, legalName?, timezone?, status?, ...config } */
+/** Superadmin only. body: { code, name, legalName?, timezone?, status?, brand?, ...config } */
 export async function createBusinessUnit(body) {
   return unwrap(await apiClient.post("/business-units", body));
 }
 
-/** Superadmin only. body: { name?, legalName?, timezone?, status? } */
+/** Superadmin only. body: { name?, legalName?, timezone?, status?, brand? } (brand: "prestige" | "sydpro") */
 export async function updateBusinessUnit(id, body) {
   return unwrap(await apiClient.patch(`/business-units/${id}`, body));
 }

@@ -8,6 +8,7 @@ const LINKS = [
   { to: "/admin/roles", label: "Roles & permissions" },
   { to: "/admin/pages", label: "Pages" },
   { to: "/admin/settings", label: "Unit settings" },
+  { to: "/admin/connections", label: "Lead connections" },
 ];
 
 export default function AdminNav() {
@@ -15,19 +16,34 @@ export default function AdminNav() {
   return (
     <div className="segmented" style={{ marginBottom: 24 }}>
       {LINKS.map((link) => (
-        <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink
+          key={link.to}
+          to={link.to}
+          end={link.end}
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
           {link.label}
         </NavLink>
       ))}
       {isSuperAdmin ? (
         <>
-          <NavLink to="/superadmin" end className={({ isActive }) => (isActive ? "active" : "")}>
+          <NavLink
+            to="/superadmin"
+            end
+            className={({ isActive }) => (isActive ? "active" : "")}
+          >
             Business units
           </NavLink>
-          <NavLink to="/superadmin/dnsp-networks" className={({ isActive }) => (isActive ? "active" : "")}>
+          <NavLink
+            to="/superadmin/dnsp-networks"
+            className={({ isActive }) => (isActive ? "active" : "")}
+          >
             DNSP networks
           </NavLink>
-          <NavLink to="/superadmin/catalog" className={({ isActive }) => (isActive ? "active" : "")}>
+          <NavLink
+            to="/superadmin/catalog"
+            className={({ isActive }) => (isActive ? "active" : "")}
+          >
             Quote catalog
           </NavLink>
         </>

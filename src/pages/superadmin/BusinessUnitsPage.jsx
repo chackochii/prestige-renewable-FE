@@ -9,6 +9,7 @@ import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import LoadMore from "@/components/LoadMore";
 import BusinessUnitFormModal from "@/features/admin/BusinessUnitFormModal";
+import { brandLabel, unitBrand } from "@/helpers/brand";
 import { formatPercent } from "@/utils/formatCurrency";
 import { useAppDispatch } from "@/store";
 import { createBusinessUnit, removeBusinessUnit, updateBusinessUnit } from "@/slices/businessUnitsSlice";
@@ -94,6 +95,7 @@ export default function BusinessUnitsPage() {
                       <div className="row-meta">
                         {u.code}
                         {u.legalName ? ` · ${u.legalName}` : ""}
+                        {` · ${brandLabel(unitBrand(u))}`}
                       </div>
                     </td>
                     <td data-label="Status">

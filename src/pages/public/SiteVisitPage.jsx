@@ -358,7 +358,7 @@ export default function SiteVisitPage() {
     <header className="site-form-head">
       <div className="site-form-inner site-form-head-row">
         <div className="brand" style={{ width: "fit-content" }}>
-          <img {...unitLogo(task?.jobNumber)} className="unit-logo" style={{ height: 40 }} />
+          <img {...unitLogo({ brand: task?.brand, code: task?.jobNumber })} className="unit-logo" style={{ height: 40 }} />
           <div>
             <div className="brand-name">Pre-site inspection</div>
             <div className="brand-sub">{task?.jobNumber || "Site visit"}</div>

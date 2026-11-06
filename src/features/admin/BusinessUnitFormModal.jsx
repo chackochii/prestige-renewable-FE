@@ -6,6 +6,7 @@ import Field from "@/components/Field";
 import { isBlank } from "@/utils/validators";
 import { useNotifications } from "@/hooks/useNotifications";
 import { TIMEZONES } from "@/constants/timezones";
+import { BRANDS, brandLabel } from "@/helpers/brand";
 
 const STATUSES = ["active", "configured", "inactive"];
 
@@ -17,6 +18,7 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
     legalName: unit?.legalName || "",
     timezone: unit?.timezone || "Australia/Sydney",
     status: unit?.status || "configured",
+    brand: unit?.brand || "prestige",
   });
   // Problems show as a toast, not a box in the form.
   const { error: showError } = useNotifications();
@@ -32,6 +34,7 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
         legalName: form.legalName.trim() || null,
         timezone: form.timezone,
         status: form.status,
+        brand: form.brand,
       };
       if (!editing) body.code = form.code.trim().toUpperCase();
       await onSave(body);
@@ -73,6 +76,15 @@ export default function BusinessUnitFormModal({ unit, onClose, onSave }) {
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Brand" hint="the logo on screen, on the public links and in the PDFs" className="span-2">
+          <select value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}>
+            {BRANDS.map((b) => (
+              <option key={b} value={b}>
+                {brandLabel(b)}
               </option>
             ))}
           </select>
