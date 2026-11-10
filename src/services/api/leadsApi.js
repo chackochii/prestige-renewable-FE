@@ -250,3 +250,35 @@ export async function createQuoteVersion(id, body) {
 export async function startQuoteDraft(id) {
   return unwrap(await apiClient.post(`/opportunities/${id}/quote/draft`));
 }
+
+// ---- AI-assisted quote ---------------------------------------------------
+// The server asks a language model for the quote's lines (items and brands
+// from the catalog, quantities, costs) and prices them from the catalog.
+// Nothing is saved until the estimator applies what they kept.
+
+/**
+ * body: { instructions?, bill? } → { project, projectType, summary, items,
+ * costs, assumptions, checks, dropped, model, energy? }. With `bill` (a
+ * reading from readAiBill) the quote is sized from the bill and `energy`
+ * carries the sizing and the quoted system's savings. Slow (a model is
+ * thinking): allow it well past the usual timeout.
+ */
+export async function suggestAiQuote(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/ai/suggest`, body, { timeout: 120000 }));
+}
+
+/**
+ * A quote from an electricity bill, step one: the server has the AI read a
+ * bill already on the job (uploaded as an attachment, category "bill").
+ * body: { documentId } → { document: { id, filename, mime }, reading, model }.
+ * Nothing is saved — the reading is checked on screen, then sent back as
+ * suggestAiQuote's `bill`.
+ */
+export async function readAiBill(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/ai/bill`, body, { timeout: 120000 }));
+}
+
+/** body: { mode: "replace" | "add", items, costs?, project?, projectType?, billDocumentId? } → the quote. */
+export async function applyAiQuote(id, body) {
+  return unwrap(await apiClient.post(`/opportunities/${id}/quote/ai/apply`, body));
+}

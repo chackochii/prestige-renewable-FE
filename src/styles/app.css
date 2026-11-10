@@ -553,6 +553,56 @@
     display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px;
     border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2);
   }
+  /* The AI-assisted quote's review dialog (features/pipeline/AiQuoteModal):
+     what is proposed, each line with why, the notes and the running total. */
+  .ai-quote-summary { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+  .ai-quote-summary p { margin: 6px 0 0; color: var(--ink-soft); font-size: calc(14px * var(--text-scale)); line-height: 1.5; }
+  .ai-quote-reason { margin-top: 4px; line-height: 1.45; max-width: 60ch; font-style: italic; }
+  .ai-quote-off td:not(:first-child) { opacity: 0.45; }
+  .ai-quote-foot { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-top: 18px; }
+  .ai-quote-notes { flex: 1 1 320px; min-width: 0; display: grid; gap: 14px; }
+  .ai-quote-notes ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: calc(13px * var(--text-scale)); line-height: 1.5; }
+  .ai-quote-totals { flex: 0 1 300px; min-width: 240px; }
+  .ai-quote-mode { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 18px; font-size: calc(14px * var(--text-scale)); color: var(--ink); }
+  .ai-quote-mode label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .ai-quote-source { margin-bottom: 14px; }
+  .ai-quote-source button { display: inline-flex; align-items: center; gap: 6px; }
+  /* Its electricity-bill steps (features/pipeline/AiQuoteBill): choosing the
+     bill, checking what was read off it, and the sizing beside the proposal. */
+  .ai-bill-picker { display: grid; gap: 14px; }
+  .ai-bill-option { align-items: center; cursor: pointer; }
+  .ai-bill-option:hover { background: var(--surface-2); }
+  .ai-bill-option.is-off { opacity: 0.55; cursor: default; }
+  .ai-bill-option-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ai-bill-option-main > svg { flex-shrink: 0; color: var(--muted); }
+  .ai-bill-option-main .row-title { overflow-wrap: anywhere; }
+  .ai-bill-option a { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; margin-top: 0; }
+  .ai-bill-upload { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ai-bill-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; overflow-wrap: anywhere; }
+  .ai-bill-section-title {
+    margin: 18px 0 10px; font-size: calc(11.5px * var(--text-scale)); font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .ai-bill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 16px; }
+  .ai-bill-grid > * { min-width: 0; }
+  .ai-bill-history { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .ai-bill-chip {
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2);
+    font-size: calc(12.5px * var(--text-scale)); color: var(--ink-soft);
+  }
+  .ai-bill-chip strong { color: var(--ink); font-weight: 600; }
+  .ai-bill-energy {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 8px 28px;
+    margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px;
+  }
+  .ai-bill-energy .list-stack { gap: 0; min-width: 0; }
+  .ai-bill-energy .list-row { align-items: center; padding: 9px 10px; }
+  .ai-bill-energy .list-row:hover { background: none; padding-left: 10px; }
+  .ai-bill-figure { font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  .ai-bill-assumptions { grid-column: 1 / -1; margin-top: 6px; font-size: calc(13px * var(--text-scale)); color: var(--ink-soft); }
+  .ai-bill-assumptions summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  .ai-bill-assumptions ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.5; }
+  .quote-state-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
   .estimation-item { padding: 18px 0; border-bottom: 1px solid var(--line); }
   .estimation-item:first-of-type { padding-top: 4px; }
   .estimation-item .section-head { margin-bottom: 10px; }
