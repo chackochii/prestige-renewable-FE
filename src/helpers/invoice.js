@@ -40,6 +40,7 @@ import {
   quoteGstBreakdown,
 } from "@/helpers/quote";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { formatPayback, perYear, savingsForQuote, savingsSentence, YEARLY_DEGRADATION } from "@/helpers/savings";
 import { addDaysIso, formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { joinAddress } from "@/utils/text";
 import { logoDataUrl } from "@/helpers/brand";
@@ -129,6 +130,16 @@ export function invoiceSnapshot({ opp, quote }) {
       gstRatePct: quote.gstRatePct,
       items: quote.items.map((i) => ({ ...i })),
       additionalCosts: quote.additionalCosts.map((c) => ({ ...c })),
+      // The savings the proposal's payback is worked out from — only when
+      // there are some, so a version saved before savings existed still
+      // matches an unchanged quote (matchesSnapshot compares this object).
+      ...(Number(quote.annualSavings) > 0
+        ? {
+            annualSavings: quote.annualSavings,
+            currentAnnualBill: quote.currentAnnualBill ?? null,
+            savingsBasis: quote.savingsBasis || "",
+          }
+        : {}),
     },
   };
 }
@@ -338,6 +349,142 @@ function pricePanel(doc, cursor, left, right) {
   cursor.y += height + 18;
 }
 
+/** Bars still paying the system off: a warm grey beside the gold of the years in profit. */
+const OWING = [205, 196, 180];
+
+/**
+ * The customer's money, year by year: each bar is the savings so far less
+ * the net investment — below the line the system is still paying for itself,
+ * above it the savings are theirs. A dashed line marks the payback.
+ */
+function paybackChart(doc, cursor, figures) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const height = 140;
+  cursor.room(height + 64);
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(11.5);
+  doc.setTextColor(...INK);
+  doc.text(`Your money over ${figures.years} years`, MARGIN, cursor.y);
+  cursor.y += 14;
+
+  const left = MARGIN + 58; // room for the amounts on the left
+  const right = pageWidth - MARGIN;
+  const top = cursor.y + 4;
+  const bottom = top + height;
+  const values = figures.curve.map((point) => point.net);
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const span = max - min || 1;
+  const yOf = (value) => top + ((max - value) / span) * height;
+  const zero = yOf(0);
+  const slot = (right - left) / figures.curve.length;
+  const bar = slot * 0.64;
+
+  figures.curve.forEach((point, index) => {
+    const y = yOf(point.net);
+    doc.setFillColor(...(point.net >= 0 ? GOLD : OWING));
+    doc.rect(left + index * slot + (slot - bar) / 2, Math.min(y, zero), bar, Math.max(0.6, Math.abs(zero - y)), "F");
+  });
+
+  // The zero line, and the amounts it is read against.
+  doc.setDrawColor(...MUTED);
+  doc.setLineWidth(0.6);
+  doc.line(left, zero, right, zero);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...MUTED);
+  const amountLabel = (value, y) => doc.text(`${value > 0 ? "+" : ""}${formatCurrency(value)}`, left - 6, y + 2.5, { align: "right" });
+  amountLabel(0, zero);
+  if (max > 0 && yOf(max) < zero - 10) amountLabel(max, yOf(max));
+  if (min < 0 && yOf(min) > zero + 10) amountLabel(min, yOf(min));
+
+  // Years along the bottom: the first, every fifth, and the last.
+  figures.curve.forEach((point, index) => {
+    if (point.year === 1 || point.year % 5 === 0 || point.year === figures.years)
+      doc.text(point.year === 1 ? "Year 1" : String(point.year), left + index * slot + slot / 2, bottom + 12, { align: "center" });
+  });
+
+  if (figures.paybackMonths) {
+    const x = left + (figures.paybackMonths / 12) * slot;
+    doc.setDrawColor(...GOLD);
+    doc.setLineWidth(0.9);
+    doc.setLineDashPattern([3, 2], 0);
+    doc.line(x, top, x, bottom);
+    doc.setLineDashPattern([], 0);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...GOLD);
+    const label = `Paid for in ${formatPayback(figures.paybackMonths, { short: true })}`;
+    const onLeft = x > (left + right) / 2;
+    doc.text(label, onLeft ? x - 4 : x + 4, top + 8, { align: onLeft ? "right" : "left" });
+  }
+
+  doc.setTextColor(...INK);
+  cursor.y = bottom + 34;
+}
+
+/** "Your savings & payback": the headline figures, the numbers behind them, and the chart. */
+function savingsSection(doc, cursor, row, figures, basis) {
+  const whole = (value) => formatCurrency(value);
+  // The section reads as one page: start a fresh one rather than split the chart from its figures.
+  cursor.room(600);
+  sectionHeading(doc, cursor, "Your savings & payback");
+  pricePanel(
+    doc,
+    cursor,
+    {
+      label: "PAYS FOR ITSELF IN",
+      value: figures.paybackMonths ? formatPayback(figures.paybackMonths, { short: true }) : `${figures.years}+ years`,
+      note: `on the net investment of ${whole(figures.investment)}`,
+    },
+    { label: "ESTIMATED SAVINGS", value: perYear(figures.annual), note: `about ${whole(figures.monthly)} a month` },
+  );
+
+  const lead = [
+    figures.paybackMonths
+      ? `At about ${perYear(figures.annual)}, the system pays back its net investment of ${whole(figures.investment)} in about ${formatPayback(figures.paybackMonths)}.`
+      : `At about ${perYear(figures.annual)}, the system saves about ${whole(figures.lifetimeSavings)} over ${figures.years} years.`,
+    figures.netGain > 0
+      ? `From then on the savings are yours: about ${whole(figures.lifetimeSavings)} over ${figures.years} years - ${whole(figures.netGain)} more than the system costs.`
+      : "",
+    figures.currentBill
+      ? `Your electricity bill would fall from about ${whole(figures.currentBill)} a year to about ${whole(figures.billAfter)} - ${Math.round(figures.billCutPct)}% less.`
+      : "",
+  ];
+  paragraph(doc, cursor, lead.filter(Boolean).join(" "));
+
+  paybackChart(doc, cursor, figures);
+
+  row({
+    body: [
+      ...(figures.currentBill
+        ? [
+            ["Electricity bill today", `about ${perYear(figures.currentBill)}`],
+            ["Electricity bill with the system", `about ${perYear(figures.billAfter)} (${Math.round(figures.billCutPct)}% less)`],
+          ]
+        : []),
+      ["Estimated savings", `${perYear(figures.annual)} (about ${whole(figures.monthly)} a month)`],
+      ["Net investment", money(figures.investment)],
+      ["Pays for itself in", formatPayback(figures.paybackMonths, { years: figures.years })],
+      ["Return on your investment", `${figures.yearlyReturnPct.toFixed(1)}% a year, in savings`],
+      [`Savings over ${figures.years} years`, whole(figures.lifetimeSavings)],
+      ...(figures.netGain > 0 ? [[`Gain over ${figures.years} years, after the investment`, whole(figures.netGain)]] : []),
+    ],
+    styles: { ...TABLE_STYLES, cellPadding: 5 },
+    columnStyles: { 0: { ...LABEL_COL, cellWidth: 200 } },
+  });
+
+  if (basis) paragraph(doc, cursor, basis, { size: 8.5, colour: MUTED, gap: 4 });
+  paragraph(
+    doc,
+    cursor,
+    `These are estimates, not a guarantee. Electricity prices are held at today's rates - if they rise, the savings grow - ` +
+      `and the system's output is taken to fall ${(YEARLY_DEGRADATION * 100).toFixed(1)}% a year as it ages. ` +
+      `Shade, the weather and how the power is used change the result.`,
+    { size: 8, colour: MUTED, italic: true },
+  );
+}
+
 // ---- The document -----------------------------------------------------------
 
 /**
@@ -358,6 +505,8 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
   const number = versionOf(saved);
   const systemName = projectTypeLabel(quote) || "System";
   const gstNote = quote.taxTreatment === "no_gst" ? "" : " + GST";
+  // Savings and payback, when the quote has an estimate of the savings.
+  const figures = savingsForQuote(quote);
 
   // ---- Title and the who/where/when block ----
   doc.setFont("times", "bold");
@@ -406,18 +555,20 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
     `This proposal covers ${quote.project || systemName.toLowerCase()} for ${quote.customer || "the client"}` +
       `${site ? ` at ${site}` : ""}. It comprises ${quote.items.length} line ` +
       `item${(quote.items.length || 0) === 1 ? "" : "s"} with a system price of ${money(gst.systemPrice)}` +
-      `${gstNote}, and a net investment of ${money(gst.grandTotal)} after the rebates and discounts set out below.`,
+      `${gstNote}, and a net investment of ${money(gst.grandTotal)} after the rebates and discounts set out below.` +
+      `${figures ? ` ${savingsSentence(figures)}` : ""}`,
   );
   paragraph(doc, cursor, TAX_TREATMENT_LABEL[quote.taxTreatment] || "", { colour: MUTED, italic: true });
 
   subHeading(doc, cursor, "At a glance");
   row({
-    head: [["System price", "Rebates & discounts", "Net investment", "Prepared"]],
+    head: [["System price", "Rebates & discounts", "Net investment", ...(figures ? ["Pays for itself in"] : []), "Prepared"]],
     body: [
       [
         `${money(gst.systemPrice)}${gstNote}`,
         money(gst.rebatesTotal + gst.discountsTotal),
         `${money(gst.grandTotal)}`,
+        ...(figures ? [formatPayback(figures.paybackMonths, { years: figures.years })] : []),
         formatDate(quote.quoteDate),
       ],
     ],
@@ -500,6 +651,9 @@ async function buildInvoiceDoc({ quote, opportunityNumber, site, inclusions, exc
       }
     },
   });
+
+  // ---- Savings and payback ----
+  if (figures) savingsSection(doc, cursor, row, figures, quote.savingsBasis);
 
   // ---- Conditions and exclusions ----
   const conditionRows = linesOf(inclusions);

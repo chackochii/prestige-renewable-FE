@@ -22,7 +22,7 @@
 // once it has. Generating waits until the draft is saved.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Sparkles, Trash2, Undo2, Zap } from "lucide-react";
+import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, HandCoins, History, Lock, Pencil, PiggyBank, Plus, Receipt, Save, Sparkles, Trash2, Undo2, Zap } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -41,6 +41,7 @@ import {
   quoteGstBreakdown,
 } from "@/helpers/quote";
 import { downloadInvoice, invoicePreviewUrl, invoiceSnapshot, matchesSnapshot, versionOf } from "@/helpers/invoice";
+import { formatPayback, perYear, savingsForQuote } from "@/helpers/savings";
 import { formatDate, timeAgo } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -62,6 +63,10 @@ import { useNotifications } from "@/hooks/useNotifications";
 import AiQuoteModal from "./AiQuoteModal";
 
 const emptyItemForm = () => ({ itemKey: "", brand: "", quantity: 1, unit: "", unitPrice: "", discountPct: 0 });
+
+/** A typed yearly amount as the server keeps it: blank or nothing is "not estimated" (null). */
+const asAmount = (value) =>
+  value === "" || value === null || value === undefined || !(Number(value) > 0) ? null : Math.round(Number(value) * 100) / 100;
 
 /**
  * The catalog as this line's pickers offer it. A saved line whose item or brand
@@ -268,6 +273,10 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const [projectDraft, setProjectDraft] = useState("");
   const [projectTypeOtherDraft, setProjectTypeOtherDraft] = useState("");
   const [gstRateDraft, setGstRateDraft] = useState(10);
+  // Savings and payback: the yearly savings, today's yearly bill, and how they were worked out.
+  const [savingsDraft, setSavingsDraft] = useState("");
+  const [billDraft, setBillDraft] = useState("");
+  const [basisDraft, setBasisDraft] = useState("");
   const [costDrafts, setCostDrafts] = useState({});
   const [savingDraft, setSavingDraft] = useState(false);
   // When the draft last reached the record (any change saved — a field, an
@@ -314,11 +323,17 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
       project: quote.project || "",
       other: quote.projectTypeOther || "",
       gst: quote.gstRatePct ?? 10,
+      savings: quote.annualSavings ?? "",
+      bill: quote.currentAnnualBill ?? "",
+      basis: quote.savingsBasis || "",
       costs: Object.fromEntries(quote.additionalCosts.map((c) => [c.id, { value: c.value, description: c.description }])),
     };
     setProjectDraft((d) => (same(d, before?.project) ? quote.project || "" : d));
     setProjectTypeOtherDraft((d) => (same(d, before?.other) ? quote.projectTypeOther || "" : d));
     setGstRateDraft((d) => (same(d, before?.gst) ? quote.gstRatePct ?? 10 : d));
+    setSavingsDraft((d) => (same(d, before?.savings) ? quote.annualSavings ?? "" : d));
+    setBillDraft((d) => (same(d, before?.bill) ? quote.currentAnnualBill ?? "" : d));
+    setBasisDraft((d) => (same(d, before?.basis) ? quote.savingsBasis || "" : d));
     setCostDrafts((drafts) => {
       const next = {};
       for (const c of quote.additionalCosts) {
@@ -381,6 +396,8 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     gstRatePct: quote.gstRatePct,
   });
   const deletingItem = quote.items.find((i) => i.id === deleteId);
+  // The payback as typed — it follows the savings fields and the price before they are saved.
+  const payback = savingsForQuote({ ...quote, annualSavings: asAmount(savingsDraft), currentAnnualBill: asAmount(billDraft) });
 
   const patchHeader = (body) => tracked(dispatch(updateOpportunityQuote({ id: opp.id, body })));
   const patchHeaderField = (field, value) => patchHeader({ [field]: value });
@@ -394,6 +411,15 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const blurGstRate = () => {
     const value = Number(gstRateDraft) || 0;
     if (value !== quote.gstRatePct) patchHeaderField("gstRatePct", value);
+  };
+  const blurSavings = () => {
+    if (asAmount(savingsDraft) !== asAmount(quote.annualSavings)) patchHeaderField("annualSavings", asAmount(savingsDraft));
+  };
+  const blurBill = () => {
+    if (asAmount(billDraft) !== asAmount(quote.currentAnnualBill)) patchHeaderField("currentAnnualBill", asAmount(billDraft));
+  };
+  const blurBasis = () => {
+    if (basisDraft.trim() !== (quote.savingsBasis || "")) patchHeaderField("savingsBasis", basisDraft.trim());
   };
 
   const saveItem = async (values) => {
@@ -457,6 +483,9 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   if (projectDraft !== (quote.project || "")) headerEdits.project = projectDraft;
   if (quote.projectType === "Other" && projectTypeOtherDraft !== (quote.projectTypeOther || "")) headerEdits.projectTypeOther = projectTypeOtherDraft;
   if (quote.taxTreatment !== "no_gst" && (Number(gstRateDraft) || 0) !== quote.gstRatePct) headerEdits.gstRatePct = Number(gstRateDraft) || 0;
+  if (asAmount(savingsDraft) !== asAmount(quote.annualSavings)) headerEdits.annualSavings = asAmount(savingsDraft);
+  if (asAmount(billDraft) !== asAmount(quote.currentAnnualBill)) headerEdits.currentAnnualBill = asAmount(billDraft);
+  if (basisDraft.trim() !== (quote.savingsBasis || "")) headerEdits.savingsBasis = basisDraft.trim();
   const costEdits = [];
   for (const cost of quote.additionalCosts) {
     const draft = costDrafts[cost.id];
@@ -1008,6 +1037,85 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         </div>
       </div>
 
+      {/* What the system saves the customer — the proposal turns it into "pays
+          for itself in …" (helpers/savings.js). Worked out from what is typed,
+          so the payback moves as the figures or the price change. */}
+      {quote.items.length ? (
+        <div style={{ marginTop: 24 }}>
+          <SectionHead icon={<PiggyBank size={13} />} title="Savings & payback" />
+          <p className="lede" style={{ marginBottom: 12 }}>
+            What the system saves the customer each year. The proposal shows it as the time the system takes to pay for itself, the return,
+            and the savings over its life. &quot;Quote from bill&quot; fills these in from the customer&apos;s electricity bill.
+          </p>
+          <div className="form-grid" style={{ marginBottom: 8 }}>
+            <Field label="Savings a year ($)" hint="incl. GST">
+              <NumberInput
+                value={savingsDraft}
+                min={0}
+                step={50}
+                placeholder="e.g. 2400"
+                disabled={!editable}
+                onChange={setSavingsDraft}
+                onBlur={blurSavings}
+              />
+            </Field>
+            <Field label="Electricity bill today ($ a year)" hint="optional">
+              <NumberInput
+                value={billDraft}
+                min={0}
+                step={50}
+                placeholder="e.g. 3200"
+                disabled={!editable}
+                onChange={setBillDraft}
+                onBlur={blurBill}
+              />
+            </Field>
+            <Field label="How the savings were worked out" hint="the customer reads this" className="span-2">
+              <textarea
+                rows={2}
+                maxLength={600}
+                value={basisDraft}
+                disabled={!editable}
+                placeholder="e.g. From your bill: about 9,800 kWh a year at 32 c a kWh."
+                onChange={(e) => setBasisDraft(e.target.value)}
+                onBlur={blurBasis}
+              />
+            </Field>
+          </div>
+          {payback ? (
+            <div className="list-stack" style={{ maxWidth: 420 }}>
+              <div className="list-row">
+                <span className="row-title">Pays for itself in</span>
+                <span className="row-meta">
+                  <strong>{formatPayback(payback.paybackMonths, { years: payback.years })}</strong>
+                </span>
+              </div>
+              <div className="list-row">
+                <span className="row-title">Return on investment</span>
+                <span className="row-meta">{payback.yearlyReturnPct.toFixed(1)}% a year</span>
+              </div>
+              <div className="list-row">
+                <span className="row-title">Savings over {payback.years} years</span>
+                <span className="row-meta">
+                  {formatCurrency(payback.lifetimeSavings)}
+                  {payback.netGain > 0 ? ` (${formatCurrency(payback.netGain)} after the investment)` : ""}
+                </span>
+              </div>
+              {payback.currentBill ? (
+                <div className="list-row">
+                  <span className="row-title">Bill with the system</span>
+                  <span className="row-meta">
+                    {perYear(payback.billAfter)} ({Math.round(payback.billCutPct)}% less)
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="lede">Enter the yearly savings to show the customer when the system pays for itself.</p>
+          )}
+        </div>
+      ) : null}
+
       {/* ---- Generating, and the PDFs that come out of it ----
           A PDF is only ever of a generated version: there is nothing to
           preview or download until the quote has been generated, and on a new
@@ -1196,11 +1304,12 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           quote={quote}
           startWith={aiQuote.source}
           onClose={() => setAiQuote(null)}
-          onApplied={({ items: added, costs: addedCosts, fromBill }) => {
+          onApplied={({ items: added, costs: addedCosts, fromBill, annualSavings }) => {
             setAiQuote(null);
             setSavedAt(new Date());
             notify(
-              `${fromBill ? "Quote from the bill" : "AI quote"} added to the draft - ${added} item${added === 1 ? "" : "s"}${addedCosts ? ` and ${addedCosts} cost line${addedCosts === 1 ? "" : "s"}` : ""}. Review it, then generate.`,
+              `${fromBill ? "Quote from the bill" : "AI quote"} added to the draft - ${added} item${added === 1 ? "" : "s"}${addedCosts ? ` and ${addedCosts} cost line${addedCosts === 1 ? "" : "s"}` : ""}` +
+                `${annualSavings ? `, with savings of ${perYear(annualSavings)} for the payback` : ""}. Review it, then generate.`,
             );
           }}
         />

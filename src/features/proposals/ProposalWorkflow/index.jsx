@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { downloadInvoice, invoiceFileName } from "@/helpers/invoice";
+import { savingsForQuote } from "@/helpers/savings";
 import {
   DEFAULT_MESSAGE,
   PROPOSAL_STAGE_ID,
@@ -211,6 +212,8 @@ export default function ProposalWorkflow({ opportunity, canEdit = false, onChang
       proposal,
       senderName: user?.name,
       businessName: unit?.name,
+      // The payback line, from the quote version this proposal sends.
+      savings: savingsForQuote(versionOf(proposal)?.snapshot?.quote),
     });
     const email = { to: proposal.sentTo, subject: proposal.emailSubject, body };
     const mailUrl = mailtoUrl(email);

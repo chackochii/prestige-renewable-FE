@@ -7,6 +7,7 @@
 // version), or declines. Records come from services/api/proposalsApi.js.
 
 import { formatDate } from "@/helpers/dateTimeHelpers";
+import { savingsSentence } from "@/helpers/savings";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 export const PROPOSAL_STAGE_ID = 3;
@@ -122,15 +123,17 @@ export const REVISED_MESSAGE = [
 /**
  * The email as the customer reads it: greeting, the sender's message, the
  * link to view and answer the proposal, and the sign-off. Plain text, because
- * an email link can only carry plain text.
+ * an email link can only carry plain text. `savings` (helpers/savings.js, for
+ * the quote version sent) adds the payback line when the quote has one.
  */
-export function proposalEmailBody({ customerFirstName, message, link, proposal, senderName, businessName }) {
+export function proposalEmailBody({ customerFirstName, message, link, proposal, senderName, businessName, savings = null }) {
   const total = proposal?.grandTotal !== null && proposal?.grandTotal !== undefined ? formatCurrency(proposal.grandTotal, { withCents: true }) : "";
   return [
     `Hi ${customerFirstName || "there"},`,
     "",
     message || DEFAULT_MESSAGE,
     "",
+    ...(savings ? [savingsSentence(savings), ""] : []),
     `View your proposal${proposal?.number ? ` ${proposal.number}` : ""}${total ? ` (${total})` : ""} and accept it online:`,
     link,
     "",

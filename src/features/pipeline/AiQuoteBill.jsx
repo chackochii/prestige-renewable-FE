@@ -20,6 +20,7 @@ import Field from "@/components/Field";
 import NumberInput from "@/components/NumberInput";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { isReadableBill, readingHasUsage } from "@/helpers/energyBill";
+import { formatPayback, savingsOf } from "@/helpers/savings";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 const BILL_ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif";
@@ -259,7 +260,8 @@ function Row({ label, value, meta }) {
 export function EnergySummary({ energy, proposalTotal }) {
   const proposed = energy.proposed;
   const savings = proposed?.annualSavings;
-  const payback = savings > 0 && proposalTotal > 0 ? proposalTotal / savings : null;
+  // The same payback the proposal will show (helpers/savings.js), on the whole proposal's price.
+  const payback = savingsOf({ investment: proposalTotal, annualSavings: savings });
   const system = proposed
     ? [proposed.systemKw > 0 ? `${amount(proposed.systemKw, 2)} kW solar` : null, proposed.batteryKwh > 0 ? `${amount(proposed.batteryKwh, 1)} kWh battery` : null]
         .filter(Boolean)
@@ -299,7 +301,13 @@ export function EnergySummary({ energy, proposalTotal }) {
               value={savings === null ? "-" : `~${formatCurrency(savings)} a year`}
               meta={savings === null ? "Add the bill's usage rate to see them" : null}
             />
-            {payback ? <Row label="Payback" value={`~${amount(payback, 1)} years`} meta={`On the proposal's ${formatCurrency(proposalTotal)}`} /> : null}
+            {payback ? (
+              <Row
+                label="Pays for itself in"
+                value={formatPayback(payback.paybackMonths, { years: payback.years })}
+                meta={`On the proposal's ${formatCurrency(proposalTotal)} - a ${payback.yearlyReturnPct.toFixed(1)}% yearly return`}
+              />
+            ) : null}
           </>
         ) : (
           <p className="row-meta" style={{ margin: 0 }}>

@@ -8,13 +8,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle2, Download, ExternalLink, FileText, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, FileText, MessageSquareText, PiggyBank, ThumbsDown, ThumbsUp } from "lucide-react";
 import Alert from "@/components/Alert";
 import { DEFAULT_MESSAGE } from "@/helpers/proposals";
 import Field from "@/components/Field";
 import LoadingState from "@/components/LoadingState";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { downloadInvoice, invoicePreviewUrl } from "@/helpers/invoice";
+import { formatPayback, perYear, savingsForQuote } from "@/helpers/savings";
 import { getErrorMessage } from "@/services/api/client";
 import { getPublicProposal, respondToProposal } from "@/services/api/proposalsApi";
 import { formatCurrency } from "@/utils/formatCurrency";
@@ -62,6 +63,56 @@ function ClosedNotice({ proposal }) {
   if (state === "expired")
     return <Alert tone="warning">This proposal expired on {formatDate(proposal.expiresAt)}. Please contact us for an updated one.{reach}</Alert>;
   return null;
+}
+
+/**
+ * What the system saves the customer, up front: when it pays for itself, the
+ * yearly savings and the lifetime figure — from the quote version that was
+ * sent (helpers/savings.js), the same numbers as the PDF. Nothing shows when
+ * the quote carries no savings estimate.
+ */
+function SavingsHighlight({ proposal }) {
+  const quote = proposal.quoteVersion?.snapshot?.quote;
+  const figures = savingsForQuote(quote);
+  if (!figures) return null;
+  return (
+    <section className="proposal-public-card proposal-public-savings">
+      <h2 className="proposal-public-h2">
+        <PiggyBank size={18} /> What this system saves you
+      </h2>
+      <div className="proposal-public-stats">
+        <div className="proposal-public-stat is-lead">
+          <span className="row-meta">Pays for itself in</span>
+          <strong>{formatPayback(figures.paybackMonths, { years: figures.years })}</strong>
+          <span className="row-meta">
+            on a net investment of {formatCurrency(figures.investment)} - a {figures.yearlyReturnPct.toFixed(1)}% yearly return
+          </span>
+        </div>
+        <div className="proposal-public-stat">
+          <span className="row-meta">Estimated savings</span>
+          <strong>{perYear(figures.annual)}</strong>
+          <span className="row-meta">about {formatCurrency(figures.monthly)} a month</span>
+        </div>
+        <div className="proposal-public-stat">
+          <span className="row-meta">Over {figures.years} years</span>
+          <strong>{formatCurrency(figures.lifetimeSavings)} saved</strong>
+          <span className="row-meta">
+            {figures.netGain > 0 ? `${formatCurrency(figures.netGain)} more than the system costs` : "at today's electricity prices"}
+          </span>
+        </div>
+      </div>
+      {figures.currentBill ? (
+        <p className="proposal-public-bill">
+          Your electricity bill: about <strong>{perYear(figures.currentBill)}</strong> today, and about{" "}
+          <strong>{perYear(figures.billAfter)}</strong> with the system - {Math.round(figures.billCutPct)}% less.
+        </p>
+      ) : null}
+      <p className="row-meta proposal-public-savings-note">
+        {quote.savingsBasis ? `${quote.savingsBasis} ` : ""}
+        These are estimates, not a guarantee - the proposal below sets out how they are worked out.
+      </p>
+    </section>
+  );
 }
 
 function PdfPanel({ proposal }) {
@@ -288,6 +339,8 @@ export default function ProposalPage() {
                 <ClosedNotice proposal={proposal} />
               </section>
             ) : null}
+
+            <SavingsHighlight proposal={proposal} />
 
             <section className="proposal-public-card">
               <PdfPanel proposal={proposal} />

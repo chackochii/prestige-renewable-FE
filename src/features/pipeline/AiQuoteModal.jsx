@@ -141,8 +141,13 @@ export default function AiQuoteModal({ opp, quote, startWith = "job", onApplied,
   const apply = async () => {
     setApplying(true);
     setError("");
+    // A quote from a bill also sets the quote's savings (the proposal's payback):
+    // the server works them out again for the lines the draft ends up with. The
+    // suggestion's system size only stands in when every line was kept.
+    const allKept = suggestion.items.length === items.length;
+    const proposed = suggestion.energy?.proposed;
     try {
-      await dispatch(
+      const saved = await dispatch(
         applyAiQuote({
           id: opp.id,
           body: {
@@ -153,10 +158,17 @@ export default function AiQuoteModal({ opp, quote, startWith = "job", onApplied,
             ...(quote.project ? {} : { project: suggestion.project }),
             ...(quote.projectType ? {} : { projectType: suggestion.projectType }),
             ...(fromBill && billDoc ? { billDocumentId: billDoc.id } : {}),
+            ...(fromBill && reading ? { bill: reading } : {}),
+            ...(fromBill && reading && allKept && proposed ? { systemKw: proposed.systemKw, batteryKwh: proposed.batteryKwh } : {}),
           },
         }),
       ).unwrap();
-      onApplied({ items: items.length, costs: costs.length, fromBill: fromBill && Boolean(billDoc) });
+      onApplied({
+        items: items.length,
+        costs: costs.length,
+        fromBill: fromBill && Boolean(billDoc),
+        annualSavings: fromBill ? (saved?.annualSavings ?? null) : null,
+      });
     } catch (err) {
       setError(errText(err, "Could not add the lines to the draft."));
       setApplying(false);
