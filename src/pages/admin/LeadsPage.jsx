@@ -25,6 +25,7 @@ import { usePageParam } from "@/hooks/usePageParam";
 import { useUrlSearch } from "@/hooks/useUrlParam";
 import { PAGE_SIZE } from "@/helpers/pagination";
 import { listInboundLeads } from "@/services/api/inboundLeadsApi";
+import ExportJobsButton from "@/features/export/ExportJobsButton";
 
 /** How to reach the customer — captured on every lead, so always worth showing. */
 const contactSummary = (o) =>
@@ -79,6 +80,8 @@ export default function LeadsPage() {
         description="Leads that haven't entered the pipeline yet. Complete the lead pack, mark as Qualified and assign an estimator to progress them."
         actions={
           <>
+            {/* Leads are the stage-1 jobs, every lifecycle — the dialog starts there. */}
+            {hasPermission(PERMISSIONS.ADMIN_EXPORT) ? <ExportJobsButton defaultStage="1" defaultLifecycle="all" /> : null}
             <Link
               className="btn btn-ghost"
               to="/leads/inbox"

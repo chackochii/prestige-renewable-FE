@@ -43,6 +43,7 @@ const RolesPage = lazy(() => import("@/pages/admin/RolesPage"));
 const PagesPage = lazy(() => import("@/pages/admin/PagesPage"));
 const UnitSettingsPage = lazy(() => import("@/pages/admin/UnitSettingsPage"));
 const ConnectionsPage = lazy(() => import("@/pages/admin/ConnectionsPage"));
+const BackupPage = lazy(() => import("@/pages/admin/BackupPage"));
 
 const page = (code, element) => (
   <RequirePage code={code}>{element}</RequirePage>
@@ -113,6 +114,11 @@ export const workspaceRoutes = [
   {
     path: "admin/connections",
     element: page(PAGE_CODES.ADMIN, <ConnectionsPage />),
+  },
+  // Excel backups and where each unit stands; the 7-day reminder opens it.
+  {
+    path: "admin/backup",
+    element: page(PAGE_CODES.ADMIN, permission(PERMISSIONS.ADMIN_EXPORT, <BackupPage />)),
   },
   ...superadminRoutes,
   // Legacy / convenience aliases

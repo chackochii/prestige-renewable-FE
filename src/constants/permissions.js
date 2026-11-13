@@ -26,6 +26,7 @@ export const PERMISSIONS = {
   ADMIN_UPDATE: "admin.update",
   ADMIN_DELETE: "admin.delete",
   ADMIN_APPROVE: "admin.approve",
+  ADMIN_EXPORT: "admin.export", // Excel export of every job — the backup; ADM, BO and SYS by default (customer details leave the system)
 
   DASHBOARDS_READ: "dashboards.read",
 };

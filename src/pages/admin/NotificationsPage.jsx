@@ -91,6 +91,12 @@ export default function NotificationsPage() {
   const open = async (notification) => {
     if (!notification.read) dispatch(markNotificationRead(notification.id));
 
+    // "You haven't taken a backup…": straight to where the backup is taken.
+    if (notification.event === "backup.overdue") {
+      navigate("/admin/backup");
+      return;
+    }
+
     const aboutTheRecord = RECORD_EVENTS.has(String(notification.event || ""));
     try {
       const id = requestIdOf(notification);

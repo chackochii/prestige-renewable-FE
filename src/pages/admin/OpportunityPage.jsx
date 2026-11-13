@@ -15,6 +15,7 @@ import EmptyState from "@/components/EmptyState";
 import StageStepper from "@/components/StageStepper";
 import HistoryTab from "@/components/HistoryTab";
 import JobDocuments from "@/features/documents/JobDocuments";
+import ExportJobButton from "@/features/export/ExportJobButton";
 import { oppTitle } from "@/helpers/opportunity";
 import LeadPackPanel from "@/features/leads/LeadPackPanel";
 import EstimationPanel from "@/features/pipeline/EstimationPanel";
@@ -120,6 +121,7 @@ export default function OpportunityPage() {
   const canSeeDocuments = [PERMISSIONS.LEADS_READ, PERMISSIONS.ESTIMATION_READ, PERMISSIONS.PROCUREMENT_READ].some((code) => hasPermission(code));
   const canEditEstimation = hasPermission(PERMISSIONS.ESTIMATION_UPDATE);
   const canDelete = isSuperAdmin && Number(opp.stage) === 1;
+  const canExport = hasPermission(PERMISSIONS.ADMIN_EXPORT);
   const current = Number(opp.stage);
   // A stage asked for that the job has not reached yet shows the current one.
   const viewing = viewStage && viewStage <= current ? viewStage : current;
@@ -190,6 +192,7 @@ export default function OpportunityPage() {
           </div>
         </div>
         <div className="opp-hero-actions">
+          {canExport ? <ExportJobButton opportunityId={opp.id} /> : null}
           {canDelete ? (
             <button type="button" className="btn btn-danger" onClick={() => setDeleteOpen(true)}>
               Delete

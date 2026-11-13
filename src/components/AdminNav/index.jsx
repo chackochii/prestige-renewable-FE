@@ -1,6 +1,7 @@
 // Pills linking the administration screens.
 
 import { NavLink } from "react-router-dom";
+import { PERMISSIONS } from "@/constants/permissions";
 import { useAuth } from "@/hooks/useAuth";
 
 const LINKS = [
@@ -9,13 +10,15 @@ const LINKS = [
   { to: "/admin/pages", label: "Pages" },
   { to: "/admin/settings", label: "Unit settings" },
   { to: "/admin/connections", label: "Lead connections" },
+  // Only for people who can take the backup (admin.export).
+  { to: "/admin/backup", label: "Data backup", permission: PERMISSIONS.ADMIN_EXPORT },
 ];
 
 export default function AdminNav() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, hasPermission } = useAuth();
   return (
     <div className="segmented" style={{ marginBottom: 24 }}>
-      {LINKS.map((link) => (
+      {LINKS.filter((link) => !link.permission || hasPermission(link.permission)).map((link) => (
         <NavLink
           key={link.to}
           to={link.to}

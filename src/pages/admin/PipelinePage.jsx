@@ -43,6 +43,7 @@ import { useUnitUsers } from "@/hooks/useUnitUsers";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAppDispatch } from "@/store";
 import { advanceStage } from "@/slices/leadsSlice";
+import ExportJobsButton from "@/features/export/ExportJobsButton";
 
 const LIFECYCLE_OPTIONS = [
   { value: "Active", label: "Active" },
@@ -161,11 +162,17 @@ export default function PipelinePage() {
         // The board speaks for itself; the list says how many there are.
         description={view === "board" ? undefined : ready ? `${total} opportunit${total === 1 ? "y" : "ies"}.` : "Loading the pipeline…"}
         actions={
-          hasPermission(PERMISSIONS.LEADS_CREATE) ? (
-            <Link className="btn btn-primary" to="/leads/new">
-              New lead
-            </Link>
-          ) : null
+          <>
+            {/* Starts from the board's stage and lifecycle filters. */}
+            {hasPermission(PERMISSIONS.ADMIN_EXPORT) ? (
+              <ExportJobsButton defaultStage={stageFilter} defaultLifecycle={lifecycle} />
+            ) : null}
+            {hasPermission(PERMISSIONS.LEADS_CREATE) ? (
+              <Link className="btn btn-primary" to="/leads/new">
+                New lead
+              </Link>
+            ) : null}
+          </>
         }
       />
 

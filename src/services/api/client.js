@@ -65,9 +65,25 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * A request for a file (responseType "blob" — the Excel exports) gets its
+ * error back as a Blob too. Reads the JSON out of it, so the message the API
+ * wrote reaches the screen like any other error.
+ */
+async function readBlobError(error) {
+  const data = error?.response?.data;
+  if (typeof Blob === "undefined" || !(data instanceof Blob) || !/json/i.test(data.type || "")) return;
+  try {
+    error.response.data = JSON.parse(await data.text());
+  } catch {
+    // Not JSON after all: the status-based message below stands.
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    await readBlobError(error);
     const status = error.response?.status;
     const apiError = toApiError(error);
     // A public route's refusal is about the link (expired, already answered),
