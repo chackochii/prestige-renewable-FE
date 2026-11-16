@@ -9,6 +9,7 @@ const LINKS = [
   { to: "/admin/pages", label: "Pages" },
   { to: "/admin/settings", label: "Unit settings" },
   { to: "/admin/connections", label: "Lead connections" },
+  { to: "/admin/skills", label: "AI skills" },
 ];
 
 export default function AdminNav() {

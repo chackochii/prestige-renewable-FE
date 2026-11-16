@@ -36,15 +36,42 @@ const initialState = {
   noticeSeen: false,
 };
 
+/**
+ * → { token, user } signed in, or { passwordSetup: { token, user } } when the
+ * password was a temporary one an administrator set: nothing is signed in
+ * until the person chooses their own (completePasswordSetup).
+ */
 export const login = createAsyncThunk("auth/login", async ({ email, password }, { rejectWithValue }) => {
   try {
-    const { token, user } = await authApi.login(email, password);
+    const { token, user, mustChangePassword } = await authApi.login(email, password);
+    if (mustChangePassword) return { passwordSetup: { token, user } };
     saveSession({ token, user });
     return { token, user };
   } catch (err) {
     return rejectWithValue(err.message);
   }
 });
+
+/** { setupToken, newPassword } → the session the person's own password opens. */
+export const completePasswordSetup = createAsyncThunk("auth/completePasswordSetup", async ({ setupToken, newPassword }, { rejectWithValue }) => {
+  try {
+    const { token, user } = await authApi.setFirstPassword(setupToken, newPassword);
+    saveSession({ token, user });
+    return { token, user };
+  } catch (err) {
+    return rejectWithValue(err.message);
+  }
+});
+
+const signedIn = (state, action) => {
+  state.status = "succeeded";
+  state.user = action.payload.user;
+  state.token = action.payload.token;
+  state.expiresAt = decodeTokenExpiry(action.payload.token);
+  state.initialized = true;
+  state.notice = null;
+  state.noticeSeen = false;
+};
 
 export const fetchMe = createAsyncThunk("auth/fetchMe", async (_, { rejectWithValue }) => {
   try {
@@ -119,17 +146,25 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(login.fulfilled, (state, action) => {
-        state.status = "succeeded";
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.expiresAt = decodeTokenExpiry(action.payload.token);
-        state.initialized = true;
-        state.notice = null;
-        state.noticeSeen = false;
+        // A temporary password: the login page asks for the person's own first.
+        if (action.payload.passwordSetup) {
+          state.status = "idle";
+          return;
+        }
+        signedIn(state, action);
       })
       .addCase(login.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload || action.error?.message || "Sign in failed.";
+      })
+      .addCase(completePasswordSetup.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(completePasswordSetup.fulfilled, signedIn)
+      .addCase(completePasswordSetup.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload || action.error?.message || "The password could not be set.";
       })
       .addCase(fetchMe.pending, (state) => {
         state.status = "loading";

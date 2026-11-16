@@ -45,9 +45,16 @@ export const isPublicRequest = (config) => {
   return /^\/?public\//.test(url) || /\/api\/public\//.test(url);
 };
 
+/**
+ * A call made with its own token (`config.sessionless`) — the first sign-in's
+ * set-up token, before there is a session: the stored session is neither sent
+ * nor ended by it.
+ */
+const isSessionless = (config) => Boolean(config?.sessionless);
+
 apiClient.interceptors.request.use((config) => {
   // No sign-in behind a public route: no token sent, no session check.
-  if (isPublicRequest(config)) return config;
+  if (isPublicRequest(config) || isSessionless(config)) return config;
   const token = getToken();
   if (token) {
     // Don't send a token we already know is dead — end the session instead
@@ -72,7 +79,7 @@ apiClient.interceptors.response.use(
     const apiError = toApiError(error);
     // A public route's refusal is about the link (expired, already answered),
     // never about the staff session — it neither ends it nor resyncs permissions.
-    if (!isPublicRequest(error.config)) {
+    if (!isPublicRequest(error.config) && !isSessionless(error.config)) {
       if (status === 401 && !isLoginRequest(error.config)) unauthorizedHandler?.({ reason: "unauthorized" });
       if (status === 403) forbiddenHandler?.(apiError, error.config);
     }

@@ -1,4 +1,5 @@
-// Prepare the proposal email: which saved quote version, to whom, the subject
+// Prepare the proposal email: which saved quote version (the manual quote or a
+// final Solar + BESS proposal — each sent in its own PDF template), to whom, the subject
 // and the message. "Open in email app" creates the customer's link and opens
 // the email app signed in on this device with the email written (greeting,
 // message, link, sign-off); "Open in Gmail" does the same in Gmail. The PDF
@@ -17,7 +18,7 @@ import Field from "@/components/Field";
 import LoadingState from "@/components/LoadingState";
 import Modal from "@/components/Modal";
 import { formatDate } from "@/helpers/dateTimeHelpers";
-import { invoicePreviewUrl } from "@/helpers/invoice";
+import { invoicePreviewUrl, isEnergyProposalVersion } from "@/helpers/invoice";
 import { DEFAULT_MESSAGE, openPendingTab } from "@/helpers/proposals";
 import { getErrorMessage } from "@/services/api/client";
 import { sendProposal } from "@/services/api/proposalsApi";
@@ -58,6 +59,8 @@ function PreviewModal({ version, unit, onClose }) {
 const versionLabel = (version, sentAs) =>
   [
     `v${version.version}`,
+    // A final Solar + BESS proposal goes in the commercial proposal template; anything else is the manual quote.
+    isEnergyProposalVersion(version) ? "Solar + BESS proposal" : "Quote",
     version.quoteNumber,
     version.grandTotal !== null && version.grandTotal !== undefined ? formatCurrency(version.grandTotal, { withCents: true }) : null,
     `saved ${formatDate(version.createdAt)}`,

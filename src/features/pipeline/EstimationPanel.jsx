@@ -61,7 +61,7 @@ import RequiredApprovalsPicker from "@/features/approvals/RequiredApprovalsPicke
 import AddCustomApproval from "@/features/approvals/AddCustomApproval";
 import { approvalHints, jobApprovalUnit, requiredKeysOf } from "@/helpers/requiredApprovals";
 import { estimationInputFromOpp } from "@/constants/estimationInput";
-import { estimationState } from "@/helpers/stageTransition";
+import { estimationState, isProposalVersion } from "@/helpers/stageTransition";
 import { formatDate } from "@/helpers/dateTimeHelpers";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { createRequest, fetchOpportunityRequests } from "@/slices/collaborationSlice";
@@ -69,6 +69,7 @@ import {
   acknowledgeLeadChange,
   collectEstimationInputs,
   fetchOpportunityAttachments,
+  fetchQuoteVersions,
   submitEstimationClientInfo,
   submitEstimatorChecklist,
   updateRequiredApprovals,
@@ -172,6 +173,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   const { notify, error: notifyError } = useNotifications();
   const attachments = useAppSelector((s) => s.leads.attachments);
   const quote = useAppSelector((s) => s.leads.quote);
+  const versions = useAppSelector((s) => s.leads.versions);
   const { oppId: collabOppId, byOpp } = useAppSelector((s) => s.collaboration);
   const requests = collabOppId === Number(opp.id) ? byOpp : [];
   const { active } = useUnitUsers();
@@ -205,6 +207,8 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   useEffect(() => {
     dispatch(fetchOpportunityAttachments(opp.id));
     dispatch(fetchOpportunityRequests(opp.id));
+    // The quote versions — a final Solar + BESS proposal among them opens the hand-over.
+    dispatch(fetchQuoteVersions(opp.id));
   }, [opp.id, dispatch]);
 
   useEffect(() => {
@@ -336,7 +340,9 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   // One flag per tab, for the tick on the tab and for choosing where to open.
   const requirementsDone = requirementsChecklistComplete;
   const siteVisitDone = showSiteVisit && preSiteResolved;
-  const quoteDone = Boolean(quote?.items?.length);
+  // A priced quote — or a final Solar + BESS proposal, which goes in its place.
+  const proposalReady = (versions ?? []).some(isProposalVersion);
+  const quoteDone = Boolean(quote?.items?.length) || proposalReady;
 
   // Sales sent the job back from proposal: the customer wants changes, and
   // the round (their message, sales' comments, the version they saw) rides
@@ -634,7 +640,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             <ContinueButton
               style={{ marginTop: 16 }}
               nextLabel={requote ? "Send revised quote" : "Send to proposal"}
-              blockers={quoteDone ? [] : ["at least one item on the quote"]}
+              blockers={quoteDone ? [] : ["at least one item on the quote, or a Solar + BESS proposal marked final"]}
               onDone={() => setTab("handover")}
             />
           </>
@@ -660,7 +666,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
         ) : (
           <LockedStep
             title="Nothing to send yet"
-            body="Sending to proposal opens once the quote is created and has at least one priced item."
+            body="Sending to proposal opens once the quote has at least one priced item, or a Solar + BESS proposal is marked final."
           />
         )
       ) : null}

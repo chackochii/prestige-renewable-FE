@@ -8,6 +8,12 @@
 // on; the salesperson is notified that the quote is ready to send to the
 // customer (prestige-be estimationHandover.js).
 //
+// What goes can be the manual quote or a final Solar + BESS proposal (the
+// AI-drafted commercial proposal — saved as a quote version when it was
+// marked final). When the job has one, the estimator picks which: the newest
+// of the two is preselected. Sales then sends that version, in its own
+// template, from the proposal stage.
+//
 // On a re-quote (`requote` — the open round sales sent back from proposal)
 // the same step returns the revised quote: it warns when the quote is still
 // the version the customer saw, and the note — what changed — is required,
@@ -21,7 +27,7 @@ import SectionHead from "@/components/SectionHead";
 import { nextStageFor, stageById } from "@/constants/stages";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
-import { invoiceSnapshot, invoiceTotals, matchesSnapshot, versionOf } from "@/helpers/invoice";
+import { invoiceSnapshot, invoiceTotals, isEnergyProposalVersion, matchesSnapshot, versionOf } from "@/helpers/invoice";
 import { advanceDeniedReason } from "@/helpers/stageAccess";
 import { estimationGateItems, quoteGateItems } from "@/helpers/stageTransition";
 import { fetchQuoteVersions, handOverToProposal, saveQuoteVersion } from "@/slices/leadsSlice";
@@ -65,9 +71,11 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [picked, setPicked] = useState(null); // "quote" | a proposal version's id — null until the estimator chooses
 
+  // Every version on the job — a job quoted only with a Solar + BESS proposal has versions before the quote builder loads.
   useEffect(() => {
-    if (quote?.id) dispatch(fetchQuoteVersions(opp.id));
+    dispatch(fetchQuoteVersions(opp.id));
   }, [dispatch, opp.id, quote?.id]);
 
   const stage = Number(opp.stage);
@@ -85,8 +93,16 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
   }
 
   const estimationMissing = estimationGateItems(opp);
-  const quoteMissing = quoteGateItems(quote);
   const denied = advanceDeniedReason(user, ESTIMATION_STAGE);
+  // Final Solar + BESS proposals, newest first, and the newest version made in the quote builder.
+  const proposalVersions = versions.filter(isEnergyProposalVersion).sort((a, b) => (versionOf(b) ?? 0) - (versionOf(a) ?? 0));
+  const newestManual = versions.filter((v) => !isEnergyProposalVersion(v)).reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0);
+  // The newest of the two goes unless the estimator picks the other.
+  const defaultPick = proposalVersions.length && (!quote?.items?.length || (versionOf(proposalVersions[0]) ?? 0) > newestManual) ? proposalVersions[0].id : "quote";
+  const pick = picked ?? defaultPick;
+  const sendingProposal = pick !== "quote" ? (proposalVersions.find((v) => v.id === pick) ?? null) : null;
+
+  const quoteMissing = sendingProposal ? [] : quoteGateItems(quote);
   // Generated: locked to a version, and that is what goes. A draft is
   // generated on send — as the next version, or back onto the newest one
   // when nothing changed (the server decides, same as the builder).
@@ -98,17 +114,17 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
   // On a re-quote the note says what changed, and sales needs it.
   const noteMissing = Boolean(requote) && !note.trim();
   const ready = !estimationMissing.length && !inspectionMissing.length && !quoteMissing.length && !denied && opp.lifecycle === "Active";
-  // The quote as it stands is the very version the customer asked to change.
-  const goingVersion = generated ?? matching;
+  // What goes is the very version the customer asked to change.
+  const goingVersion = sendingProposal ?? generated ?? matching;
   const unchanged = Boolean(requote?.quoteVersion && goingVersion && goingVersion.id === requote.quoteVersion.id);
 
   const send = async () => {
     setBusy(true);
     setError("");
     try {
-      // The proposal stage sends a generated version; generate the quote now
-      // if it is still a draft.
-      let version = generated;
+      // The proposal stage sends a generated version: the chosen Solar + BESS
+      // proposal as it was saved, or the quote — generated now if it is still a draft.
+      let version = sendingProposal ?? generated;
       if (!version) {
         const snapshot = invoiceSnapshot({ opp, quote });
         version = await dispatch(
@@ -133,6 +149,34 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
           ? `The customer asked for changes (re-quote round ${requote.round}). When the revised quote is final, send it back to ${nextLabel} with a note on what changed - sales sends the new proposal.`
           : `Once the quote is final, send it to the ${nextLabel} stage. Sales will then send the proposal to the customer to accept online.`}
       </p>
+
+      {proposalVersions.length ? (
+        <div className="handover-pick" role="radiogroup" aria-label="What goes to the customer" style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          <div className="row-meta">What goes to the customer</div>
+          {proposalVersions.map((version) => (
+            <label key={version.id} className="list-row" style={{ alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+              <input type="radio" name="handover-pick" checked={pick === version.id} onChange={() => setPicked(version.id)} />
+              <span style={{ minWidth: 0 }}>
+                <span className="row-title">
+                  Solar + BESS proposal {version.quoteNumber} - version {versionOf(version)}
+                </span>
+                <span className="row-meta" style={{ display: "block", whiteSpace: "normal" }}>
+                  {[version.snapshot?.energyProposal?.title, version.grandTotal !== null && version.grandTotal !== undefined ? `${formatCurrency(version.grandTotal, { withCents: true })} net incl. GST` : null, "the commercial proposal PDF, marked final"].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+            </label>
+          ))}
+          <label className="list-row" style={{ alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+            <input type="radio" name="handover-pick" checked={pick === "quote"} onChange={() => setPicked("quote")} />
+            <span style={{ minWidth: 0 }}>
+              <span className="row-title">Manual quote {quote?.quoteNumber ?? ""}</span>
+              <span className="row-meta" style={{ display: "block", whiteSpace: "normal" }}>
+                {totals ? `${quote.items.length} item${quote.items.length === 1 ? "" : "s"} · ${formatCurrency(totals.gst.grandTotal, { withCents: true })} · the quote PDF` : "No items on the quote yet"}
+              </span>
+            </span>
+          </label>
+        </div>
+      ) : null}
 
       <div className="list-stack">
         {requote ? (
@@ -165,15 +209,25 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
           title="Pre-site inspection"
           detail={inspectionMissing.length ? inspectionMissing.join(" · ") : "Not needed, or its findings are approved."}
         />
-        <CheckRow
-          done={!quoteMissing.length}
-          title="Quote priced"
-          detail={
-            totals
-              ? `${quote.quoteNumber} · ${quote.items.length} item${quote.items.length === 1 ? "" : "s"} · ${formatCurrency(totals.gst.grandTotal, { withCents: true })}`
-              : "Add at least one item to the quote."
-          }
-        />
+        {sendingProposal ? (
+          <CheckRow
+            done
+            title={`Solar + BESS proposal final - version ${versionOf(sendingProposal)}`}
+            detail="Marked final and saved as a quote version: this proposal PDF is what sales will send the customer."
+          />
+        ) : null}
+        {!sendingProposal ? (
+          <CheckRow
+            done={!quoteMissing.length}
+            title="Quote priced"
+            detail={
+              totals
+                ? `${quote.quoteNumber} · ${quote.items.length} item${quote.items.length === 1 ? "" : "s"} · ${formatCurrency(totals.gst.grandTotal, { withCents: true })}`
+                : "Add at least one item to the quote, or mark a Solar + BESS proposal final (Proposal PDF tab)."
+            }
+          />
+        ) : null}
+        {!sendingProposal ? (
         <CheckRow
           done={Boolean(generated)}
           warn
@@ -196,6 +250,7 @@ export default function ProposalHandover({ opp, unit, requote = null, onSent, in
                   : `It will be generated as version ${latestNumber + 1} and locked when you send it.`
           }
         />
+        ) : null}
       </div>
 
       <div className="form-grid" style={{ marginTop: 16 }}>

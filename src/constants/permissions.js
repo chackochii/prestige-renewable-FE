@@ -28,6 +28,9 @@ export const PERMISSIONS = {
   ADMIN_APPROVE: "admin.approve",
 
   DASHBOARDS_READ: "dashboards.read",
+
+  // Admin → AI skills: the proposal skill, its reference files and calculator settings.
+  SKILLS_MANAGE: "skills.manage",
 };
 
 /** Permission that gates visibility of a registry page. */

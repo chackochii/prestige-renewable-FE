@@ -77,7 +77,7 @@ export default function UserFormModal({ user, roles, units, defaultUnitId, canAs
       body={
         editing
           ? "Roles and unit assignments take effect on the person's next request."
-          : "The person signs in with the email and password you set here."
+          : "The password you set here is temporary: the person signs in with it once and is then asked to choose their own."
       }
       onClose={onClose}
       actions={
@@ -104,7 +104,11 @@ export default function UserFormModal({ user, roles, units, defaultUnitId, canAs
         <Field label="Phone">
           <input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
         </Field>
-        <Field label={editing ? "New password" : "Password"} hint={editing ? "leave blank to keep current" : "minimum 8 characters"} error={errors.password}>
+        <Field
+          label={editing ? "New temporary password" : "Temporary password"}
+          hint={editing ? "leave blank to keep current - a new one must be changed at their next sign-in" : "minimum 8 characters - they choose their own at first sign-in"}
+          error={errors.password}
+        >
           <input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} autoComplete="new-password" />
         </Field>
         <Field label="Status">

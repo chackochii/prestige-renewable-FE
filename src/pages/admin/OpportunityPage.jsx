@@ -5,7 +5,7 @@ import { reviewNeeded, reviewReasons } from "@/helpers/approvals";
 import { approvalConditions } from "@/helpers/approvalChecklist";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowRight, Clock, FileStack, FolderOpen, Send } from "lucide-react";
+import { ArrowRight, Clock, FileStack, FileText, FolderOpen, Send } from "lucide-react";
 import Badge from "@/components/Badge";
 import Alert from "@/components/Alert";
 import Tabs from "@/components/Tabs";
@@ -15,6 +15,7 @@ import EmptyState from "@/components/EmptyState";
 import StageStepper from "@/components/StageStepper";
 import HistoryTab from "@/components/HistoryTab";
 import JobDocuments from "@/features/documents/JobDocuments";
+import EnergyProposalsPanel from "@/features/energyProposal/EnergyProposalsPanel";
 import { oppTitle } from "@/helpers/opportunity";
 import LeadPackPanel from "@/features/leads/LeadPackPanel";
 import EstimationPanel from "@/features/pipeline/EstimationPanel";
@@ -54,7 +55,7 @@ export default function OpportunityPage() {
   const { user, hasPermission, isSuperAdmin } = useAuth();
   const { unit, units, switchUnit } = useBusinessUnit();
   const { notify } = useNotifications();
-  const { selected: opp, selectedStatus, selectedError, quote } = useAppSelector((s) => s.leads);
+  const { selected: opp, selectedStatus, selectedError, quote, versions } = useAppSelector((s) => s.leads);
   // Procurement and construction are let go on the procurement record (PO
   // release; then material receipt and Green Deal), so it is read here for the gate.
   // No task date on the job before the day the lead was created.
@@ -119,13 +120,14 @@ export default function OpportunityPage() {
   const canEdit = hasPermission(PERMISSIONS.LEADS_UPDATE);
   const canSeeDocuments = [PERMISSIONS.LEADS_READ, PERMISSIONS.ESTIMATION_READ, PERMISSIONS.PROCUREMENT_READ].some((code) => hasPermission(code));
   const canEditEstimation = hasPermission(PERMISSIONS.ESTIMATION_UPDATE);
+  const canSeeProposals = [PERMISSIONS.LEADS_READ, PERMISSIONS.ESTIMATION_READ].some((code) => hasPermission(code));
   const canDelete = isSuperAdmin && Number(opp.stage) === 1;
   const current = Number(opp.stage);
   // A stage asked for that the job has not reached yet shows the current one.
   const viewing = viewStage && viewStage <= current ? viewStage : current;
   const stage = stageById(current);
   const next = nextStageFor(current, unit);
-  const gate = advanceState(opp, { quote, user, procurementJob: procurementRecord.job, approvalJob: approvalRecord.job });
+  const gate = advanceState(opp, { quote, versions, user, procurementJob: procurementRecord.job, approvalJob: approvalRecord.job });
   const stageHidden = stageHiddenReason(user, viewing);
   const sla = slaStatus(opp.slaDueAt);
   const life = lifecycleMeta(opp.lifecycle);
@@ -290,6 +292,8 @@ export default function OpportunityPage() {
           { key: "work", label: "Stage Tasks", icon: <FileStack size={14} /> },
           // Every file on the job, whatever stage it came in at - for anyone who may read them (GET /attachments).
           ...(canSeeDocuments ? [{ key: "documents", label: "Documents", icon: <FolderOpen size={14} /> }] : []),
+          // The commercial Solar + BESS proposal PDF, at any stage (energy proposals, drafted to the admin's AI skill).
+          ...(canSeeProposals ? [{ key: "energyProposal", label: "Proposal PDF", icon: <FileText size={14} /> }] : []),
           { key: "history", label: "History", icon: <Clock size={14} /> },
         ]}
       />
@@ -355,6 +359,8 @@ export default function OpportunityPage() {
         </div>
       ) : tab === "documents" && canSeeDocuments ? (
         <JobDocuments opp={opp} timeZone={timeZone} />
+      ) : tab === "energyProposal" && canSeeProposals ? (
+        <EnergyProposalsPanel opp={opp} canEdit={canEdit || canEditEstimation} />
       ) : (
         <HistoryTab opp={opp} timeZone={timeZone} canEdit={canEdit} />
       )}

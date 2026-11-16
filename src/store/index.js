@@ -24,6 +24,8 @@ import dlpOmReducer from "@/slices/dlpOmSlice";
 import employeeReducer from "@/slices/employeeSlice";
 import notificationsReducer from "@/slices/notificationsSlice";
 import inboxReducer from "@/slices/inboxSlice";
+import aiSkillsReducer from "@/slices/aiSkillsSlice";
+import energyProposalsReducer from "@/slices/energyProposalsSlice";
 
 export const store = configureStore({
   reducer: {
@@ -46,6 +48,8 @@ export const store = configureStore({
     employee: employeeReducer,
     notifications: notificationsReducer,
     inbox: inboxReducer,
+    aiSkills: aiSkillsReducer,
+    energyProposals: energyProposalsReducer,
   },
 });
 

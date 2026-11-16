@@ -22,7 +22,7 @@
 // once it has. Generating waits until the draft is saved.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Sparkles, Trash2, Undo2, Zap } from "lucide-react";
+import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, FileText, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Sparkles, Trash2, Undo2, Zap } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -40,7 +40,7 @@ import {
   lineTotal,
   quoteGstBreakdown,
 } from "@/helpers/quote";
-import { downloadInvoice, invoicePreviewUrl, invoiceSnapshot, matchesSnapshot, versionOf } from "@/helpers/invoice";
+import { downloadInvoice, invoicePreviewUrl, invoiceSnapshot, isEnergyProposalVersion, matchesSnapshot, versionOf } from "@/helpers/invoice";
 import { formatDate, timeAgo } from "@/helpers/dateTimeHelpers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { useAppDispatch, useAppSelector } from "@/store";
@@ -60,6 +60,7 @@ import {
 } from "@/slices/leadsSlice";
 import { useNotifications } from "@/hooks/useNotifications";
 import AiQuoteModal from "./AiQuoteModal";
+import EnergyProposalsPanel from "@/features/energyProposal/EnergyProposalsPanel";
 
 const emptyItemForm = () => ({ itemKey: "", brand: "", quantity: 1, unit: "", unitPrice: "", discountPct: 0 });
 
@@ -261,6 +262,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const [preview, setPreview] = useState(null); // null closed, { version } open
   const [history, setHistory] = useState(false); // the earlier versions, in a modal
   const [aiQuote, setAiQuote] = useState(null); // the AI-assisted quote dialog: null closed, { source: "job" | "bill" } open
+  const [energyProposals, setEnergyProposals] = useState(false); // the commercial Solar + BESS proposal PDFs, in a dialog
   const versions = useAppSelector((s) => s.leads.versions);
   const versionsStatus = useAppSelector((s) => s.leads.versionsStatus);
   const versionsError = useAppSelector((s) => s.leads.versionsError);
@@ -363,13 +365,18 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
 
   // The server numbers the versions; the list comes back newest first, so a
   // row with no number falls back to its position in the list.
-  const latestVersion = versions.reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0);
-  const nextVersion = (latestVersion || versions.length) + 1;
-  const savedMatch = versions.some((version) => matchesSnapshot({ opp, quote }, version));
-  const versionLabel = (version) => `Version ${versionOf(version) ?? versions.length - versions.indexOf(version)}`;
+  // A final Solar + BESS proposal is saved as a version of this quote too
+  // (kind "energy_proposal"): it shares the numbering, but this builder's own
+  // row and messages are about the versions built here.
+  const manualVersions = versions.filter((v) => !isEnergyProposalVersion(v));
+  const nextVersion = (versions.reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0) || versions.length) + 1;
+  const latestVersion = manualVersions.reduce((max, v) => Math.max(max, versionOf(v) ?? 0), 0);
+  const savedMatch = manualVersions.some((version) => matchesSnapshot({ opp, quote }, version));
+  const versionLabel = (version) =>
+    `Version ${versionOf(version) ?? versions.length - versions.indexOf(version)}${isEnergyProposalVersion(version) ? " · Solar + BESS proposal" : ""}`;
   // The one the buttons act on, and the rest behind the link.
-  const latest = versions.length
-    ? versions.reduce((best, v) => ((versionOf(v) ?? 0) > (versionOf(best) ?? 0) ? v : best), versions[0])
+  const latest = manualVersions.length
+    ? manualVersions.reduce((best, v) => ((versionOf(v) ?? 0) > (versionOf(best) ?? 0) ? v : best), manualVersions[0])
     : null;
   const earlier = versions.filter((v) => v.id !== latest?.id);
 
@@ -698,7 +705,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     setStartingDraft(true);
     try {
       await dispatch(startQuoteDraft(opp.id)).unwrap();
-      notify(`New quote started from version ${latestVersion} - edit it, then generate it as version ${latestVersion + 1}`, "info");
+      notify(`New quote started from version ${latestVersion} - edit it, then generate it as version ${nextVersion}`, "info");
       return true;
     } catch (err) {
       notifyError(errText(err, "Could not start a new quote."));
@@ -756,7 +763,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           <p className="lede quote-state-text" style={{ margin: 0 }}>
             <Badge tone="warning">Draft</Badge>
             <span>
-              {versions.length ? `New quote from version ${latestVersion}. ` : ""}
+              {manualVersions.length ? `New quote from version ${latestVersion}. ` : ""}
               Save the draft as you go - generate it when it is final to lock it as version {nextVersion}.
             </span>
           </p>
@@ -845,6 +852,15 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             title={dirty ? "Save the draft first" : "Upload or choose the customer's electricity bill - AI sizes the system from it and proposes the quote"}
           >
             <Zap size={14} /> Quote from bill
+          </button>
+          {/* The commercial proposal PDF (Prestige template): AI reads the bills to the admin's skill, the calculator works out the figures. */}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setEnergyProposals(true)}
+            title="Draft the commercial Solar + BESS proposal PDF from the customer's bills, to the AI skill set on Admin → AI skills"
+          >
+            <FileText size={14} /> Solar + BESS proposal
           </button>
         </div>
       ) : null}
@@ -1099,7 +1115,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         ) : null}
       </div>
 
-      {!versions.length && versionsStatus !== "loading" ? (
+      {!manualVersions.length && versionsStatus !== "loading" ? (
         <p className="lede" style={{ marginTop: 10 }}>
           {quote.items.length
             ? "Generate the quote to get the PDF - preview and download come from a generated version, and generating locks the quote."
@@ -1188,6 +1204,12 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             </>
           }
         />
+      ) : null}
+
+      {energyProposals ? (
+        <Modal title="Solar + BESS proposals" className="document" confirmClose={false} onClose={() => setEnergyProposals(false)}>
+          <EnergyProposalsPanel opp={opp} canEdit={canEdit} />
+        </Modal>
       ) : null}
 
       {aiQuote ? (

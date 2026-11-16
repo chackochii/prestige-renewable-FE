@@ -43,6 +43,7 @@ const RolesPage = lazy(() => import("@/pages/admin/RolesPage"));
 const PagesPage = lazy(() => import("@/pages/admin/PagesPage"));
 const UnitSettingsPage = lazy(() => import("@/pages/admin/UnitSettingsPage"));
 const ConnectionsPage = lazy(() => import("@/pages/admin/ConnectionsPage"));
+const AiSkillsPage = lazy(() => import("@/pages/admin/AiSkillsPage"));
 
 const page = (code, element) => (
   <RequirePage code={code}>{element}</RequirePage>
@@ -113,6 +114,11 @@ export const workspaceRoutes = [
   {
     path: "admin/connections",
     element: page(PAGE_CODES.ADMIN, <ConnectionsPage />),
+  },
+  // The proposal skill: readable by admin readers, changed with skills.manage (checked on the page and by the API).
+  {
+    path: "admin/skills",
+    element: page(PAGE_CODES.ADMIN, <AiSkillsPage />),
   },
   ...superadminRoutes,
   // Legacy / convenience aliases

@@ -602,6 +602,55 @@
   .ai-bill-assumptions { grid-column: 1 / -1; margin-top: 6px; font-size: calc(13px * var(--text-scale)); color: var(--ink-soft); }
   .ai-bill-assumptions summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   .ai-bill-assumptions ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.5; }
+
+  /* ---- Admin → AI skills ----------------------------------------------- */
+  .skill-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 8px; }
+  .skill-editor {
+    width: 100%; min-height: 460px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: calc(13px * var(--text-scale)); line-height: 1.55; padding: 14px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--ink); tab-size: 2;
+  }
+  .skill-json {
+    max-height: 360px; overflow: auto; padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line);
+    font-size: calc(12px * var(--text-scale)); color: var(--ink-soft);
+  }
+  .skill-savebar {
+    position: sticky; bottom: 0; display: flex; gap: 16px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap;
+    margin: 18px -24px -22px; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--surface); border-radius: 0 0 16px 16px;
+  }
+  .skill-savebar .field { flex: 1 1 320px; margin: 0; }
+  .skill-settings { display: grid; gap: 26px; }
+  .skill-settings-section h3 { margin: 0 0 10px; font-size: calc(16px * var(--text-scale)); color: var(--ink); }
+  .skill-settings-section h4, .ep-editor h4, .ep-workout h4 { margin: 18px 0 8px; font-size: calc(14px * var(--text-scale)); color: var(--ink); }
+  .skill-inline-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .skill-inline-row.wide { grid-template-columns: 200px minmax(0, 1fr) auto; align-items: start; }
+  .skill-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px 10px; }
+  .table.compact td { padding: 8px 8px 8px 0; }
+  .table.compact th { padding-right: 8px; }
+
+  /* ---- Energy proposals ------------------------------------------------ */
+  .ep-editor-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .ep-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; }
+  .ep-composer { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+  .ep-bills { display: grid; gap: 6px; margin-bottom: 4px; }
+  .ep-bills label { display: flex; align-items: center; gap: 8px; font-size: calc(14px * var(--text-scale)); color: var(--ink); overflow-wrap: anywhere; }
+  .ep-workout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 24px; }
+  .ep-workout-table td:first-child { color: var(--ink-soft); }
+  .ep-workout-table .ep-row-total td { font-weight: 700; color: var(--ink); background: var(--surface-2); }
+  .ep-workout-table .ep-row-net td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--ink); }
+  .ep-flags { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: calc(14px * var(--text-scale)); color: var(--ink-soft); line-height: 1.45; }
+  .ep-word-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; margin-bottom: 10px; }
+  .ep-word-card > div { display: grid; gap: 6px; }
+  .ep-word-num {
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; margin-top: 4px;
+    background: #c36a12; color: #fff; font-weight: 700; font-size: calc(11px * var(--text-scale));
+  }
+  .ep-pdf-frame { width: 100%; height: calc(100vh - 160px); min-height: 480px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  @media (max-width: 640px) {
+    .skill-inline-row, .skill-inline-row.wide { grid-template-columns: minmax(0, 1fr) auto; }
+    .skill-inline-row > :nth-child(2) { grid-column: 1; }
+    .skill-savebar { margin: 18px -20px -20px; padding: 12px 20px; }
+  }
   .quote-state-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
   .estimation-item { padding: 18px 0; border-bottom: 1px solid var(--line); }
   .estimation-item:first-of-type { padding-top: 4px; }

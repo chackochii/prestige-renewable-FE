@@ -18,6 +18,13 @@
 // (items, costs, tax treatment, totals, and the customer and site it was
 // written for). Viewing or downloading it later rebuilds the PDF from that
 // snapshot, so later edits never change a proposal that has already been sent.
+//
+// Two kinds of version share this: the manual quote (built in the quote
+// builder — this file's own template) and a final Solar + BESS proposal
+// (snapshot.kind "energy_proposal", saved when the estimator marks it final —
+// drawn with helpers/energyProposalPdf.js in the commercial proposal
+// template). Every preview and download of a version goes through here, so
+// the customer gets the right document whichever way the job was quoted.
 
 import {
   ACCEPTANCE_NOTE,
@@ -43,6 +50,12 @@ import { formatCurrency } from "@/utils/formatCurrency";
 import { addDaysIso, formatDate, todayIso } from "@/helpers/dateTimeHelpers";
 import { joinAddress } from "@/utils/text";
 import { logoDataUrl } from "@/helpers/brand";
+import { buildEnergyProposalDoc, energyProposalFileName } from "@/helpers/energyProposalPdf";
+
+/** Whether a saved version is a Solar + BESS proposal (drawn in the proposal template), not the manual quote. */
+export function isEnergyProposalVersion(version) {
+  return version?.snapshot?.kind === "energy_proposal" && Boolean(version.snapshot.energyProposal);
+}
 
 const TAX_TREATMENT_LABEL = {
   exclusive: "Prices are GST-exclusive - GST is added on top.",
@@ -140,6 +153,7 @@ export function versionOf(version) {
 
 /** "PRS-Q1042-v2.pdf" for a saved version, "…-draft.pdf" for the live quote. */
 export function invoiceFileName({ quote, version }) {
+  if (isEnergyProposalVersion(version)) return energyProposalFileName(version.snapshot.energyProposal);
   const number = version?.snapshot?.quote?.quoteNumber || quote?.quoteNumber || "quote";
   return `${number}-${version ? `v${versionOf(version) ?? version.id}` : "draft"}.pdf`;
 }
@@ -150,7 +164,7 @@ export function invoiceFileName({ quote, version }) {
  * counts — but re-saving an unchanged quote does not make a new version.
  */
 export function matchesSnapshot({ opp, quote }, version) {
-  if (!version?.snapshot) return false;
+  if (!version?.snapshot || isEnergyProposalVersion(version)) return false;
   const current = invoiceSnapshot({ opp, quote });
   return stableJson(current.quote) === stableJson(version.snapshot.quote);
 }
@@ -607,11 +621,16 @@ function sourceFor({ opp, quote, unit, version }) {
   };
 }
 
+/** The jsPDF document for the live quote or a saved version — in the proposal template for a Solar + BESS version. */
+async function buildDocFor({ opp, quote, unit, version }) {
+  if (isEnergyProposalVersion(version)) return buildEnergyProposalDoc(version.snapshot.energyProposal);
+  return buildInvoiceDoc(sourceFor({ opp, quote, unit, version }));
+}
+
 /** Downloads the PDF for the live quote, or for a saved version when `version` is given. */
 export async function downloadInvoice({ opp, quote, unit, version }) {
-  const source = sourceFor({ opp, quote, unit, version });
-  const doc = await buildInvoiceDoc(source);
-  doc.save(invoiceFileName(source));
+  const doc = await buildDocFor({ opp, quote, unit, version });
+  doc.save(invoiceFileName({ quote, version }));
 }
 
 /**
@@ -619,6 +638,6 @@ export async function downloadInvoice({ opp, quote, unit, version }) {
  * URL and must pass it to URL.revokeObjectURL when the preview closes.
  */
 export async function invoicePreviewUrl({ opp, quote, unit, version }) {
-  const doc = await buildInvoiceDoc(sourceFor({ opp, quote, unit, version }));
+  const doc = await buildDocFor({ opp, quote, unit, version });
   return URL.createObjectURL(doc.output("blob"));
 }

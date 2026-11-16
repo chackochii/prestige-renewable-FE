@@ -143,6 +143,11 @@ export default function UsersPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                   {u.status !== "active" ? <Badge tone="danger">Disabled</Badge> : null}
+                  {u.passwordIsTemporary ? (
+                    <span title="Signs in with the temporary password you set, then chooses their own">
+                      <Badge tone="warning">Temporary password</Badge>
+                    </span>
+                  ) : null}
                   {(u.roles || []).map((code) => (
                     <Badge key={code} tone={code === SUPER_ROLE_CODE ? "gold" : "neutral"}>
                       {roleName(code, roles)}

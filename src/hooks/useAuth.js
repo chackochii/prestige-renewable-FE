@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { fetchMe, login as loginThunk, logout as logoutAction } from "@/slices/authSlice";
+import { completePasswordSetup as completePasswordSetupThunk, fetchMe, login as loginThunk, logout as logoutAction } from "@/slices/authSlice";
 import {
   hasAnyPermission as anyPermission,
   hasPermission as permission,
@@ -16,8 +16,13 @@ export function useAuth() {
   const { user, token, status, error, initialized, expiresAt, notice, noticeSeen } = useAppSelector((s) => s.auth);
   const catalog = useAppSelector((s) => s.roles.roles);
 
+  // → { token, user } signed in, or { passwordSetup: { token, user } } when the person must choose their own password first.
   const login = useCallback(
     (email, password) => dispatch(loginThunk({ email, password })).unwrap(),
+    [dispatch],
+  );
+  const completePasswordSetup = useCallback(
+    (setupToken, newPassword) => dispatch(completePasswordSetupThunk({ setupToken, newPassword })).unwrap(),
     [dispatch],
   );
   const logout = useCallback(() => dispatch(logoutAction()), [dispatch]);
@@ -45,6 +50,7 @@ export function useAuth() {
     hasPermission,
     hasAnyPermission,
     login,
+    completePasswordSetup,
     logout,
     refresh,
   };

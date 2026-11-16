@@ -68,8 +68,17 @@ export function estimationGateItems(opp) {
 }
 
 /** Items still missing before an opportunity can leave estimation without a priced quote. */
-export function quoteGateItems(quote) {
-  return quote?.items?.length ? [] : ["In order to send a proposal, ensure that at least one priced item is added to the quote."];
+/** Whether a saved version is a final Solar + BESS proposal (prestige-be energyProposalService). */
+export const isProposalVersion = (version) => version?.kind === "energy_proposal" || version?.snapshot?.kind === "energy_proposal";
+
+/**
+ * What the quote still needs before the job can go to proposal: a priced
+ * item — or, instead, a final Solar + BESS proposal saved as a version
+ * (`versions`, the job's quote versions), which goes in place of the quote.
+ */
+export function quoteGateItems(quote, versions = []) {
+  if ((versions ?? []).some(isProposalVersion)) return [];
+  return quote?.items?.length ? [] : ["In order to send a proposal, ensure that at least one priced item is added to the quote (or a Solar + BESS proposal is marked final)."];
 }
 
 /**
@@ -102,7 +111,7 @@ function approvalGateItems(opp, approvalJob) {
   return exitBlockers(approvalJob);
 }
 
-export function advanceState(opp, { quote, user, procurementJob, approvalJob } = {}) {
+export function advanceState(opp, { quote, versions = [], user, procurementJob, approvalJob } = {}) {
   if (!opp) return { canAdvance: false, missing: ["No record"] };
   if (opp.lifecycle && CLOSED_LIFECYCLES.includes(opp.lifecycle))
     return { canAdvance: false, missing: [`Record is ${opp.lifecycle.toLowerCase()}`] };
@@ -112,7 +121,7 @@ export function advanceState(opp, { quote, user, procurementJob, approvalJob } =
     stage === 1
       ? leadGateItems(opp)
       : stage === 2
-        ? [...estimationGateItems(opp), ...quoteGateItems(quote)]
+        ? [...estimationGateItems(opp), ...quoteGateItems(quote, versions)]
         : stage === 3
           ? // The customer accepting (online, or recorded by sales) moves the job on by itself.
             ["This stage is complete when the customer accepts the proposal. The job will then move to Approvals automatically."]
