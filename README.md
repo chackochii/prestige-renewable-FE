@@ -15,7 +15,8 @@ Front end for the Prestige Business Units sales & delivery pipeline (leads → e
 ```bash
 npm install
 cp .env.example .env   # set VITE_API_BASE_URL to the prestige-be URL (default http://localhost:8000/api)
-npm run dev            # http://localhost:3000
+                       # and PORT for the dev/preview server (default 3000)
+npm run dev            # http://localhost:<PORT>, 3000 by default
 ```
 
 Other scripts:
