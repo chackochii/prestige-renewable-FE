@@ -8,6 +8,7 @@ import process from "node:process";
 export default defineConfig(({ mode }) => {
   // Empty prefix loads every var, so PORT stays server-side (not exposed to the client bundle).
   const env = loadEnv(mode, process.cwd(), "");
+  const port = Number(env.PORT) || 3000;
 
   return {
     plugins: [react(), tailwindcss()],
@@ -16,9 +17,15 @@ export default defineConfig(({ mode }) => {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
+    // strictPort: fail loudly if PORT is taken instead of silently moving to the next free port.
     server: {
-      port: Number(env.PORT) || 3000,
+      port,
+      strictPort: true,
       open: false,
+    },
+    preview: {
+      port,
+      strictPort: true,
     },
     build: {
       rollupOptions: {
