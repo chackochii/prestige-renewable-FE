@@ -1,37 +1,20 @@
-// Leads: opportunities still at stage 1 in the current business unit, 12 to
-// a page with numbered pages below, newest first. The search runs on the API
-// across every lead; the search and the page are kept in the URL, so Back
-// from a lead returns to the list as it was.
+// Lead Board: every record from Leads to Approvals, laid out as the Jobs
+// Board is (the same StageBoard: list or board, the same filters). A job
+// leaves it for the Jobs Board when it reaches Procurement.
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Inbox } from "lucide-react";
-import PageHeader from "@/components/PageHeader";
-import Badge from "@/components/Badge";
 import CopyLinkButton from "@/components/CopyLinkButton";
-import EmptyState from "@/components/EmptyState";
-import LoadingState from "@/components/LoadingState";
-import Pagination from "@/components/Pagination";
-import Alert from "@/components/Alert";
-import OppCell from "@/components/OppCell";
+import StageBoard from "@/features/pipeline/StageBoard";
+import { LEAD_BOARD_LAST_STAGE } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
-import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
 import { enquiryLink } from "@/features/leads/enquiryLink";
-import { slaStatus } from "@/helpers/dateTimeHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { useBusinessUnit } from "@/hooks/useBusinessUnit";
-import { useOpportunities } from "@/hooks/useOpportunities";
-import { usePageParam } from "@/hooks/usePageParam";
-import { useUrlSearch } from "@/hooks/useUrlParam";
-import { PAGE_SIZE } from "@/helpers/pagination";
 import { listInboundLeads } from "@/services/api/inboundLeadsApi";
 
-/** How to reach the customer — captured on every lead, so always worth showing. */
-const contactSummary = (o) =>
-  [o.customerPhone, o.customerEmail].filter(Boolean).join(" · ") || "-";
-
 export default function LeadsPage() {
-  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { unit, unitId } = useBusinessUnit();
   // How many ad-platform leads wait in the inbox, for the button. A failure
@@ -41,149 +24,37 @@ export default function LeadsPage() {
     let alive = true;
     if (!unitId) return undefined;
     listInboundLeads({ businessUnitId: unitId, status: "pending", pageSize: 1 })
-      .then(
-        (result) =>
-          alive && setPendingInbox(result.counts?.pending ?? result.total),
-      )
+      .then((result) => alive && setPendingInbox(result.counts?.pending ?? result.total))
       .catch(() => alive && setPendingInbox(null));
     return () => {
       alive = false;
     };
   }, [unitId]);
-  // Only part of the list is loaded now, so searching in the browser would miss
-  // anything further down. The search goes to the API, which applies it across
-  // every lead and pages the result.
-  const { search, setSearch, term: settledSearch } = useUrlSearch();
 
-  const [page, setPage] = usePageParam(settledSearch);
-
-  // The API returns them newest first, a page at a time.
-  const {
-    items: rows,
-    error,
-    ready,
-    loading,
-    total,
-  } = useOpportunities(
-    {
-      stage: 1,
-      ...(settledSearch ? { search: settledSearch } : {}),
-    },
-    { page, pageSize: PAGE_SIZE },
-  );
-
-  return (
+  const actions = (
     <>
-      <PageHeader
-        title="Leads"
-        description="Leads that haven't entered the pipeline yet. Complete the lead pack, mark as Qualified and assign an estimator to progress them."
-        actions={
-          <>
-            <Link
-              className="btn btn-ghost"
-              to="/leads/inbox"
-              title="Leads delivered by Meta and Google Ads"
-            >
-              <Inbox size={16} /> Inbox
-              {pendingInbox ? ` (${pendingInbox})` : ""}
-            </Link>
-            {hasPermission(PERMISSIONS.LEADS_CREATE) ? (
-              <>
-                {/* Hand this to a customer, a partner or a campaign: it files
-                  straight into this unit with no sign-in. */}
-                <CopyLinkButton
-                  value={enquiryLink(unit?.code)}
-                  label="Copy enquiry link"
-                  copiedLabel="Link copied"
-                  className="btn btn-ghost"
-                  toast={
-                    unit?.name
-                      ? `Enquiry link for ${unit.name} copied`
-                      : "Enquiry link copied"
-                  }
-                />
-                <Link className="btn btn-primary" to="/leads/new">
-                  New lead
-                </Link>
-              </>
-            ) : null}
-          </>
-        }
-      />
-
-      <div className="toolbar">
-        <input
-          className="search"
-          placeholder="Search name, number, email or phone"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search leads"
-        />
-      </div>
-
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      <div className="card card-pad">
-        {/* A page past the end (the list shrank since) has no rows but a total:
-            the pager below moves it back to the last page rather than this
-            saying there are no leads. */}
-        {(loading && !rows.length) || (ready && !rows.length && total > 0) ? (
-          <LoadingState label="Loading leads…" />
-        ) : ready && rows.length === 0 ? (
-          <EmptyState
-            title={settledSearch ? "No leads match" : "No leads waiting"}
-            body={
-              settledSearch
-                ? "No lead matches that search."
-                : "Every lead has been qualified or moved out. Capture a new one to get started."
-            }
+      <Link className="btn btn-ghost" to="/leads/inbox" title="Leads delivered by Meta and Google Ads">
+        <Inbox size={16} /> Inbox
+        {pendingInbox ? ` (${pendingInbox})` : ""}
+      </Link>
+      {hasPermission(PERMISSIONS.LEADS_CREATE) ? (
+        <>
+          {/* Hand this to a customer, a partner or a campaign: it files
+              straight into this unit with no sign-in. */}
+          <CopyLinkButton
+            value={enquiryLink(unit?.code)}
+            label="Copy enquiry link"
+            copiedLabel="Link copied"
+            className="btn btn-ghost"
+            toast={unit?.name ? `Enquiry link for ${unit.name} copied` : "Enquiry link copied"}
           />
-        ) : (
-          <div className={`table-wrap${loading ? " is-refreshing" : ""}`}>
-            <table className="table clickable stack">
-              <thead>
-                <tr>
-                  <th>Lead</th>
-                  <th>Source</th>
-                  <th>Contact</th>
-                  <th>Next action</th>
-                  <th>SLA</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((o) => {
-                  const sla = slaStatus(o.slaDueAt);
-                  return (
-                    <tr
-                      key={o.id}
-                      onClick={() => navigate(`/opportunities/${o.id}`)}
-                    >
-                      <td data-label="Lead">
-                        <OppCell opp={o} />
-                      </td>
-                      <td data-label="Source">
-                        {leadSourceLabel(o.leadSource)}
-                      </td>
-                      <td data-label="Contact">{contactSummary(o)}</td>
-                      <td data-label="Next action">{o.nextAction || "-"}</td>
-                      <td data-label="SLA">
-                        <Badge tone={sla.tone}>{sla.label}</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <Pagination
-          page={page}
-          total={total}
-          onPageChange={setPage}
-          noun="leads"
-          loading={loading}
-        />
-      </div>
+          <Link className="btn btn-primary" to="/leads/new">
+            New lead
+          </Link>
+        </>
+      ) : null}
     </>
   );
+
+  return <StageBoard title="Lead Board" actions={actions} maxStage={LEAD_BOARD_LAST_STAGE} />;
 }

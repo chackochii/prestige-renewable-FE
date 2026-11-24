@@ -6,7 +6,10 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CircleCheck, Download, Receipt, Search } from "lucide-react";
+import { CircleCheck, Download, Plus, Receipt, Search } from "lucide-react";
+import NewQuoteModal from "@/features/pipeline/NewQuoteModal";
+import { PERMISSIONS } from "@/constants/permissions";
+import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
 import Badge from "@/components/Badge";
@@ -36,6 +39,9 @@ export default function QuotesPage() {
   const { search, setSearch, term } = useUrlSearch();
   const [page, setPage] = usePageParam(term);
   const [downloading, setDownloading] = useState(null);
+  // "New quote": pick a lead with an electricity bill uploaded and open its quote.
+  const [picking, setPicking] = useState(false);
+  const canQuote = useAuth().hasPermission(PERMISSIONS.ESTIMATION_UPDATE);
   const { items: rows, error, ready, loading, total, totals } = useOpportunities(
     { minStage: PROPOSAL_STAGE, totals: 1, ...(term ? { search: term } : {}) },
     { page, pageSize: PAGE_SIZE },
@@ -55,7 +61,18 @@ export default function QuotesPage() {
 
   return (
     <>
-      <PageHeader title="Quotes" description="Every job with a proposal, newest first. Open a job to see its quote and progress." />
+      <PageHeader
+        title="Quotes"
+        description="Every job with a proposal, newest first. Open a job to see its quote and progress."
+        actions={
+          canQuote ? (
+            <button type="button" className="btn btn-primary" onClick={() => setPicking(true)} title="Quote a lead from its uploaded electricity bill">
+              <Plus size={16} /> New quote
+            </button>
+          ) : null
+        }
+      />
+      {picking ? <NewQuoteModal onClose={() => setPicking(false)} /> : null}
       <div className="stats">
         <StatCard
           icon={<Receipt size={17} />}

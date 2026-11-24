@@ -28,7 +28,7 @@ import { APPROVALS_STAGE } from "@/constants/approvals";
 import ProposalStagePanel from "@/features/proposals/ProposalStagePanel";
 import { PROPOSAL_STAGE_ID } from "@/helpers/proposals";
 import { PROCUREMENT_STAGE } from "@/constants/procurement";
-import { enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
+import { boardPathFor, enabledStagesFor, lifecycleMeta, nextStageFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { canAdvanceFrom, stageHiddenReason, viewableStages } from "@/helpers/stageAccess";
 import { advanceState } from "@/helpers/stageTransition";
@@ -171,8 +171,8 @@ export default function OpportunityPage() {
 
   return (
     <div ref={pageRef}>
-      <Link to={current === 1 ? "/leads" : "/pipeline"} className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}>
-        {current === 1 ? "Leads" : "Jobs Board"}
+      <Link to={boardPathFor(current)} className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}>
+        {boardPathFor(current) === "/leads" ? "Lead Board" : "Jobs Board"}
       </Link>
 
       <div className="opp-hero">

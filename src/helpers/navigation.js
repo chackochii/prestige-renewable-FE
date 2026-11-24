@@ -1,18 +1,11 @@
 // Sidebar navigation is data: the page registry (GET /pages) filtered by the
-// user's permission codes and the business unit's disabled pages. Only two
-// entries are fixed in code — Home (every signed-in user) and the superadmin
-// business-unit screen (ADM only, deliberately outside the registry so it can
-// never be granted away or toggled off).
+// user's permission codes and the business unit's disabled pages. Only Home
+// is fixed in code. The superadmin screens (business units, DNSP networks,
+// quote catalog) are Control Centre tabs (AdminNav), ADM only.
 
-import { hasPermission, isSuperAdmin } from "@/constants/roles";
+import { hasPermission } from "@/constants/roles";
 
 export const HOME_NAV_ITEM = { code: "home", label: "Home", path: "/", fixed: true };
-export const SUPERADMIN_NAV_ITEM = {
-  code: "superadmin",
-  label: "Business units",
-  path: "/superadmin",
-  fixed: true,
-};
 
 /** Is this registry page visible to the user inside the given unit? */
 export function canSeePage(page, user, unit) {
@@ -40,6 +33,5 @@ export function buildNav({ pages = [], user, unit }) {
     .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code))
     .filter((page) => canSeePage(page, user, unit))
     .forEach((page) => items.push({ code: page.code, label: page.label, path: page.path }));
-  if (isSuperAdmin(user)) items.push(SUPERADMIN_NAV_ITEM);
   return items;
 }
