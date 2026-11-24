@@ -31,6 +31,7 @@ const ApprovalsPage = lazy(() => import("@/pages/admin/ApprovalsPage"));
 const ProcurementPage = lazy(() => import("@/pages/admin/ProcurementPage"));
 const ConstructionPage = lazy(() => import("@/pages/admin/ConstructionPage"));
 const QuotesPage = lazy(() => import("@/pages/admin/QuotesPage"));
+const LeadQuotePage = lazy(() => import("@/pages/admin/LeadQuotePage"));
 const CostsPage = lazy(() => import("@/pages/admin/CostsPage"));
 const InvoicingPage = lazy(() => import("@/pages/admin/InvoicingPage"));
 const WarrantyPage = lazy(() => import("@/pages/admin/WarrantyPage"));
@@ -87,6 +88,8 @@ export const workspaceRoutes = [
     element: page(PAGE_CODES.CONSTRUCTION, <ConstructionPage />),
   },
   { path: "quotes", element: page(PAGE_CODES.QUOTES, <QuotesPage />) },
+  // A lead's quote, sized from its electricity bill (Quotes → New quote).
+  { path: "quotes/lead/:id", element: page(PAGE_CODES.QUOTES, <LeadQuotePage />) },
   { path: "costs", element: page(PAGE_CODES.COSTS, <CostsPage />) },
   { path: "billing", element: page(PAGE_CODES.BILLING, <InvoicingPage />) },
   { path: "warranty", element: page(PAGE_CODES.WARRANTY, <WarrantyPage />) },

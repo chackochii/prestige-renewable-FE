@@ -305,7 +305,7 @@ export default function LeadForm({
   const doneTimeframe = !isBlank(form.preferredInstallTimeframe);
   const doneLocation = !isBlank(form.preferredInstallLocation);
   const doneComments = !isBlank(form.customerComments);
-  const doneIntent = Boolean(form.customerIntentConfirmed);
+  const doneIntent = !isBlank(form.customerIntentNotes) || Boolean(form.customerIntentConfirmed);
   const doneSource = !isBlank(form.leadSource);
   // Offers and budget are recorded when there are any — never a blocker.
   const doneOffers = !isBlank(form.businessOffers) || !isBlank(form.customerBudget);
@@ -696,20 +696,19 @@ export default function LeadForm({
               </ChecklistRow>
 
               <ChecklistRow done={doneIntent} label="Genuine interest" required>
-                <label className="check" style={{ margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.customerIntentConfirmed}
+                <Field hint="what the customer said that shows they mean to proceed" error={err("customerIntentNotes")}>
+                  <textarea
+                    rows={2}
+                    value={form.customerIntentNotes}
                     disabled={disabled}
-                    onChange={(e) => set("customerIntentConfirmed", e.target.checked)}
+                    placeholder="e.g. Wants it installed before summer, has budget approved"
+                    onChange={(e) => {
+                      set("customerIntentNotes", e.target.value);
+                      // The flag the API's stage-1 gate reads follows the notes.
+                      set("customerIntentConfirmed", !isBlank(e.target.value));
+                    }}
                   />
-                  Customer confirmed they are genuinely interested in proceeding
-                </label>
-                {err("customerIntentConfirmed") ? (
-                  <p className="field-error" style={{ marginTop: 6 }}>
-                    {err("customerIntentConfirmed")}
-                  </p>
-                ) : null}
+                </Field>
               </ChecklistRow>
 
               <ChecklistRow done={doneComments} label="Initial requirements & comments" required>

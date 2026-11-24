@@ -62,6 +62,9 @@ import { useNotifications } from "@/hooks/useNotifications";
 import AiQuoteModal from "./AiQuoteModal";
 import EnergyProposalsPanel from "@/features/energyProposal/EnergyProposalsPanel";
 
+/** The AI-assisted quote (Build with AI, Quote from bill) is hidden for now - set true to show its buttons again. */
+const SHOW_AI_QUOTE = false;
+
 const emptyItemForm = () => ({ itemKey: "", brand: "", quantity: 1, unit: "", unitPrice: "", discountPct: 0 });
 
 /**
@@ -742,15 +745,19 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             </span>
             {canEdit ? (
               <span className="quote-state-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={handleNewQuoteFromBill}
-                  disabled={startingDraft || catalogStatus !== "succeeded"}
-                  title="Start a new quote and size it from the customer's electricity bill"
-                >
-                  <Zap size={14} /> New quote from a bill
-                </button>
+                {SHOW_AI_QUOTE ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={handleNewQuoteFromBill}
+                      disabled={startingDraft || catalogStatus !== "succeeded"}
+                      title="Start a new quote and size it from the customer's electricity bill"
+                    >
+                      <Zap size={14} /> New quote from a bill
+                    </button>
+                  </>
+                ) : null}
                 <button type="button" className="btn btn-primary btn-sm" onClick={handleNewQuote} disabled={startingDraft}>
                   <FilePlus size={14} /> {startingDraft ? "Starting…" : "Create new quote"}
                 </button>
@@ -833,26 +840,30 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setModal({ item: null })}>
             <Plus size={14} /> Add Item
           </button>
-          {/* Proposes the lines from the job details and the catalog; reviewed before anything is added. */}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => setAiQuote({ source: "job" })}
-            disabled={dirty || catalogStatus !== "succeeded"}
-            title={dirty ? "Save the draft first" : "Let AI propose the quote's lines from the job details - you review them first"}
-          >
-            <Sparkles size={14} /> Build with AI
-          </button>
-          {/* Reads the customer's electricity bill, sizes the system from it, then proposes the lines. */}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => setAiQuote({ source: "bill" })}
-            disabled={dirty || catalogStatus !== "succeeded"}
-            title={dirty ? "Save the draft first" : "Upload or choose the customer's electricity bill - AI sizes the system from it and proposes the quote"}
-          >
-            <Zap size={14} /> Quote from bill
-          </button>
+          {SHOW_AI_QUOTE ? (
+            <>
+              {/* Proposes the lines from the job details and the catalog; reviewed before anything is added. */}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setAiQuote({ source: "job" })}
+                disabled={dirty || catalogStatus !== "succeeded"}
+                title={dirty ? "Save the draft first" : "Let AI propose the quote's lines from the job details - you review them first"}
+              >
+                <Sparkles size={14} /> Build with AI
+              </button>
+              {/* Reads the customer's electricity bill, sizes the system from it, then proposes the lines. */}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setAiQuote({ source: "bill" })}
+                disabled={dirty || catalogStatus !== "succeeded"}
+                title={dirty ? "Save the draft first" : "Upload or choose the customer's electricity bill - AI sizes the system from it and proposes the quote"}
+              >
+                <Zap size={14} /> Quote from bill
+              </button>
+            </>
+          ) : null}
           {/* The commercial proposal PDF (Prestige template): AI reads the bills to the admin's skill, the calculator works out the figures. */}
           <button
             type="button"

@@ -332,6 +332,11 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
   // The quote waits on the requirements checklist as well, whichever way the
   // client-input question went.
   const showQuoteBuilder = requirementsChecklistComplete && inspectionCleared && state === "ready";
+  // An uploaded electricity bill opens the quote straight away, before the
+  // checklist and the pre-site visit are done. Sending it to proposal still
+  // waits on those (showQuoteBuilder) - the API checks them on hand-over.
+  const hasBill = billFiles.length > 0;
+  const quoteOpen = showQuoteBuilder || hasBill;
   // The pre-site visit tab opens once the requirements are in (the estimator
   // decides there whether a visit is needed), or straight away when the lead
   // already said one is.
@@ -351,7 +356,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
 
   // Estimation always opens on its first tab, Requirements — the Continue
   // buttons lead on from there. A re-quote opens on the quote it is about.
-  const [tab, setTab] = useState(() => (requote && showQuoteBuilder ? "quote" : "requirements"));
+  const [tab, setTab] = useState(() => (requote && quoteOpen ? "quote" : "requirements"));
 
   useEffect(() => {
     if (focusHandover) setTab("handover");
@@ -495,7 +500,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
           <ContinueButton
             style={{ marginTop: 16 }}
             nextLabel={needsInspection && !preSiteResolved ? "Pre-site visit" : "Quote"}
-            blockers={leadRows.filter((row) => !row.done).map((row) => row.label)}
+            blockers={hasBill && !(needsInspection && !preSiteResolved) ? [] : leadRows.filter((row) => !row.done).map((row) => row.label)}
             onDone={() => setTab(needsInspection && !preSiteResolved ? "site-visit" : "quote")}
           />
         </>
@@ -617,7 +622,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
               style={{ marginTop: 16 }}
               nextLabel="Quote"
               blockers={
-                showQuoteBuilder
+                quoteOpen
                   ? []
                   : !requirementsChecklistComplete
                     ? ["the requirements checklist"]
@@ -634,8 +639,14 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
       ) : null}
 
       {tab === "quote" ? (
-        showQuoteBuilder ? (
+        quoteOpen ? (
           <>
+            {!showQuoteBuilder ? (
+              <Alert tone="info" style={{ marginBottom: 12 }}>
+                The quote is open because an electricity bill is uploaded. Finish the requirements checklist
+                {needsInspection ? " and the pre-site inspection" : ""} before sending it to proposal.
+              </Alert>
+            ) : null}
             <QuoteBuilder opp={opp} unit={unit} canEdit={canEdit} />
             <ContinueButton
               style={{ marginTop: 16 }}
@@ -649,7 +660,7 @@ export default function EstimationPanel({ opp, unit, canEdit, onViewLead, focusH
             title="Quote not open yet"
             body={
               !requirementsChecklistComplete
-                ? "The quote opens once the requirements checklist on the first tab is complete."
+                ? "The quote opens once an electricity bill is uploaded, or once the requirements checklist on the first tab is complete."
                 : findingsIn && !findingsApproved
                   ? "The pre-site inspection findings are in - approve them on the pre-site visit tab and the quote opens."
                   : needsInspection && !inspection
