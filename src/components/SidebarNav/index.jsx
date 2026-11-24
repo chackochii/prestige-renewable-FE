@@ -1,9 +1,8 @@
 // Sidebar: brand, search trigger and the permission-driven nav.
 
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   Briefcase,
-  Building2,
   CircleDollarSign,
   ClipboardCheck,
   FileText,
@@ -45,16 +44,17 @@ const ICONS = {
   referrers: Users,
   dashboards: Gauge,
   admin: Settings,
-  superadmin: Building2,
 };
 
-const NAV_ORDER = ["home", "pipeline", "leads", "approvals", "procurement", "quotes", "admin"];
-const NAV_LABELS = { pipeline: "Jobs Board", admin: "Control Centre" };
+const NAV_ORDER = ["home", "leads", "pipeline", "approvals", "procurement", "quotes", "admin"];
+const NAV_LABELS = { leads: "Lead Board", pipeline: "Jobs Board", admin: "Control Centre" };
 
 export default function SidebarNav({ open, onClose, onSearch }) {
   const { user } = useAuth();
   const { unit } = useBusinessUnit();
   const pages = useAppSelector((s) => s.pages.items);
+  // Business units, DNSP networks and the catalog are Control Centre tabs.
+  const inSuperadmin = useLocation().pathname.startsWith("/superadmin");
   // The order and names the business asked for (UAT, Oct 2026): these first,
   // in this order, then any other page the person can open, as the registry
   // lists them.
@@ -87,7 +87,12 @@ export default function SidebarNav({ open, onClose, onSearch }) {
         {items.map((item) => {
           const Icon = ICONS[item.code] || LayoutGrid;
           return (
-            <NavLink key={item.path} to={item.path} end={item.path === "/"}>
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/"}
+              className={({ isActive }) => (isActive || (inSuperadmin && item.code === "admin") ? "active" : "")}
+            >
               <Icon size={17} />
               {item.label}
             </NavLink>

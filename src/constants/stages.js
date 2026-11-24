@@ -89,6 +89,12 @@ export const STAGES = [
 export const FIRST_STAGE = 1;
 export const LAST_STAGE = 11;
 
+// The Lead Board holds Leads to Approvals; a job moves to the Jobs Board when it reaches Procurement.
+export const LEAD_BOARD_LAST_STAGE = 5;
+
+/** The board a record at `stage` sits on: "/leads" (the Lead Board) or "/pipeline" (the Jobs Board). */
+export const boardPathFor = (stage) => (Number(stage) <= LEAD_BOARD_LAST_STAGE ? "/leads" : "/pipeline");
+
 // A record still at retired stage 4 was already won, so it reads as Approvals.
 const RETIRED_TO = { 4: 5 };
 

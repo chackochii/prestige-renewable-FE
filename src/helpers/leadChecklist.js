@@ -108,9 +108,9 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
     },
     {
       key: "intent",
-      label: "Genuine interest confirmed",
-      value: opp.customerIntentConfirmed ? "Confirmed" : "",
-      done: Boolean(opp.customerIntentConfirmed),
+      label: "Genuine interest",
+      value: opp.customerIntentNotes?.trim() || (opp.customerIntentConfirmed ? "Confirmed" : ""),
+      done: Boolean(opp.customerIntentNotes?.trim()) || Boolean(opp.customerIntentConfirmed),
     },
     {
       key: "comments",

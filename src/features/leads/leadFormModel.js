@@ -62,6 +62,7 @@ export function emptyLeadForm() {
     preferredInstallTimeframe: "",
     preferredInstallLocation: "",
     customerIntentConfirmed: false,
+    customerIntentNotes: "",
     customerComments: "",
     businessOffers: "",
     customerBudget: "",
@@ -153,6 +154,7 @@ export function leadToForm(opp) {
     preferredInstallTimeframe: str(opp.preferredInstallTimeframe),
     preferredInstallLocation: str(opp.preferredInstallLocation),
     customerIntentConfirmed: Boolean(opp.customerIntentConfirmed),
+    customerIntentNotes: str(opp.customerIntentNotes),
     customerComments: str(opp.customerComments),
     businessOffers: str(opp.businessOffers),
     customerBudget: str(opp.customerBudget),
@@ -324,7 +326,9 @@ export function formToPayload(form) {
     siteSpecificRequirements: form.siteRequirementsNone ? "" : trim(form.siteSpecificRequirements),
     preferredInstallTimeframe: form.preferredInstallTimeframe,
     preferredInstallLocation: trim(form.preferredInstallLocation),
-    customerIntentConfirmed: Boolean(form.customerIntentConfirmed),
+    // The flag the API's stage-1 gate reads: set while there are notes (or a tick from before them).
+    customerIntentConfirmed: Boolean(form.customerIntentConfirmed) || !isBlank(form.customerIntentNotes),
+    customerIntentNotes: trim(form.customerIntentNotes),
     customerComments: trim(form.customerComments),
     businessOffers: trim(form.businessOffers),
     customerBudget: numberOrNull(form.customerBudget),
@@ -363,7 +367,7 @@ const CUSTOMER_TAB_FIELDS = new Set([
   "customerPhone", "customerEmail", "unassignedReason",
   // Where they got our details, genuine interest and the contact attempts sit on the Customer details tab too.
   "leadSource", "leadSourceDetails", "referrerId", "customerComments",
-  "customerIntentConfirmed", "needsClientContact", "contactAttempts",
+  "customerIntentConfirmed", "customerIntentNotes", "needsClientContact", "contactAttempts",
 ]);
 const DECISION_TAB_FIELDS = new Set(["estimatorId", "notPotentialReason"]);
 const TAB_ORDER = ["customer", "checklist", "decision"];
@@ -441,8 +445,9 @@ export function validateLeadForm(form, { minDate = "" } = {}) {
       errors.preferredInstallTimeframe = "Confirm the preferred installation timeframe.";
     if (isBlank(form.preferredInstallLocation))
       errors.preferredInstallLocation = "Confirm the preferred battery location.";
-    if (!form.customerIntentConfirmed)
-      errors.customerIntentConfirmed = "Confirm the customer is genuinely interested in proceeding.";
+    // Notes now; a lead ticked before the notes existed stays confirmed.
+    if (!form.customerIntentConfirmed && isBlank(form.customerIntentNotes))
+      errors.customerIntentNotes = "Add notes on the customer's genuine interest in proceeding.";
   }
   return errors;
 }

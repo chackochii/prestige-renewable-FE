@@ -12,7 +12,7 @@ import LoadingState from "@/components/LoadingState";
 import WaitingFor from "@/features/dashboard/WaitingFor";
 import { oppTitle, oppValue } from "@/helpers/opportunity";
 import { waitingForCount, waitingForGroups } from "@/helpers/waitingFor";
-import { enabledStagesFor, stageById } from "@/constants/stages";
+import { boardPathFor, enabledStagesFor, stageById } from "@/constants/stages";
 import { PERMISSIONS } from "@/constants/permissions";
 import { isOverdue, periodStart, slaStatus, timeAgo } from "@/helpers/dateTimeHelpers";
 import { approvalTimers } from "@/helpers/approvals";
@@ -279,7 +279,7 @@ export default function HomePage() {
 
       <div className="grid-2">
         <div>
-          <Card title="Pipeline by Stage" sub="Active records per stage. Open the Jobs Board for the full view.">
+          <Card title="Pipeline by Stage" sub="Active records per stage. Leads to Approvals are on the Lead Board, Procurement onwards on the Jobs Board.">
             <div className="stage-list">
               {data.byStage.map((s, i) => (
                 <button
@@ -287,8 +287,8 @@ export default function HomePage() {
                   type="button"
                   className={`stage-row${s.count ? "" : " stage-empty"}`}
                   style={{ "--i": i }}
-                  title={`${s.label} · open in the pipeline`}
-                  onClick={() => navigate(`/pipeline?stage=${s.id}`)}
+                  title={`${s.label} · open in the ${boardPathFor(s.id) === "/leads" ? "Lead Board" : "Jobs Board"}`}
+                  onClick={() => navigate(`${boardPathFor(s.id)}?stage=${s.id}`)}
                 >
                   <span className="stage-label">{s.short}</span>
                   <span className="stage-track">
