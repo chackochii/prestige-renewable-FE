@@ -151,11 +151,17 @@ export default function AiSkillsPage() {
         title="AI skills"
         description="The instructions the AI follows when it drafts a commercial Solar + BESS proposal, the reference files it reads with them, and the calculator's prices and rules. Changes apply to the next proposal drafted; every save is kept as a version."
         actions={
-          canManage ? (
-            <button type="button" className="btn btn-ghost" onClick={() => setModal("new")}>
-              <Plus size={16} /> Skill
+          <>
+            {/* Marks the AI features as on their way; nothing to click yet. */}
+            <button type="button" className="btn btn-gold" disabled title="AI features are coming soon">
+              <Sparkles size={16} /> Coming soon
             </button>
-          ) : null
+            {canManage ? (
+              <button type="button" className="btn btn-ghost" onClick={() => setModal("new")}>
+                <Plus size={16} /> Skill
+              </button>
+            ) : null}
+          </>
         }
       />
       <AdminNav />

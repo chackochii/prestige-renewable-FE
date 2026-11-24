@@ -434,7 +434,9 @@ export function validateLeadForm(form, { minDate = "" } = {}) {
     if (isBlank(form.billingSameAsSite))
       errors.billingSameAsSite = "Confirm whether the site address is the billing address.";
     if (isBlank(form.customerComments)) errors.customerComments = "Record the initial customer requirements and comments.";
-    if (isBlank(form.propertyStoreys)) errors.propertyStoreys = "Confirm whether the house is single or multi-storey.";
+    if (isBlank(form.propertyStoreys)) errors.propertyStoreys = "Confirm the building type: single storey, multi-storey or other.";
+    else if (form.propertyStoreys === "other" && isBlank(form.buildingTypeDetails))
+      errors.buildingTypeDetails = "Say what type of building it is.";
     if (isBlank(form.roofType)) errors.roofType = "Confirm the roof type.";
     if (isBlank(form.electricalPhase)) errors.electricalPhase = "Confirm the electrical phase.";
     if (isBlank(form.financeAssistance))

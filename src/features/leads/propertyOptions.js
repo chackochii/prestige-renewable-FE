@@ -27,6 +27,8 @@ export const serviceRequirementKeys = (value) =>
 export const STOREY_OPTIONS = [
   { key: "single", label: "Single storey" },
   { key: "double", label: "Multi-Storey" },
+  // Typed in words (estimationInput.buildingTypeDetails) — required when picked.
+  { key: "other", label: "Other" },
 ];
 
 export const ROOF_TYPES = [
@@ -75,6 +77,11 @@ export const serviceRequirementText = (value, other) =>
     .map((key) => (key === "other" ? String(other ?? "").trim() || "Other" : serviceRequirementLabel(key)))
     .join(", ");
 export const storeyLabel = (key) => label(STOREY_OPTIONS, key);
+/**
+ * What a lead's building type reads as: "Other" shows the type typed for it
+ * (estimationInput.buildingTypeDetails).
+ */
+export const storeyText = (key, details) => (key === "other" ? String(details ?? "").trim() || "Other" : storeyLabel(key));
 export const roofTypeLabel = (key) => label(ROOF_TYPES, key);
 export const electricalPhaseLabel = (key) => label(ELECTRICAL_PHASES, key);
 export const installTimeframeLabel = (key) => label([...INSTALL_TIMEFRAMES, ...LEGACY_INSTALL_TIMEFRAMES], key);

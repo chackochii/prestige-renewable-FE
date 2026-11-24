@@ -296,7 +296,9 @@ export default function LeadForm({
       : !isBlank(form.billingSameAsSite);
   const doneEmail = !isBlank(form.customerEmail);
   const donePhone = !isBlank(form.customerPhone);
-  const doneStoreys = !isBlank(form.propertyStoreys);
+  // "Other" counts once the building type is typed in.
+  const otherBuilding = form.propertyStoreys === "other";
+  const doneStoreys = !isBlank(form.propertyStoreys) && (!otherBuilding || !isBlank(form.buildingTypeDetails));
   const doneRoof = !isBlank(form.roofType);
   const donePhase = !isBlank(form.electricalPhase);
   const doneBills = form.energyHasBills || billFiles.length > 0;
@@ -872,7 +874,14 @@ export default function LeadForm({
                   error={err("propertyStoreys")}
                   onChange={(v) => set("propertyStoreys", v)}
                 />
-                {business ? (
+                {/* The same field either way: required for Other, optional detail on a business lead. */}
+                {otherBuilding ? (
+                  <div style={{ marginTop: 10 }}>
+                    <Field label="Building type" required error={err("buildingTypeDetails")}>
+                      {input("buildingTypeDetails", { placeholder: "e.g. Granny flat, Shed, Warehouse", maxLength: 120 })}
+                    </Field>
+                  </div>
+                ) : business ? (
                   <div style={{ marginTop: 10 }}>
                     <Field label="Building Details" hint="optional">
                       {input("buildingTypeDetails", { placeholder: "e.g. Warehouse, Shopping Complex" })}

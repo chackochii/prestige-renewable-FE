@@ -16,7 +16,7 @@ import {
   VPP_OPTIONS,
   estimationInputFromOpp,
 } from "@/constants/estimationInput";
-import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementText, storeyLabel } from "@/features/leads/propertyOptions";
+import { electricalPhaseLabel, installTimeframeLabel, roofTypeLabel, serviceRequirementText, storeyText } from "@/features/leads/propertyOptions";
 import { leadSourceLabel } from "@/features/leads/leadSourceOptions";
 import { joinAddress } from "@/utils/text";
 
@@ -68,7 +68,13 @@ export function leadMandatoryItems(opp, { billCount = 0 } = {}) {
       value: opp.billingSameAsSite === "yes" ? "Same as site" : opp.customerBillingAddress,
       done: filled(opp.billingSameAsSite),
     },
-    { key: "storeys", label: "Building type", value: storeyLabel(opp.propertyStoreys), done: filled(opp.propertyStoreys) },
+    {
+      key: "storeys",
+      label: "Building type",
+      value: storeyText(opp.propertyStoreys, estimationInputFromOpp(opp).buildingTypeDetails),
+      // "Other" needs the building type typed in, as the API's checklist does.
+      done: filled(opp.propertyStoreys) && (opp.propertyStoreys !== "other" || filled(estimationInputFromOpp(opp).buildingTypeDetails)),
+    },
     { key: "roof", label: "Roof type", value: roofTypeLabel(opp.roofType), done: filled(opp.roofType) },
     {
       key: "phase",

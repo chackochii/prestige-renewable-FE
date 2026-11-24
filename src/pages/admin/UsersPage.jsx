@@ -58,6 +58,8 @@ export default function UsersPage() {
   const canCreate = hasPermission(PERMISSIONS.ADMIN_CREATE);
   const canUpdate = hasPermission(PERMISSIONS.ADMIN_UPDATE);
   const canDelete = hasPermission(PERMISSIONS.ADMIN_DELETE);
+  // Every row keeps an actions column while the viewer may edit or delete anyone.
+  const showActions = canUpdate || canDelete;
   const adminCount = items.filter((u) => u.roles?.includes(SUPER_ROLE_CODE) && u.status === "active").length;
 
   const save = async (payload, password) => {
@@ -130,8 +132,8 @@ export default function UsersPage() {
             const isAdminAccount = u.roles?.includes(SUPER_ROLE_CODE);
             const manageable = isSuperAdmin || !isAdminAccount;
             return (
-              <div key={u.id} className="list-row" style={{ flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <div key={u.id} className={`list-row user-row${showActions ? "" : " no-actions"}`}>
+                <div style={{ minWidth: 0 }}>
                   <div className="row-title">
                     {u.name}
                     {isMe ? " · you" : ""}
@@ -141,7 +143,7 @@ export default function UsersPage() {
                     {u.businessUnits?.length ? ` · ${u.businessUnits.map((b) => b.code).join(", ")}` : ""}
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <div className="user-row-badges">
                   {u.status !== "active" ? <Badge tone="danger">Disabled</Badge> : null}
                   {u.passwordIsTemporary ? (
                     <span title="Signs in with the temporary password you set, then chooses their own">
@@ -153,23 +155,28 @@ export default function UsersPage() {
                       {roleName(code, roles)}
                     </Badge>
                   ))}
-                  {canUpdate && manageable ? (
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(u)}>
-                      Edit
-                    </button>
-                  ) : null}
-                  {canDelete && manageable ? (
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      disabled={isMe || lastAdmin}
-                      title={isMe ? "You cannot delete your own account" : lastAdmin ? "Keep at least one administrator" : "Delete user"}
-                      onClick={() => setDeleting(u)}
-                    >
-                      Delete
-                    </button>
-                  ) : null}
                 </div>
+                {/* Kept (empty) on a row this person cannot manage, so the column stays put. */}
+                {showActions ? (
+                  <div className="user-row-actions">
+                    {canUpdate && manageable ? (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(u)}>
+                        Edit
+                      </button>
+                    ) : null}
+                    {canDelete && manageable ? (
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        disabled={isMe || lastAdmin}
+                        title={isMe ? "You cannot delete your own account" : lastAdmin ? "Keep at least one administrator" : "Delete user"}
+                        onClick={() => setDeleting(u)}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             );
           })

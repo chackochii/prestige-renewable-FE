@@ -306,6 +306,16 @@
   .form-grid > * { min-width: 0; }
   .form-grid .span-2 { grid-column: span 2; }
   .form-grid.auto { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  /* Unit settings → Notification priority: one row per notice, its name on the
+     left and the dropdown in a column of its own, so every dropdown lines up
+     however long the name is. Two columns of rows on a wide screen. */
+  .priority-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); column-gap: 32px; }
+  .field.priority-field {
+    display: grid; grid-template-columns: minmax(0, 1fr) calc(150px * var(--text-scale)); align-items: center; gap: 6px 16px;
+    padding: 10px 0; border-bottom: 1px solid var(--line);
+  }
+  .field.priority-field > select { width: 100%; }
+  .field.priority-field > .field-error { grid-column: 1 / -1; }
   /* Repeating editable rows (billing split, tiers, key/label lists). Column
      widths come from a variable so the mobile rule below can override them. */
   .row-grid { display: grid; grid-template-columns: var(--row-cols, 140px 1fr auto); gap: 12px 16px; align-items: end; margin-bottom: 8px; }
@@ -488,6 +498,16 @@
   button.list-row { width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; font: inherit; color: inherit; }
   button.list-row:last-child { border-bottom: 0; }
   button.list-row:hover { background: var(--surface-2); padding-left: 14px; }
+  /* Control Centre → Users: person | badges | actions. The badges wrap inside
+     their own column and the actions column is one width on every row, so
+     Edit and Delete line up however many roles a person holds. */
+  .list-row.user-row {
+    display: grid; align-items: center; gap: 8px 16px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(max-content, calc(132px * var(--text-scale)));
+  }
+  .list-row.user-row.no-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+  .user-row-badges { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .user-row-actions { display: flex; gap: 8px; justify-content: flex-end; white-space: nowrap; }
   /* Inbox rows: unread carries a marker and slightly stronger text. */
   .notice.unread .row-title { font-weight: 700; }
   .notice-dot {
@@ -1159,6 +1179,12 @@
     .row-grid + .row-grid { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
     .row-grid + .row-grid .field > label { display: block; }
     .list-row { flex-wrap: wrap; }
+    /* Phone: each notice's name above its dropdown. */
+    .field.priority-field { grid-template-columns: minmax(0, 1fr); }
+    /* Phone: the person and the actions on top, the badges full width below. */
+    .list-row.user-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .list-row.user-row.no-actions { grid-template-columns: minmax(0, 1fr); }
+    .user-row-badges { grid-column: 1 / -1; grid-row: 2; }
     .card-head > div + div { width: 100%; }
     .file-grid { grid-template-columns: 1fr; }
     .file-card { grid-template-columns: 56px minmax(0, 1fr) auto; }

@@ -362,10 +362,17 @@ export default function UnitSettingsPage() {
             {events.length === 0 ? (
               <p className="lede">Loading the notification list…</p>
             ) : (
-              <div className="form-grid auto">
+              <div className="priority-list">
                 {events.map((event) => (
-                  <Field key={event.key} label={event.label} hint={`default ${priorityMeta(event.defaultPriority).label.toLowerCase()}`}>
+                  <Field
+                    key={event.key}
+                    className="priority-field"
+                    htmlFor={`priority-${event.key}`}
+                    label={event.label}
+                    hint={`default ${priorityMeta(event.defaultPriority).label.toLowerCase()}`}
+                  >
                     <select
+                      id={`priority-${event.key}`}
                       value={form.notificationPriorities[event.key] || ""}
                       disabled={!canEdit}
                       onChange={(e) => {
