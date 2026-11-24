@@ -22,7 +22,7 @@
 // once it has. Generating waits until the draft is saved.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, FileText, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Trash2, Undo2 } from "lucide-react";
+import { BadgePercent, Download, Eye, FileCheck, FilePlus, FileSpreadsheet, FileText, HandCoins, History, Lock, Pencil, Plus, Receipt, Save, Sparkles, Trash2, Undo2, Zap } from "lucide-react";
 import Alert from "@/components/Alert";
 import Badge from "@/components/Badge";
 import Field from "@/components/Field";
@@ -59,7 +59,11 @@ import {
   updateQuoteItem,
 } from "@/slices/leadsSlice";
 import { useNotifications } from "@/hooks/useNotifications";
+import AiQuoteModal from "./AiQuoteModal";
 import EnergyProposalsPanel from "@/features/energyProposal/EnergyProposalsPanel";
+
+/** The AI-assisted quote (Build with AI, Quote from bill) is hidden for now - set true to show its buttons again. */
+const SHOW_AI_QUOTE = false;
 
 const emptyItemForm = () => ({ itemKey: "", brand: "", quantity: 1, unit: "", unitPrice: "", discountPct: 0 });
 
@@ -260,6 +264,7 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
   const [startingDraft, setStartingDraft] = useState(false);
   const [preview, setPreview] = useState(null); // null closed, { version } open
   const [history, setHistory] = useState(false); // the earlier versions, in a modal
+  const [aiQuote, setAiQuote] = useState(null); // the AI-assisted quote dialog: null closed, { source: "job" | "bill" } open
   const [energyProposals, setEnergyProposals] = useState(false); // the commercial Solar + BESS proposal PDFs, in a dialog
   const versions = useAppSelector((s) => s.leads.versions);
   const versionsStatus = useAppSelector((s) => s.leads.versionsStatus);
@@ -713,6 +718,11 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
     }
   };
 
+  /** A new quote sized from an electricity bill: the draft first, then the bill dialog. */
+  const handleNewQuoteFromBill = async () => {
+    if (await handleNewQuote()) setAiQuote({ source: "bill" });
+  };
+
   const generatedVersion = quote.generatedVersion ?? latest;
 
   return (
@@ -735,6 +745,19 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
             </span>
             {canEdit ? (
               <span className="quote-state-actions">
+                {SHOW_AI_QUOTE ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={handleNewQuoteFromBill}
+                      disabled={startingDraft || catalogStatus !== "succeeded"}
+                      title="Start a new quote and size it from the customer's electricity bill"
+                    >
+                      <Zap size={14} /> New quote from a bill
+                    </button>
+                  </>
+                ) : null}
                 <button type="button" className="btn btn-primary btn-sm" onClick={handleNewQuote} disabled={startingDraft}>
                   <FilePlus size={14} /> {startingDraft ? "Starting…" : "Create new quote"}
                 </button>
@@ -817,6 +840,30 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setModal({ item: null })}>
             <Plus size={14} /> Add Item
           </button>
+          {SHOW_AI_QUOTE ? (
+            <>
+              {/* Proposes the lines from the job details and the catalog; reviewed before anything is added. */}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setAiQuote({ source: "job" })}
+                disabled={dirty || catalogStatus !== "succeeded"}
+                title={dirty ? "Save the draft first" : "Let AI propose the quote's lines from the job details - you review them first"}
+              >
+                <Sparkles size={14} /> Build with AI
+              </button>
+              {/* Reads the customer's electricity bill, sizes the system from it, then proposes the lines. */}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setAiQuote({ source: "bill" })}
+                disabled={dirty || catalogStatus !== "succeeded"}
+                title={dirty ? "Save the draft first" : "Upload or choose the customer's electricity bill - AI sizes the system from it and proposes the quote"}
+              >
+                <Zap size={14} /> Quote from bill
+              </button>
+            </>
+          ) : null}
           {/* The commercial proposal PDF (Prestige template): AI reads the bills to the admin's skill, the calculator works out the figures. */}
           <button
             type="button"
@@ -1174,6 +1221,22 @@ export default function QuoteBuilder({ opp, unit, canEdit }) {
         <Modal title="Solar + BESS proposals" className="document" confirmClose={false} onClose={() => setEnergyProposals(false)}>
           <EnergyProposalsPanel opp={opp} canEdit={canEdit} />
         </Modal>
+      ) : null}
+
+      {aiQuote ? (
+        <AiQuoteModal
+          opp={opp}
+          quote={quote}
+          startWith={aiQuote.source}
+          onClose={() => setAiQuote(null)}
+          onApplied={({ items: added, costs: addedCosts, fromBill }) => {
+            setAiQuote(null);
+            setSavedAt(new Date());
+            notify(
+              `${fromBill ? "Quote from the bill" : "AI quote"} added to the draft - ${added} item${added === 1 ? "" : "s"}${addedCosts ? ` and ${addedCosts} cost line${addedCosts === 1 ? "" : "s"}` : ""}. Review it, then generate.`,
+            );
+          }}
+        />
       ) : null}
 
       {modal ? (

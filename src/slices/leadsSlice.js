@@ -505,6 +505,35 @@ export const startQuoteDraft = createAsyncThunk("leads/quote/draft", async (id, 
   }
 });
 
+// ---- AI-assisted quote ---------------------------------------------------
+
+/** Asks for a proposed quote. Nothing is saved or stored — the review dialog holds the answer. */
+export const suggestAiQuote = createAsyncThunk("leads/quote/ai/suggest", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.suggestAiQuote(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/** Has the AI read an electricity bill on the job. Nothing is stored — the dialog holds the reading. */
+export const readAiBill = createAsyncThunk("leads/quote/ai/bill", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.readAiBill(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
+/** Puts the reviewed lines into the draft; the whole quote comes back. */
+export const applyAiQuote = createAsyncThunk("leads/quote/ai/apply", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await api.applyAiQuote(id, body);
+  } catch (err) {
+    return reject(err, rejectWithValue);
+  }
+});
+
 /**
  * A record changed (or created): refresh it where it is shown. In the list
  * held it is updated in place — or taken out, when the change moved it out of
@@ -751,6 +780,9 @@ const leadsSlice = createSlice({
         if (!state.versions.some((v) => v.id === version.id)) state.versions.unshift(version);
       })
       .addCase(startQuoteDraft.fulfilled, (state, action) => {
+        if (action.payload && forOpen(state, action)) state.quote = action.payload;
+      })
+      .addCase(applyAiQuote.fulfilled, (state, action) => {
         if (action.payload && forOpen(state, action)) state.quote = action.payload;
       })
       .addCase(logout, () => initialState);
